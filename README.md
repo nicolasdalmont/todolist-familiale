@@ -1,112 +1,72 @@
-# To-Do List Familiale — Prototype
+# To-Do List Familiale
 
-Prototype cliquable de l'application décrite dans le cahier des charges
-(v2.0), construit en HTML/CSS/JavaScript **sans framework ni dépendance
-externe** afin de pouvoir tourner immédiatement, sans étape de build.
+Application web responsive de gestion de tâches partagées en famille —
+Next.js (App Router) + Supabase (base de données, authentification, RLS) +
+Vercel (hébergement).
 
-## Pourquoi pas directement Next.js / Supabase ici ?
+Ce dépôt a été écrit et poussé directement par Claude depuis une session
+cloud (pas de clone local dans le flux de travail retenu pour ce projet) —
+voir le guide de mise en route (GitHub / Supabase / Vercel) partagé en
+artifact dans la conversation pour le détail des étapes.
 
-L'environnement cloud de cette session n'a pas accès au registre npm
-(politique réseau de l'organisation), donc impossible d'installer Next.js,
-React, etc. ici. Ce prototype vanilla JS sert donc de **maquette
-fonctionnelle** : il permet de valider les parcours et l'ergonomie tout de
-suite, et sert de référence pour l'implémentation finale en
-Next.js + Supabase + déploiement Vercel/GitHub (comme pour Calyxter Set
-Manager), qui pourra se faire sur ta machine ou dans un environnement ayant
-accès à npm.
+## Pile technique
 
-## Lancer le prototype
+- **Next.js 14** (App Router, TypeScript, Tailwind CSS)
+- **Supabase** : Postgres + Auth (email/mot de passe) + Row Level Security
+- **Vercel** : build et hébergement, déploiement continu sur chaque push
 
-Un service worker est enregistré pour l'installabilité PWA : cela ne
-fonctionne pas en ouvrant le fichier directement (`file://`), il faut un
-petit serveur local. Depuis ce dossier :
+## Variables d'environnement
+
+À définir dans Vercel (Project Settings → Environment Variables), voir
+`.env.example` :
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+Ces deux valeurs viennent de Supabase → Project Settings → API. La clé
+`anon` est publique par conception (RLS protège les données, pas la clé) —
+ne jamais utiliser la clé `service_role` ici.
+
+## Schéma de base de données
+
+Voir `supabase/schema.sql` — tables `profiles`, `tasks`, `task_assignees`
+(assignation multiple), `comments`, avec les policies RLS garantissant
+qu'une tâche privée reste invisible aux autres utilisateurs.
+
+## Fonctionnement
+
+- L'administrateur crée les comptes depuis Supabase (Authentication →
+  Users → Invite) ; chaque utilisateur définit ensuite son mot de passe.
+- Toute nouvelle tâche est assignée automatiquement à son créateur.
+- Une tâche récurrente clôturée ("Terminée") régénère automatiquement la
+  prochaine occurrence avec les mêmes assignations.
+- Visibilité partagée (visible par tous) ou privée (visible uniquement par
+  le créateur), appliquée au niveau base de données via RLS — pas
+  seulement dans l'interface.
+
+## Ce qui n'est pas encore implémenté
+
+Conformément au phasage du cahier des charges, restent à construire :
+
+- Offline-first réel (file d'attente IndexedDB + réconciliation à la
+  reconnexion) — le service worker actuel ne fait que mettre en cache
+  l'app shell.
+- Notifications Web Push et App Badge (nécessitent des clés VAPID et une
+  fonction serveur d'envoi).
+- Interface d'administration pour la création de comptes (actuellement
+  faite depuis le tableau de bord Supabase).
+
+## Développement local (optionnel)
+
+Le flux de travail retenu pour ce projet ne repose pas sur une copie
+locale — Claude committe et pousse directement depuis sa session cloud.
+Si tu veux malgré tout lancer le projet en local (ex : sur une machine
+ayant accès à npm) :
 
 ```bash
-python3 -m http.server 8000
-# puis ouvrir http://localhost:8000
+npm install
+cp .env.example .env.local   # puis renseigner les deux valeurs Supabase
+npm run dev
 ```
-
-ou avec Node (si `npx serve` est disponible sur ta machine) :
-
-```bash
-npx serve .
-```
-
-Une fois ouvert dans Chrome/Edge, l'icône d'installation (⊕ dans la barre
-d'adresse) permet d'installer l'app sur le bureau ou l'écran d'accueil.
-
-## Ce qui est implémenté dans ce prototype
-
-- Sélection de profil (mock d'authentification — 4 utilisateurs pré-remplis,
-  dont un administrateur).
-- Tableau de bord des tâches avec filtres (Toutes / Mes tâches / Partagées /
-  Privées / Terminées / Archivées).
-- Création / édition de tâche : titre, description, échéance, récurrence
-  (quotidienne, hebdomadaire, mensuelle, personnalisée), assignation
-  multiple, visibilité partagée/privée.
-- Assignation automatique de toute nouvelle tâche à son créateur.
-- Cycle de statut (À faire / En cours / Terminée / Archivée) avec
-  régénération automatique d'une tâche récurrente à sa clôture.
-- Fil de commentaires horodatés par tâche.
-- Design mobile-first, responsive.
-- Manifest + service worker basique : app installable, cache de l'app shell.
-
-## Ce qui n'est volontairement pas fait ici (prototype uniquement)
-
-Ces points sont prévus dans le cahier des charges mais nécessitent une vraie
-API/BDD et seront à construire lors de l'implémentation finale (Phases 2 à
-4) :
-
-- Authentification réelle (hachage de mot de passe, session
-  chiffrée/JWT) — remplacée ici par une simple sélection de profil.
-- Persistance partagée entre utilisateurs : les données sont stockées en
-  `localStorage`, donc **locales à ce navigateur** (pas de synchronisation
-  réelle entre appareils — ce sera le rôle de Supabase).
-- Synchronisation offline avancée (file d'attente IndexedDB + réconciliation
-  au retour du réseau) : le prototype fonctionne hors-ligne car tout est
-  déjà local, mais le vrai moteur de sync reste à construire avec le
-  backend.
-- Notifications Web Push et App Badge (nécessitent un backend et des clés
-  VAPID).
-- Interface d'administration complète (création de comptes par
-  l'administrateur) — un stub minimal seulement.
-
-## Structure du projet
-
-```
-todolist-familiale/
-├── index.html
-├── manifest.json
-├── sw.js                     # service worker (cache app shell)
-├── css/styles.css
-├── icons/                    # icônes PWA générées (192/512)
-├── js/
-│   ├── app.js                 # routeur (hash-based) + bootstrap
-│   ├── store.js                # "faux backend" localStorage, calqué sur
-│   │                            # le futur schéma Supabase
-│   ├── helpers.js
-│   └── views/
-│       ├── login.js
-│       ├── dashboard.js
-│       ├── task-form.js
-│       └── task-detail.js
-└── scripts/                   # scripts utilitaires (icônes, captures d'écran)
-```
-
-Le schéma de données dans `js/store.js` est volontairement pensé pour
-correspondre à ce que seront les tables Postgres/Supabase :
-`users`, `tasks`, `task_assignees` (relation d'assignation multiple),
-`comments`. Cela doit faciliter la reprise en Next.js + Supabase.
-
-## Prochaines étapes suggérées
-
-1. Valider ce prototype (parcours, ergonomie, champs) avant de coder le
-   "vrai" backend.
-2. Créer le projet Supabase (base Postgres + Auth + Row Level Security pour
-   la visibilité privée/partagée) et le repo GitHub, connecté à Vercel
-   (comme pour Calyxter Set Manager).
-3. Réimplémenter l'interface en Next.js (App Router) en réutilisant ce
-   prototype comme référence UX, en branchant Supabase Auth et la base de
-   données à la place du `store.js` local.
-4. Ajouter Service Worker avancé + IndexedDB pour l'offline-first réel, puis
-   Web Push / App Badge.

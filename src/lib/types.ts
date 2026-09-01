@@ -2,6 +2,9 @@ export type Role = "admin" | "user";
 export type TaskStatus = "todo" | "in_progress" | "done" | "archived";
 export type Visibility = "shared" | "private";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom";
+// Ordre volontairement alphabétique (reflète l'ordre d'affichage demandé) ;
+// voir src/lib/categories.ts pour les libellés et icônes associés.
+export type Category = "achats" | "autre" | "cadeaux" | "enfants" | "famille" | "maison" | "vacances";
 
 export interface Recurrence {
   type: RecurrenceType;
@@ -24,6 +27,11 @@ export interface Profile {
   created_at: string;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 export interface Comment {
   id: string;
   task_id: string;
@@ -41,7 +49,9 @@ export interface Task {
   recurrence: Recurrence;
   status: TaskStatus;
   visibility: Visibility;
+  category: Category;
   created_by: string;
   created_at: string;
   assignees?: Profile[];
+  tags?: Tag[];
 }

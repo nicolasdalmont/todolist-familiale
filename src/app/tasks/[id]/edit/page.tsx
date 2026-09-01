@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfiles, getTask } from "@/lib/queries";
+import { getProfiles, getTags, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 import { IconArrowLeft } from "@/components/Icons";
@@ -17,7 +17,7 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
   const task = await getTask(supabase, params.id);
   if (!task) notFound();
 
-  const profiles = await getProfiles(supabase);
+  const [profiles, allTags] = await Promise.all([getProfiles(supabase), getTags(supabase)]);
 
   return (
     <div className="min-h-screen bg-paper">
@@ -32,7 +32,7 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
           </Link>
           <h2 className="text-lg font-extrabold">Modifier la tâche</h2>
         </div>
-        <TaskForm mode="edit" profiles={profiles} currentUserId={profile.id} task={task} />
+        <TaskForm mode="edit" profiles={profiles} allTags={allTags} currentUserId={profile.id} task={task} />
       </main>
     </div>
   );

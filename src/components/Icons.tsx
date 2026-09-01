@@ -118,3 +118,108 @@ export function IconChat({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// --- Icônes de catégorie -------------------------------------------------
+
+export function IconHome({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M4 11.5 12 4l8 7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 10v9a1 1 0 0 0 1 1h3v-5h4v5h3a1 1 0 0 0 1-1v-9" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IconBaby({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <rect x="10" y="2.3" width="4" height="2.6" rx="0.9" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="9" y="5.2" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M8 8.7h8l.6 2.3c.27 1.05.4 2.13.4 3.2V17a3 3 0 0 1-3 3h-4a3 3 0 0 1-3-3v-2.8c0-1.07.13-2.15.4-3.2L8 8.7Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M8.6 14h6.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconShoppingBag({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M6 8h12l-1 12.5a1.5 1.5 0 0 1-1.5 1.4h-7a1.5 1.5 0 0 1-1.5-1.4L6 8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M9 8V6.5a3 3 0 0 1 6 0V8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconGift({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <rect x="4" y="9.5" width="16" height="4" rx="1" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="5.5" y="13.5" width="13" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 9.5v11" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M9.5 9.5c-1.5-.2-2.5-1.3-2.3-2.6.2-1.2 1.6-1.8 2.7-1a4 4 0 0 1 1.9 2.7M14.5 9.5c1.5-.2 2.5-1.3 2.3-2.6-.2-1.2-1.6-1.8-2.7-1a4 4 0 0 0-1.9 2.7"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function IconSun({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 3v2.2M12 18.8V21M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M3 12h2.2M18.8 12H21M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function IconDots({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <circle cx="6" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="18" cy="12" r="1.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconTag({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M11.5 4H6a1.5 1.5 0 0 0-1.5 1.5v5.5c0 .4.16.78.44 1.06l8 8a1.5 1.5 0 0 0 2.12 0l5.44-5.44a1.5 1.5 0 0 0 0-2.12l-8-8A1.5 1.5 0 0 0 11.5 4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <circle cx="8.3" cy="8.3" r="1.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function IconSearch({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M19 19l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}

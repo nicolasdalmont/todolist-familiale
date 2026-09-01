@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getUserWithPasswordHash } from "@/lib/queries";
+import { getUserWithPasswordHash, upsertTagIds } from "@/lib/queries";
 import {
   clearSessionCookie,
   getSessionUserId,
@@ -12,7 +12,18 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { computeNextOccurrence } from "@/lib/format";
+import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
 import type { Recurrence } from "@/lib/types";
+
+async function syncTaskTags(supabase: ReturnType<typeof createAdminClient>, taskId: string, tagNames: string[]) {
+  const tagIds = await upsertTagIds(supabase, tagNames);
+  await supabase.from("task_tags").delete().eq("task_id", taskId);
+  if (tagIds.length) {
+    const rows = tagIds.map((tagId) => ({ task_id: taskId, tag_id: tagId }));
+    const { error } = await supabase.from("task_tags").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+}
 
 function parseRecurrence(formData: FormData): Recurrence {
   const type = String(formData.get("recurrenceType") || "none") as Recurrence["type"];
@@ -100,6 +111,9 @@ export async function createTaskAction(formData: FormData) {
   const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
   const visibility = String(formData.get("visibility") || "shared");
   const recurrence = parseRecurrence(formData);
+  const categoryRaw = String(formData.get("category") || "");
+  const category = isCategory(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
+  const tagNames = formData.getAll("tags").map(String);
 
   const assigneeIds = new Set(formData.getAll("assignees").map(String));
   assigneeIds.add(userId);
@@ -112,6 +126,7 @@ export async function createTaskAction(formData: FormData) {
       due_at: dueAt,
       visibility,
       recurrence,
+      category,
       created_by: userId,
     })
     .select()
@@ -124,6 +139,8 @@ export async function createTaskAction(formData: FormData) {
   const rows = Array.from(assigneeIds).map((id) => ({ task_id: task.id, user_id: id }));
   const { error: assignError } = await supabase.from("task_assignees").insert(rows);
   if (assignError) throw new Error(assignError.message);
+
+  await syncTaskTags(supabase, task.id, tagNames);
 
   revalidatePath("/");
   redirect(`/tasks/${task.id}`);
@@ -146,11 +163,14 @@ export async function updateTaskAction(formData: FormData) {
   const visibility = String(formData.get("visibility") || "shared");
   const status = String(formData.get("status") || "todo");
   const recurrence = parseRecurrence(formData);
+  const categoryRaw = String(formData.get("category") || "");
+  const category = isCategory(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
+  const tagNames = formData.getAll("tags").map(String);
   const assigneeIds = Array.from(new Set(formData.getAll("assignees").map(String)));
 
   const { error } = await supabase
     .from("tasks")
-    .update({ title, description, due_at: dueAt, visibility, status, recurrence })
+    .update({ title, description, due_at: dueAt, visibility, status, recurrence, category })
     .eq("id", taskId);
   if (error) throw new Error(error.message);
 
@@ -160,6 +180,8 @@ export async function updateTaskAction(formData: FormData) {
     const { error: assignError } = await supabase.from("task_assignees").insert(rows);
     if (assignError) throw new Error(assignError.message);
   }
+
+  await syncTaskTags(supabase, taskId, tagNames);
 
   revalidatePath("/");
   revalidatePath(`/tasks/${taskId}`);
@@ -204,6 +226,7 @@ export async function setStatusAction(taskId: string, status: string) {
           due_at: next,
           recurrence: task.recurrence,
           visibility: task.visibility,
+          category: task.category,
           created_by: task.created_by,
           status: "todo",
         })
@@ -211,14 +234,19 @@ export async function setStatusAction(taskId: string, status: string) {
         .single();
 
       if (newTask) {
-        const { data: assignees } = await supabase
-          .from("task_assignees")
-          .select("user_id")
-          .eq("task_id", taskId);
+        const [{ data: assignees }, { data: taskTags }] = await Promise.all([
+          supabase.from("task_assignees").select("user_id").eq("task_id", taskId),
+          supabase.from("task_tags").select("tag_id").eq("task_id", taskId),
+        ]);
         if (assignees?.length) {
           await supabase
             .from("task_assignees")
             .insert(assignees.map((a) => ({ task_id: newTask.id, user_id: a.user_id })));
+        }
+        if (taskTags?.length) {
+          await supabase
+            .from("task_tags")
+            .insert(taskTags.map((t) => ({ task_id: newTask.id, tag_id: t.tag_id })));
         }
       }
     }

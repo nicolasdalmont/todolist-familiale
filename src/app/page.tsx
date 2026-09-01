@@ -2,10 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTasks } from "@/lib/queries";
+import { getTags, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { FilterTabs } from "@/components/FilterTabs";
-import { TaskCard } from "@/components/TaskCard";
+import { TaskFilterList } from "@/components/TaskFilterList";
 import { IconPlus } from "@/components/Icons";
 import type { Task } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export default async function DashboardPage({
   // Il n'y a plus de RLS par utilisateur (voir supabase/schema.sql) : le
   // filtrage "partagé / privé" est appliqué ici, côté application.
   const supabase = createAdminClient();
-  const tasks = await getTasks(supabase);
+  const [tasks, allTags] = await Promise.all([getTasks(supabase), getTags(supabase)]);
   const filter = searchParams.filter ?? "all";
   const filtered = applyFilter(tasks, filter, profile.id);
 
@@ -52,17 +52,7 @@ export default async function DashboardPage({
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
         <FilterTabs active={filter} />
-        <div className="flex flex-col gap-2.5">
-          {filtered.length === 0 ? (
-            <div className="py-16 text-center text-sm text-ink-muted">
-              Aucune tâche ici pour le moment.
-              <br />
-              Appuie sur + pour en créer une.
-            </div>
-          ) : (
-            filtered.map((task) => <TaskCard key={task.id} task={task} />)
-          )}
-        </div>
+        <TaskFilterList tasks={filtered} allTags={allTags} />
       </main>
       <Link
         href="/tasks/new"

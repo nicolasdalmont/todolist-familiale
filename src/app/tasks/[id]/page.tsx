@@ -8,8 +8,9 @@ import { Avatar } from "@/components/Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "@/components/Badge";
 import { StatusButtons } from "@/components/StatusButtons";
 import { CommentThread } from "@/components/CommentThread";
-import { IconArrowLeft, IconCalendar, IconPencil, IconRepeat, IconUser, IconUsers } from "@/components/Icons";
+import { IconArrowLeft, IconCalendar, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { formatDate, isOverdue, recurrenceLabel } from "@/lib/format";
+import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   ]);
 
   const overdue = isOverdue(task.due_at, task.status);
+  const CategoryIcon = CATEGORY_ICONS[task.category];
 
   return (
     <div className="min-h-screen bg-paper">
@@ -58,6 +60,9 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
           ) : null}
 
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
+            <CategoryIcon className="h-4 w-4" /> Catégorie : <strong className="ml-1 text-ink">{CATEGORY_LABELS[task.category]}</strong>
+          </div>
+          <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
             <IconCalendar className="h-4 w-4" /> Échéance : <strong className="ml-1 text-ink">{formatDate(task.due_at)}</strong>
           </div>
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
@@ -75,6 +80,16 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
             </span>
             <span>{(task.assignees ?? []).map((a) => a.name).join(", ")}</span>
           </div>
+          {task.tags && task.tags.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
+              <IconTag className="h-4 w-4" /> Tags :
+              {task.tags.map((tag) => (
+                <span key={tag.id} className="rounded-full bg-sand px-2 py-0.5 text-[12px] font-medium text-ink">
+                  #{tag.name}
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           <StatusButtons taskId={task.id} current={task.status} />
         </div>

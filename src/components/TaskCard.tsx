@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { Task } from "@/lib/types";
 import { formatDate, isOverdue } from "@/lib/format";
+import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
 import { Avatar } from "./Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "./Badge";
 import { IconCalendar, IconRepeat } from "./Icons";
 
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task.due_at, task.status);
+  const CategoryIcon = CATEGORY_ICONS[task.category];
 
   return (
     <Link
@@ -20,6 +22,9 @@ export function TaskCard({ task }: { task: Task }) {
         <StatusBadge status={task.status} />
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-muted">
+        <span className="flex items-center gap-1 rounded-full bg-sand px-2 py-0.5 font-semibold text-ink">
+          <CategoryIcon className="h-3.5 w-3.5" /> {CATEGORY_LABELS[task.category]}
+        </span>
         {overdue ? (
           <OverdueBadge />
         ) : (
@@ -30,6 +35,15 @@ export function TaskCard({ task }: { task: Task }) {
         <VisibilityBadge visibility={task.visibility} />
         {task.recurrence && task.recurrence.type !== "none" && <IconRepeat className="h-3.5 w-3.5" />}
       </div>
+      {task.tags && task.tags.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {task.tags.map((tag) => (
+            <span key={tag.id} className="rounded-full bg-paper px-2 py-0.5 text-[11.5px] font-medium text-ink-muted">
+              #{tag.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="flex -space-x-2">
         {(task.assignees ?? []).map((a) => (
           <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />

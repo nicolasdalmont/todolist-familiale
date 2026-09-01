@@ -6,7 +6,14 @@ import { getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { FilterTabs } from "@/components/FilterTabs";
 import { TaskCard } from "@/components/TaskCard";
+import { IconPlus } from "@/components/Icons";
 import type { Task } from "@/lib/types";
+
+// Ceinture-bretelles en plus du "cache: no-store" déjà forcé dans le client
+// Supabase admin (voir src/lib/supabase/admin.ts) : garantit qu'aucune
+// couche de cache Next.js ne serve un instantané périmé de la liste des
+// tâches sur cette page.
+export const dynamic = "force-dynamic";
 
 function applyFilter(tasks: Task[], filter: string, userId: string): Task[] {
   switch (filter) {
@@ -41,7 +48,7 @@ export default async function DashboardPage({
   const filtered = applyFilter(tasks, filter, profile.id);
 
   return (
-    <div className="min-h-screen bg-[#f6f5fb]">
+    <div className="min-h-screen bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
         <FilterTabs active={filter} />
@@ -59,10 +66,10 @@ export default async function DashboardPage({
       </main>
       <Link
         href="/tasks/new"
-        className="fixed bottom-7 right-5 flex h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-3xl text-white shadow-lg shadow-brand/40"
+        className="fixed bottom-7 right-5 flex h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40"
         title="Nouvelle tâche"
       >
-        +
+        <IconPlus className="h-6 w-6" />
       </Link>
     </div>
   );

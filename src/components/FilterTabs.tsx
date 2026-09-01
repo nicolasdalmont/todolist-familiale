@@ -21,7 +21,7 @@ export function FilterTabs({ active }: { active: string }) {
             className={`whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] font-semibold ${
               isActive
                 ? "border-brand bg-brand text-white"
-                : "border-slate-200 bg-white text-ink-muted hover:border-brand/40"
+                : "border-line bg-surface text-ink-muted hover:border-brand/40"
             }`}
           >
             {f.label}

@@ -6,15 +6,22 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#6C5CE7",
-          dark: "#5B4BD6",
-          light: "#A29BFE",
-          soft: "#EEF0FF",
+          DEFAULT: "#E2621F",
+          dark: "#B84B15",
+          light: "#F3A467",
+          soft: "#FBE7D0",
         },
         ink: {
-          DEFAULT: "#1E2028",
-          muted: "#6B7080",
+          DEFAULT: "#2A2118",
+          muted: "#8A7A5C",
         },
+        // Palette "écru" : remplace les gris froids (slate) et le blanc pur
+        // par des tons chauds et un fond parcheminé.
+        paper: "#F5EBD8",
+        surface: "#FFFCF5",
+        sand: "#F0E4C8",
+        line: "#E4D3AC",
+        "line-soft": "#EFE4CB",
       },
       borderRadius: {
         xl2: "18px",

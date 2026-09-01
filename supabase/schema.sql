@@ -28,7 +28,7 @@ create table public.users (
   name text not null unique,
   password_hash text not null,
   role text not null default 'user' check (role in ('admin', 'user')),
-  color text default '#6C5CE7',
+  color text default '#B84B15',
   -- Passe à true une fois que l'utilisateur a remplacé le mot de passe
   -- temporaire par son propre mot de passe.
   password_set boolean not null default false,

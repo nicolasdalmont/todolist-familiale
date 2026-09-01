@@ -4,6 +4,5 @@
 
 html,
 body {
-  background: #f6f5fb;
-  color: #1e2028;
+  @apply bg-paper text-ink;
 }

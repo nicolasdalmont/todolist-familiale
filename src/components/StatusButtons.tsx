@@ -9,10 +9,10 @@ import type { TaskStatus } from "@/lib/types";
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
 
 const ACTIVE_STYLES: Record<TaskStatus, string> = {
-  todo: "border-transparent bg-brand-soft text-brand-dark",
-  in_progress: "border-transparent bg-amber-50 text-amber-700",
+  todo: "border-transparent bg-sand text-ink-muted",
+  in_progress: "border-transparent bg-brand-soft text-brand-dark",
   done: "border-transparent bg-emerald-50 text-emerald-700",
-  archived: "border-transparent bg-slate-100 text-slate-500",
+  archived: "border-transparent bg-stone-200 text-stone-500",
 };
 
 export function StatusButtons({ taskId, current }: { taskId: string; current: TaskStatus }) {
@@ -35,7 +35,7 @@ export function StatusButtons({ taskId, current }: { taskId: string; current: Ta
           disabled={isPending}
           onClick={() => handleClick(status)}
           className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold disabled:opacity-50 ${
-            status === current ? ACTIVE_STYLES[status] : "border-slate-200 text-ink-muted"
+            status === current ? ACTIVE_STYLES[status] : "border-line text-ink-muted"
           }`}
         >
           {STATUS_LABELS[status]}

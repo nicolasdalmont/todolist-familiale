@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { loginAction, setPasswordAction } from "@/lib/actions";
 import { Avatar } from "./Avatar";
+import { IconArrowLeft, IconCheck } from "./Icons";
 import type { Profile } from "@/lib/types";
 
 type Step =
@@ -59,10 +60,10 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
 
   if (step.name === "pick") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-7 bg-[#f6f5fb] p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-7 bg-paper p-6">
         <div className="flex flex-col items-center gap-2.5 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-gradient-to-br from-brand to-brand-light text-3xl text-white">
-            ✓
+          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-gradient-to-br from-brand to-brand-light text-white">
+            <IconCheck className="h-8 w-8" />
           </div>
           <h1 className="text-xl font-extrabold">To-Do List Familiale</h1>
           <p className="max-w-xs text-[13.5px] text-ink-muted">Choisis ton profil pour continuer.</p>
@@ -74,7 +75,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
               key={p.id}
               type="button"
               onClick={() => pickProfile(p)}
-              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 bg-white px-2.5 py-[18px] shadow-sm hover:border-brand"
+              className="flex flex-col items-center gap-2 rounded-2xl border-2 border-line bg-surface px-2.5 py-[18px] shadow-sm hover:border-brand"
             >
               <Avatar profile={p} size="lg" />
               <span className="text-[13.5px] font-bold">{p.name}</span>
@@ -95,13 +96,13 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
   const { profile, changingPassword } = step;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#f6f5fb] p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-paper p-6">
       <button
         type="button"
         onClick={backToGrid}
-        className="fixed left-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[17px]"
+        className="fixed left-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
       >
-        ←
+        <IconArrowLeft className="h-4 w-4" />
       </button>
 
       <div className="flex flex-col items-center gap-2.5 text-center">
@@ -130,7 +131,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
             />
           </div>
           <div>
@@ -144,7 +145,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
               minLength={6}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
             />
           </div>
           <div>
@@ -158,7 +159,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
               minLength={6}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
             />
           </div>
 
@@ -194,7 +195,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+              className="w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
             />
           </div>
 

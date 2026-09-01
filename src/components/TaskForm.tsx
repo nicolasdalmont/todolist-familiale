@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
 import { toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import type { Profile, Task, TaskStatus, Visibility } from "@/lib/types";
+import { IconLock, IconUsers } from "./Icons";
 
 export function TaskForm({
   mode,
@@ -40,7 +41,7 @@ export function TaskForm({
           required
           defaultValue={task?.title}
           placeholder="Ex : Courses de la semaine"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+          className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         />
       </div>
 
@@ -53,7 +54,7 @@ export function TaskForm({
           name="description"
           defaultValue={task?.description}
           placeholder="Détails, liste, instructions..."
-          className="min-h-[90px] w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+          className="min-h-[90px] w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         />
       </div>
 
@@ -66,7 +67,7 @@ export function TaskForm({
           name="dueAt"
           type="datetime-local"
           defaultValue={task ? toDatetimeLocalValue(task.due_at) : ""}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+          className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         />
       </div>
 
@@ -76,7 +77,7 @@ export function TaskForm({
           name="recurrenceType"
           value={recurrenceType}
           onChange={(e) => setRecurrenceType(e.target.value as typeof recurrenceType)}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
+          className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         >
           <option value="none">Ponctuelle (pas de répétition)</option>
           <option value="daily">Quotidienne</option>
@@ -98,12 +99,12 @@ export function TaskForm({
               name="recurrenceInterval"
               min={1}
               defaultValue={task?.recurrence?.interval ?? 2}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px]"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px]"
             />
             <select
               name="recurrenceUnit"
               defaultValue={task?.recurrence?.unit ?? "weeks"}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px]"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px]"
             >
               <option value="days">jour(s)</option>
               <option value="weeks">semaine(s)</option>
@@ -115,24 +116,24 @@ export function TaskForm({
 
       <div className="mb-4">
         <label className="mb-1.5 block text-[13px] font-bold">Visibilité</label>
-        <div className="flex overflow-hidden rounded-xl border border-slate-200">
+        <div className="flex overflow-hidden rounded-xl border border-line">
           <button
             type="button"
             onClick={() => setVisibility("shared")}
-            className={`flex-1 border-r border-slate-200 py-2.5 text-[13.5px] font-semibold ${
+            className={`flex flex-1 items-center justify-center gap-1.5 border-r border-line py-2.5 text-[13.5px] font-semibold ${
               visibility === "shared" ? "bg-brand text-white" : "text-ink-muted"
             }`}
           >
-            👥 Partagée
+            <IconUsers className="h-4 w-4" /> Partagée
           </button>
           <button
             type="button"
             onClick={() => setVisibility("private")}
-            className={`flex-1 py-2.5 text-[13.5px] font-semibold ${
+            className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold ${
               visibility === "private" ? "bg-brand text-white" : "text-ink-muted"
             }`}
           >
-            🔒 Privée
+            <IconLock className="h-4 w-4" /> Privée
           </button>
         </div>
         <p className="mt-1 text-xs text-ink-muted">Une tâche privée n&apos;est visible que par toi.</p>
@@ -147,7 +148,7 @@ export function TaskForm({
             return (
               <label
                 key={p.id}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-2.5 py-2 text-sm font-medium"
+                className="flex items-center gap-2.5 rounded-xl border border-line px-2.5 py-2 text-sm font-medium"
               >
                 <input
                   type="checkbox"
@@ -176,7 +177,7 @@ export function TaskForm({
             id="status"
             name="status"
             defaultValue={task.status}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14.5px]"
+            className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px]"
           >
             {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
               <option key={s} value={s}>

@@ -5,6 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfiles } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
+import { IconArrowLeft } from "@/components/Icons";
+
+export const dynamic = "force-dynamic";
 
 export default async function NewTaskPage() {
   const profile = await getCurrentUser();
@@ -14,15 +17,15 @@ export default async function NewTaskPage() {
   const profiles = await getProfiles(supabase);
 
   return (
-    <div className="min-h-screen bg-[#f6f5fb]">
+    <div className="min-h-screen bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pt-1">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">
           <Link
             href="/"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[17px]"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
           >
-            ←
+            <IconArrowLeft className="h-4 w-4" />
           </Link>
           <h2 className="text-lg font-extrabold">Nouvelle tâche</h2>
         </div>

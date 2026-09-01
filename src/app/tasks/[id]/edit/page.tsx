@@ -1,20 +1,16 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getProfile, getProfiles, getTask } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getProfiles, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 
 export default async function EditTaskPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
+  const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
+  const supabase = createAdminClient();
   const task = await getTask(supabase, params.id);
   if (!task) notFound();
 
@@ -33,7 +29,7 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
           </Link>
           <h2 className="text-lg font-extrabold">Modifier la tâche</h2>
         </div>
-        <TaskForm mode="edit" profiles={profiles} currentUserId={user.id} task={task} />
+        <TaskForm mode="edit" profiles={profiles} currentUserId={profile.id} task={task} />
       </main>
     </div>
   );

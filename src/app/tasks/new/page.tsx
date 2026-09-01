@@ -1,20 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getProfile, getProfiles } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getProfiles } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 
 export default async function NewTaskPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
+  const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
+  const supabase = createAdminClient();
   const profiles = await getProfiles(supabase);
 
   return (
@@ -30,7 +26,7 @@ export default async function NewTaskPage() {
           </Link>
           <h2 className="text-lg font-extrabold">Nouvelle tâche</h2>
         </div>
-        <TaskForm mode="create" profiles={profiles} currentUserId={user.id} />
+        <TaskForm mode="create" profiles={profiles} currentUserId={profile.id} />
       </main>
     </div>
   );

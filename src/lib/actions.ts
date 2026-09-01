@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getUserWithPasswordHash } from "@/lib/queries";
+import {
+  clearSessionCookie,
+  getSessionUserId,
+  hashPassword,
+  setSessionCookie,
+  verifyPassword,
+} from "@/lib/auth";
 import { computeNextOccurrence } from "@/lib/format";
 import type { Recurrence } from "@/lib/types";
 
@@ -18,18 +26,71 @@ function parseRecurrence(formData: FormData): Recurrence {
   return { type, interval: 1 };
 }
 
+// --- Authentification -------------------------------------------------
+
+// Connexion "normale" : l'utilisateur a déjà défini son propre mot de
+// passe (password_set = true).
+export async function loginAction(
+  userId: string,
+  password: string
+): Promise<{ error?: string }> {
+  const supabase = createAdminClient();
+  const user = await getUserWithPasswordHash(supabase, userId);
+
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    return { error: "Mot de passe incorrect." };
+  }
+
+  await setSessionCookie(user.id);
+  redirect("/");
+}
+
+// Première connexion (mot de passe temporaire) ou changement volontaire de
+// mot de passe : vérifie le mot de passe actuel/temporaire, puis enregistre
+// le nouveau et ouvre une session.
+export async function setPasswordAction(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ error?: string }> {
+  if (newPassword.length < 6) {
+    return { error: "Le mot de passe doit contenir au moins 6 caractères." };
+  }
+
+  const supabase = createAdminClient();
+  const user = await getUserWithPasswordHash(supabase, userId);
+
+  if (!user || !verifyPassword(currentPassword, user.password_hash)) {
+    return {
+      error: user?.password_set
+        ? "Mot de passe actuel incorrect."
+        : "Mot de passe temporaire incorrect.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash: hashPassword(newPassword), password_set: true })
+    .eq("id", userId);
+
+  if (error) return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+
+  await setSessionCookie(userId);
+  redirect("/");
+}
+
 export async function signOutAction() {
-  const supabase = createClient();
-  await supabase.auth.signOut();
+  clearSessionCookie();
   redirect("/login");
 }
 
+// --- Tâches -------------------------------------------------------------
+
 export async function createTaskAction(formData: FormData) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
 
   const title = String(formData.get("title") || "").trim();
   if (!title) return;
@@ -41,7 +102,7 @@ export async function createTaskAction(formData: FormData) {
   const recurrence = parseRecurrence(formData);
 
   const assigneeIds = new Set(formData.getAll("assignees").map(String));
-  assigneeIds.add(user.id);
+  assigneeIds.add(userId);
 
   const { data: task, error } = await supabase
     .from("tasks")
@@ -51,7 +112,7 @@ export async function createTaskAction(formData: FormData) {
       due_at: dueAt,
       visibility,
       recurrence,
-      created_by: user.id,
+      created_by: userId,
     })
     .select()
     .single();
@@ -60,7 +121,7 @@ export async function createTaskAction(formData: FormData) {
     throw new Error(error?.message || "Impossible de créer la tâche.");
   }
 
-  const rows = Array.from(assigneeIds).map((userId) => ({ task_id: task.id, user_id: userId }));
+  const rows = Array.from(assigneeIds).map((id) => ({ task_id: task.id, user_id: id }));
   const { error: assignError } = await supabase.from("task_assignees").insert(rows);
   if (assignError) throw new Error(assignError.message);
 
@@ -69,7 +130,10 @@ export async function createTaskAction(formData: FormData) {
 }
 
 export async function updateTaskAction(formData: FormData) {
-  const supabase = createClient();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   if (!taskId) return;
 
@@ -92,7 +156,7 @@ export async function updateTaskAction(formData: FormData) {
 
   await supabase.from("task_assignees").delete().eq("task_id", taskId);
   if (assigneeIds.length) {
-    const rows = assigneeIds.map((userId) => ({ task_id: taskId, user_id: userId }));
+    const rows = assigneeIds.map((id) => ({ task_id: taskId, user_id: id }));
     const { error: assignError } = await supabase.from("task_assignees").insert(rows);
     if (assignError) throw new Error(assignError.message);
   }
@@ -103,7 +167,10 @@ export async function updateTaskAction(formData: FormData) {
 }
 
 export async function deleteTaskAction(formData: FormData) {
-  const supabase = createClient();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   if (!taskId) return;
   await supabase.from("tasks").delete().eq("id", taskId);
@@ -115,7 +182,10 @@ export async function deleteTaskAction(formData: FormData) {
 // ("done"), régénère automatiquement la prochaine occurrence avec les
 // mêmes assignations.
 export async function setStatusAction(taskId: string, status: string) {
-  const supabase = createClient();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
 
   const { data: task } = await supabase.from("tasks").select("*").eq("id", taskId).single();
   if (!task) return;
@@ -159,17 +229,15 @@ export async function setStatusAction(taskId: string, status: string) {
 }
 
 export async function addCommentAction(formData: FormData) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
 
+  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   const body = String(formData.get("body") || "").trim();
   if (!taskId || !body) return;
 
-  const { error } = await supabase.from("comments").insert({ task_id: taskId, author_id: user.id, body });
+  const { error } = await supabase.from("comments").insert({ task_id: taskId, author_id: userId, body });
   if (error) throw new Error(error.message);
 
   revalidatePath(`/tasks/${taskId}`);

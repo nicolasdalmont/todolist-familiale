@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getComments, getProfile, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
@@ -10,15 +11,10 @@ import { CommentThread } from "@/components/CommentThread";
 import { formatDate, isOverdue, recurrenceLabel } from "@/lib/format";
 
 export default async function TaskDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
+  const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
+  const supabase = createAdminClient();
   const task = await getTask(supabase, params.id);
   if (!task) notFound();
 

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getProfile, getTasks } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { FilterTabs } from "@/components/FilterTabs";
 import { TaskCard } from "@/components/TaskCard";
@@ -29,21 +30,15 @@ export default async function DashboardPage({
 }: {
   searchParams: { filter?: string };
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const profile = await getProfile(supabase, user.id);
+  const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
-  // Row Level Security ne renvoie déjà que les tâches visibles par
-  // l'utilisateur (partagées, ou privées dont il est le créateur).
+  // Il n'y a plus de RLS par utilisateur (voir supabase/schema.sql) : le
+  // filtrage "partagé / privé" est appliqué ici, côté application.
+  const supabase = createAdminClient();
   const tasks = await getTasks(supabase);
   const filter = searchParams.filter ?? "all";
-  const filtered = applyFilter(tasks, filter, user.id);
+  const filtered = applyFilter(tasks, filter, profile.id);
 
   return (
     <div className="min-h-screen bg-[#f6f5fb]">

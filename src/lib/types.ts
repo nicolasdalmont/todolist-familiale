@@ -9,11 +9,18 @@ export interface Recurrence {
   unit?: "days" | "weeks" | "months";
 }
 
+// Représente une ligne de la table "users". Ne contient jamais
+// password_hash : ce champ reste confiné au code serveur d'authentification
+// (src/lib/auth.ts) et n'est jamais sélectionné dans les requêtes qui
+// alimentent l'interface (voir src/lib/queries.ts).
 export interface Profile {
   id: string;
   name: string;
   role: Role;
   color: string;
+  // false tant que l'utilisateur n'a pas remplacé le mot de passe temporaire
+  // donné par l'administrateur par son propre mot de passe.
+  password_set: boolean;
   created_at: string;
 }
 

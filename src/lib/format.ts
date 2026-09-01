@@ -89,3 +89,35 @@ export function toDatetimeLocalValue(iso: string | null): string {
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 }
+
+// --- Clés de date locale (filtre "échéance", tuiles du tableau de bord) --
+//
+// Volontairement calculées côté client (voir HomeDashboard.tsx et
+// TaskFilterList.tsx, tous deux "use client") plutôt que côté serveur :
+// un Server Component s'exécute avec l'heure/le fuseau du serveur Vercel
+// (UTC), qui ne correspond pas forcément au fuseau réel de la famille —
+// calculer "aujourd'hui"/"cette semaine" côté navigateur évite un décalage
+// d'un jour près de minuit, sur le même principe que isOverdue() déjà
+// utilisé côté client dans TaskCard.
+
+// Clé "YYYY-MM-DD" (fuseau local) à partir d'une date ISO — sert à comparer
+// une échéance à une date choisie sans se soucier de l'heure exacte.
+export function dateKeyFromIso(iso: string): string {
+  return dateKeyFromDate(new Date(iso));
+}
+
+export function dateKeyFromDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Renvoie la date (minuit local) du dimanche de la semaine en cours —
+// aujourd'hui inclus si on est déjà dimanche.
+export function upcomingSunday(from: Date): Date {
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const daysUntilSunday = (7 - d.getDay()) % 7; // getDay() : dimanche = 0
+  d.setDate(d.getDate() + daysUntilSunday);
+  return d;
+}

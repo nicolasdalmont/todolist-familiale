@@ -292,7 +292,7 @@ export function TaskForm({
               const formData = new FormData();
               formData.set("taskId", task.id);
               await deleteTaskAction(formData);
-              router.push("/");
+              router.push("/tasks");
             }}
             className="w-full rounded-xl bg-rose-50 py-3 text-[14.5px] font-bold text-rose-600"
           >

@@ -3,17 +3,31 @@
 import { useMemo, useState } from "react";
 import type { Tag, Task } from "@/lib/types";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
+import { dateKeyFromIso } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
 import { IconSearch } from "./Icons";
 
-// Filtrage additionnel (catégorie / tags / mots-clefs), appliqué côté
-// client par-dessus le filtre de statut déjà résolu côté serveur (voir
-// src/app/page.tsx). Volontairement en mémoire : la liste de tâches d'une
-// famille reste petite, et ça évite un aller-retour serveur à chaque frappe.
-export function TaskFilterList({ tasks, allTags }: { tasks: Task[]; allTags: Tag[] }) {
+// Filtrage additionnel (catégorie / tags / mots-clefs / échéance), appliqué
+// côté client par-dessus le filtre de statut déjà résolu côté serveur (voir
+// src/app/tasks/page.tsx). Volontairement en mémoire : la liste de tâches
+// d'une famille reste petite, et ça évite un aller-retour serveur à chaque
+// frappe.
+export function TaskFilterList({
+  tasks,
+  allTags,
+  initialDueAtMost,
+}: {
+  tasks: Task[];
+  allTags: Tag[];
+  // Pré-remplit le filtre d'échéance, passé en "?dueAtMost=YYYY-MM-DD" par
+  // les tuiles du tableau de bord (voir HomeDashboard.tsx) — ex. "toutes
+  // les tâches ouvertes dont l'échéance est aujourd'hui au plus tard".
+  initialDueAtMost?: string;
+}) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 
@@ -35,15 +49,23 @@ export function TaskFilterList({ tasks, allTags }: { tasks: Task[]; allTags: Tag
         const hasAny = Array.from(selectedTags).some((name) => taskTagNames.has(name));
         if (!hasAny) return false;
       }
+      if (dueAtMost) {
+        // "Au plus tard à cette date" : exclut les tâches sans échéance
+        // (rien à comparer) et celles dont l'échéance dépasse la date
+        // choisie. Comparaison de chaînes "YYYY-MM-DD" = comparaison
+        // chronologique, sans se soucier de l'heure exacte.
+        if (!task.due_at || dateKeyFromIso(task.due_at) > dueAtMost) return false;
+      }
       if (q) {
         const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [tasks, category, selectedTags, query]);
+  }, [tasks, category, selectedTags, dueAtMost, query]);
 
-  const hasActiveFilters = category !== null || selectedTags.size > 0 || query.trim().length > 0;
+  const hasActiveFilters =
+    category !== null || selectedTags.size > 0 || dueAtMost.length > 0 || query.trim().length > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -101,6 +123,28 @@ export function TaskFilterList({ tasks, allTags }: { tasks: Task[]; allTags: Tag
           ))}
         </div>
       ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
+          Échéance au plus tard le
+        </label>
+        <input
+          id="dueAtMost"
+          type="date"
+          value={dueAtMost}
+          onChange={(e) => setDueAtMost(e.target.value)}
+          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
+        />
+        {dueAtMost ? (
+          <button
+            type="button"
+            onClick={() => setDueAtMost("")}
+            className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
+          >
+            Effacer
+          </button>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-2.5">
         {filtered.length === 0 ? (

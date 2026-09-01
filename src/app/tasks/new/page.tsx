@@ -22,7 +22,7 @@ export default async function NewTaskPage() {
       <main className="mx-auto max-w-[720px] px-4 pt-1">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">
           <Link
-            href="/"
+            href="/tasks"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
           >
             <IconArrowLeft className="h-4 w-4" />

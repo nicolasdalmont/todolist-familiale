@@ -143,6 +143,7 @@ export async function createTaskAction(formData: FormData) {
   await syncTaskTags(supabase, task.id, tagNames);
 
   revalidatePath("/");
+  revalidatePath("/tasks");
   redirect(`/tasks/${task.id}`);
 }
 
@@ -184,6 +185,7 @@ export async function updateTaskAction(formData: FormData) {
   await syncTaskTags(supabase, taskId, tagNames);
 
   revalidatePath("/");
+  revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
   redirect(`/tasks/${taskId}`);
 }
@@ -197,7 +199,8 @@ export async function deleteTaskAction(formData: FormData) {
   if (!taskId) return;
   await supabase.from("tasks").delete().eq("id", taskId);
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/tasks");
+  redirect("/tasks");
 }
 
 // Change le statut d'une tâche. Si elle est récurrente et clôturée
@@ -253,6 +256,7 @@ export async function setStatusAction(taskId: string, status: string) {
   }
 
   revalidatePath("/");
+  revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
 }
 

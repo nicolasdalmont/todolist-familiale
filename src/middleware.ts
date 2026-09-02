@@ -47,5 +47,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js).*)"],
+  // /api/version exclu : c'est un simple repère de version interrogé par
+  // AppUpdateWatcher.tsx pour détecter un nouveau déploiement, y compris
+  // depuis l'écran de connexion (pas encore de session) — pas de raison de
+  // le faire passer par la vérification de session, ni de risquer qu'une
+  // redirection vers /login casse la réponse JSON attendue côté client.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version).*)",
+  ],
 };

@@ -123,7 +123,12 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
 
         <ChecklistSection taskId={task.id} items={task.checklist ?? []} editable={editable} />
 
-        <CommentThread taskId={task.id} comments={comments} />
+        <CommentThread
+          taskId={task.id}
+          comments={comments}
+          currentUserId={profile.id}
+          canModerate={task.created_by === profile.id}
+        />
       </main>
     </div>
   );

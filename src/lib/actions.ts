@@ -330,6 +330,37 @@ export async function addCommentAction(formData: FormData) {
   revalidatePath(`/tasks/${taskId}`);
 }
 
+// Un commentaire peut être supprimé par son propre auteur, ou par le
+// créateur de la tâche (qui reste responsable de sa tâche et peut modérer
+// les commentaires qui y sont laissés) — pas par un simple éditeur/lecteur
+// assigné, qui n'a pas ce rôle de modération. Contrairement à
+// addCommentAction (ouvert à canView), la suppression n'est donc pas basée
+// sur getTaskAccess().canEdit — un éditeur assigné ne peut pas supprimer le
+// commentaire de quelqu'un d'autre.
+export async function deleteCommentAction(taskId: string, commentId: string) {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
+
+  const { data: comment } = await supabase
+    .from("comments")
+    .select("id, task_id, author_id")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (!comment || comment.task_id !== taskId) return;
+
+  const access = await getTaskAccess(supabase, taskId, userId);
+  if (!access.exists) return;
+  const canDelete = comment.author_id === userId || access.createdBy === userId;
+  if (!canDelete) return;
+
+  const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/tasks/${taskId}`);
+}
+
 // --- Checklist ------------------------------------------------------
 //
 // Gérée directement depuis l'écran de détail (pas depuis le formulaire de

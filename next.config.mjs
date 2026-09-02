@@ -18,6 +18,20 @@ const nextConfig = {
       dynamic: 0,
     },
   },
+  // Empêche le navigateur (et le CDN Vercel) de mettre en cache sw.js
+  // lui-même : sans ça, un nouveau déploiement du service worker (ex. le
+  // correctif du 02/09/2026, v1 → v2 — voir public/sw.js) peut mettre
+  // jusqu'à 24h à être détecté par les navigateurs déjà installés, qui
+  // continueraient entre-temps à servir les pages depuis l'ancien cache
+  // fautif.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

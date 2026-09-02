@@ -18,6 +18,7 @@
 -- Les évolutions du schéma sur la base existante passent désormais par des
 -- scripts additifs dans supabase/migrations/ (voir ce dossier).
 
+drop table if exists public.checklist_items cascade;
 drop table if exists public.comments cascade;
 drop table if exists public.task_assignees cascade;
 drop table if exists public.tasks cascade;
@@ -84,6 +85,17 @@ create table public.comments (
   created_at timestamptz default now()
 );
 
+-- Checklist (sous-tâches à cocher) d'une tâche — voir migration
+-- 004_checklist.sql. Pas de colonne d'ordre dédiée : l'affichage suit
+-- created_at.
+create table public.checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references public.tasks(id) on delete cascade,
+  label text not null,
+  done boolean not null default false,
+  created_at timestamptz default now()
+);
+
 -- Tags libres (créés à la volée depuis le formulaire de tâche), utilisés
 -- pour la recherche/le filtrage sur le tableau de bord.
 create table public.tags (
@@ -104,6 +116,7 @@ alter table public.task_assignees enable row level security;
 alter table public.comments enable row level security;
 alter table public.tags enable row level security;
 alter table public.task_tags enable row level security;
+alter table public.checklist_items enable row level security;
 
 -- Volontairement aucune policy : le rôle "anon" (et "authenticated", non
 -- utilisé ici) n'a donc accès à rien. Tout passe par le rôle service_role

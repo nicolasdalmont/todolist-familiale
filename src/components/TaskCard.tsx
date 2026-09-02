@@ -9,6 +9,8 @@ import { IconCalendar, IconRepeat } from "./Icons";
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task.due_at, task.status);
   const CategoryIcon = CATEGORY_ICONS[task.category];
+  const checklist = task.checklist ?? [];
+  const checklistDone = checklist.filter((i) => i.done).length;
 
   return (
     <Link
@@ -42,6 +44,19 @@ export function TaskCard({ task }: { task: Task }) {
               #{tag.name}
             </span>
           ))}
+        </div>
+      ) : null}
+      {checklist.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-sand">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${(checklistDone / checklist.length) * 100}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-[11.5px] font-semibold text-ink-muted">
+            {checklistDone}/{checklist.length}
+          </span>
         </div>
       ) : null}
       <div className="flex -space-x-2">

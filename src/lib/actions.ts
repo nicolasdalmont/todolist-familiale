@@ -278,9 +278,10 @@ export async function setStatusAction(taskId: string, status: string) {
         .single();
 
       if (newTask) {
-        const [{ data: assignees }, { data: taskTags }] = await Promise.all([
+        const [{ data: assignees }, { data: taskTags }, { data: checklistItems }] = await Promise.all([
           supabase.from("task_assignees").select("user_id, role").eq("task_id", taskId),
           supabase.from("task_tags").select("tag_id").eq("task_id", taskId),
+          supabase.from("checklist_items").select("label").eq("task_id", taskId),
         ]);
         if (assignees?.length) {
           await supabase
@@ -291,6 +292,14 @@ export async function setStatusAction(taskId: string, status: string) {
           await supabase
             .from("task_tags")
             .insert(taskTags.map((t) => ({ task_id: newTask.id, tag_id: t.tag_id })));
+        }
+        // La checklist repart décochée sur la nouvelle occurrence — recopier
+        // l'état "coché" de la tâche qui vient de se terminer n'aurait pas
+        // de sens pour une tâche récurrente (ex. liste de courses).
+        if (checklistItems?.length) {
+          await supabase
+            .from("checklist_items")
+            .insert(checklistItems.map((c) => ({ task_id: newTask.id, label: c.label, done: false })));
         }
       }
     }
@@ -318,5 +327,73 @@ export async function addCommentAction(formData: FormData) {
   const { error } = await supabase.from("comments").insert({ task_id: taskId, author_id: userId, body });
   if (error) throw new Error(error.message);
 
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+// --- Checklist ------------------------------------------------------
+//
+// Gérée directement depuis l'écran de détail (pas depuis le formulaire de
+// création/modification) — voir src/components/ChecklistSection.tsx.
+// Ajouter/cocher/supprimer un item exige canEdit, comme changer le statut
+// de la tâche (contrairement aux commentaires, ouverts aux lecteurs) : une
+// checklist fait partie du contenu de la tâche, pas d'une discussion
+// autour.
+
+export async function addChecklistItemAction(formData: FormData) {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
+  const taskId = String(formData.get("taskId"));
+  const label = String(formData.get("label") || "").trim();
+  if (!taskId || !label) return;
+
+  const access = await getTaskAccess(supabase, taskId, userId);
+  if (!access.exists || !access.canEdit) return;
+
+  const { error } = await supabase.from("checklist_items").insert({ task_id: taskId, label });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function toggleChecklistItemAction(taskId: string, itemId: string, done: boolean) {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
+  const access = await getTaskAccess(supabase, taskId, userId);
+  if (!access.exists || !access.canEdit) return;
+
+  // Le filtre .eq("task_id", taskId) est une ceinture-bretelles : garantit
+  // qu'un itemId ne peut agir que sur la tâche pour laquelle l'accès vient
+  // d'être vérifié, même si itemId provenait d'ailleurs.
+  const { error } = await supabase
+    .from("checklist_items")
+    .update({ done })
+    .eq("id", itemId)
+    .eq("task_id", taskId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function deleteChecklistItemAction(taskId: string, itemId: string) {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  const supabase = createAdminClient();
+  const access = await getTaskAccess(supabase, taskId, userId);
+  if (!access.exists || !access.canEdit) return;
+
+  const { error } = await supabase.from("checklist_items").delete().eq("id", itemId).eq("task_id", taskId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/");
+  revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
 }

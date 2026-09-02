@@ -234,3 +234,26 @@ export function IconBarChart({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Utilisée pour la section "Checklist" de l'écran de détail d'une tâche —
+// voir src/components/ChecklistSection.tsx.
+export function IconChecklist({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <rect x="3.5" y="4.5" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5 7.5l1 1 2-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="3.5" y="13.5" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M13 7.5h7.5M13 16.5h7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Bouton de suppression (item de checklist, notamment) — voir
+// src/components/ChecklistSection.tsx.
+export function IconX({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}

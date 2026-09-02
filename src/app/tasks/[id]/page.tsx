@@ -7,6 +7,7 @@ import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "@/components/Badge";
 import { StatusButtons } from "@/components/StatusButtons";
+import { ChecklistSection } from "@/components/ChecklistSection";
 import { CommentThread } from "@/components/CommentThread";
 import { IconArrowLeft, IconCalendar, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { formatDate, isOverdue, recurrenceLabel } from "@/lib/format";
@@ -119,6 +120,8 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
 
           {editable ? <StatusButtons taskId={task.id} current={task.status} /> : null}
         </div>
+
+        <ChecklistSection taskId={task.id} items={task.checklist ?? []} editable={editable} />
 
         <CommentThread taskId={task.id} comments={comments} />
       </main>

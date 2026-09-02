@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ChecklistItem, Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canView } from "./access";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -56,9 +56,10 @@ export async function upsertTagIds(supabase: DB, names: string[]): Promise<strin
 interface TaskRow extends Task {
   task_assignees: { role: ShareRole; users: Profile }[] | null;
   task_tags: { tags: Tag }[] | null;
+  checklist_items: ChecklistItem[] | null;
 }
 
-const TASK_SELECT = `*, task_assignees(role, users(${PROFILE_COLUMNS})), task_tags(tags(id, name))`;
+const TASK_SELECT = `*, task_assignees(role, users(${PROFILE_COLUMNS})), task_tags(tags(id, name)), checklist_items(id, label, done, created_at)`;
 
 function mapTaskRow(row: TaskRow): Task {
   return {
@@ -67,6 +68,13 @@ function mapTaskRow(row: TaskRow): Task {
       .filter((a) => a.users)
       .map((a) => ({ ...a.users, role: a.role })),
     tags: (row.task_tags ?? []).map((t) => t.tags).filter(Boolean),
+    // PostgREST ne garantit pas l'ordre d'une ressource imbriquée sans
+    // .order() dédié côté requête ; trier ici (en mémoire, quelques items
+    // au plus) est plus simple que de chaîner un .order(foreignTable: ...)
+    // sur chaque appel de TASK_SELECT.
+    checklist: (row.checklist_items ?? [])
+      .slice()
+      .sort((a, b) => a.created_at.localeCompare(b.created_at)),
   };
 }
 

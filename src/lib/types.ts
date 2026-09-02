@@ -45,6 +45,15 @@ export interface Comment {
   author?: Profile | null;
 }
 
+// Item d'une checklist de tâche (sous-tâche à cocher) — voir
+// src/components/ChecklistSection.tsx et migration 004_checklist.sql.
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -63,6 +72,10 @@ export interface Task {
   // compte admin/user de la personne).
   assignees?: Array<Omit<Profile, "role"> & { role: ShareRole }>;
   tags?: Tag[];
+  // Sous-tâches à cocher, dans l'ordre de création. Absent ou vide : pas de
+  // checklist pour cette tâche — TaskCard.tsx n'affiche alors aucun
+  // indicateur d'avancement.
+  checklist?: ChecklistItem[];
 }
 
 // Statistiques par utilisateur, réservées à l'écran admin

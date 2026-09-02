@@ -1,14 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Tag, Task } from "@/lib/types";
+import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
-import { dateKeyFromIso } from "@/lib/format";
+import { dateKeyFromIso, STATUS_LABELS } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
 import { IconSearch } from "./Icons";
 
-// Filtrage additionnel (catégorie / tags / mots-clefs / échéance), appliqué
-// côté client par-dessus le filtre de statut déjà résolu côté serveur (voir
+// Statuts affichés par défaut (tout sauf "archivée") — reproduit l'ancien
+// comportement de l'onglet "Toutes" du temps où le statut était un onglet
+// séparé plutôt qu'un filtre ici.
+const DEFAULT_STATUSES: TaskStatus[] = ["todo", "in_progress", "done"];
+const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
+
+// Filtrage additionnel (statut / partagé-privé / catégorie / tags /
+// mots-clefs / échéance), appliqué côté client par-dessus la portée déjà
+// résolue côté serveur ("Toutes" vs "Mes tâches", voir
 // src/app/tasks/page.tsx). Volontairement en mémoire : la liste de tâches
 // d'une famille reste petite, et ça évite un aller-retour serveur à chaque
 // frappe.
@@ -28,6 +35,8 @@ export function TaskFilterList({
   const [category, setCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
+  const [statuses, setStatuses] = useState<Set<TaskStatus>>(new Set(DEFAULT_STATUSES));
+  const [visibility, setVisibility] = useState<Visibility | null>(null);
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 
@@ -40,9 +49,20 @@ export function TaskFilterList({
     });
   }
 
+  function toggleStatus(status: TaskStatus) {
+    setStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((task) => {
+      if (!statuses.has(task.status)) return false;
+      if (visibility && task.visibility !== visibility) return false;
       if (category && task.category !== category) return false;
       if (selectedTags.size > 0) {
         const taskTagNames = new Set((task.tags ?? []).map((t) => t.name));
@@ -62,10 +82,16 @@ export function TaskFilterList({
       }
       return true;
     });
-  }, [tasks, category, selectedTags, dueAtMost, query]);
+  }, [tasks, statuses, visibility, category, selectedTags, dueAtMost, query]);
 
   const hasActiveFilters =
-    category !== null || selectedTags.size > 0 || dueAtMost.length > 0 || query.trim().length > 0;
+    statuses.size !== DEFAULT_STATUSES.length ||
+    !DEFAULT_STATUSES.every((s) => statuses.has(s)) ||
+    visibility !== null ||
+    category !== null ||
+    selectedTags.size > 0 ||
+    dueAtMost.length > 0 ||
+    query.trim().length > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -105,6 +131,42 @@ export function TaskFilterList({
             </button>
           );
         })}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {STATUS_ORDER.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => toggleStatus(s)}
+            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+              statuses.has(s) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+            }`}
+          >
+            {STATUS_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            { value: null, label: "Toutes" },
+            { value: "shared" as Visibility, label: "Partagées" },
+            { value: "private" as Visibility, label: "Privées" },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => setVisibility(opt.value)}
+            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+              visibility === opt.value ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {tagNames.length > 0 ? (

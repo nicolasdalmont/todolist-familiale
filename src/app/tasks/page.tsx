@@ -15,21 +15,16 @@ import type { Task } from "@/lib/types";
 // tâches sur cette page.
 export const dynamic = "force-dynamic";
 
+// "Toutes" = tout ce qui m'est visible (déjà limité par getTasks à ce que
+// je peux voir — voir src/lib/access.ts). "Mes tâches" = uniquement les
+// tâches que j'ai créées (un sous-ensemble : les tâches que d'autres ont
+// partagées avec moi n'y figurent pas). Le statut, la visibilité
+// partagée/privée, la catégorie, les tags, l'échéance et la recherche sont
+// désormais tous des filtres additionnels dans TaskFilterList, pas des
+// onglets séparés.
 function applyFilter(tasks: Task[], filter: string, userId: string): Task[] {
-  switch (filter) {
-    case "mine":
-      return tasks.filter((t) => (t.assignees ?? []).some((a) => a.id === userId));
-    case "shared":
-      return tasks.filter((t) => t.visibility === "shared");
-    case "private":
-      return tasks.filter((t) => t.visibility === "private" && t.created_by === userId);
-    case "done":
-      return tasks.filter((t) => t.status === "done");
-    case "archived":
-      return tasks.filter((t) => t.status === "archived");
-    default:
-      return tasks.filter((t) => t.status !== "archived");
-  }
+  if (filter === "mine") return tasks.filter((t) => t.created_by === userId);
+  return tasks;
 }
 
 export default async function TasksPage({
@@ -40,10 +35,10 @@ export default async function TasksPage({
   const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
-  // Il n'y a plus de RLS par utilisateur (voir supabase/schema.sql) : le
-  // filtrage "partagé / privé" est appliqué ici, côté application.
+  // getTasks ne renvoie que les tâches visibles par profile.id (créées par
+  // lui, ou partagées avec lui) — voir src/lib/access.ts.
   const supabase = createAdminClient();
-  const [tasks, allTags] = await Promise.all([getTasks(supabase), getTags(supabase)]);
+  const [tasks, allTags] = await Promise.all([getTasks(supabase, profile.id), getTags(supabase)]);
   const filter = searchParams.filter ?? "all";
   const filtered = applyFilter(tasks, filter, profile.id);
 

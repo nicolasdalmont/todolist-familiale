@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Comment, Profile, Tag, Task } from "./types";
+import type { Comment, Profile, ShareRole, Tag, Task } from "./types";
+import { canView } from "./access";
 
 type DB = SupabaseClient<any, "public", any>;
 
@@ -53,21 +54,28 @@ export async function upsertTagIds(supabase: DB, names: string[]): Promise<strin
 }
 
 interface TaskRow extends Task {
-  task_assignees: { users: Profile }[] | null;
+  task_assignees: { role: ShareRole; users: Profile }[] | null;
   task_tags: { tags: Tag }[] | null;
 }
 
-const TASK_SELECT = `*, task_assignees(users(${PROFILE_COLUMNS})), task_tags(tags(id, name))`;
+const TASK_SELECT = `*, task_assignees(role, users(${PROFILE_COLUMNS})), task_tags(tags(id, name))`;
 
 function mapTaskRow(row: TaskRow): Task {
   return {
     ...row,
-    assignees: (row.task_assignees ?? []).map((a) => a.users).filter(Boolean),
+    assignees: (row.task_assignees ?? [])
+      .filter((a) => a.users)
+      .map((a) => ({ ...a.users, role: a.role })),
     tags: (row.task_tags ?? []).map((t) => t.tags).filter(Boolean),
   };
 }
 
-export async function getTasks(supabase: DB): Promise<Task[]> {
+// Ne renvoie que les tâches visibles par userId : celles qu'il a créées, ou
+// pour lesquelles il figure dans task_assignees (quel que soit son rôle).
+// Toute tâche privée à quelqu'un d'autre, ou partagée sans lui, est
+// exclue — c'est ici que la confidentialité "privée par défaut" est
+// appliquée, pas seulement dans l'affichage (voir src/lib/access.ts).
+export async function getTasks(supabase: DB, userId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
     .select(TASK_SELECT)
@@ -75,16 +83,22 @@ export async function getTasks(supabase: DB): Promise<Task[]> {
 
   if (error) throw new Error(error.message);
 
-  return ((data as unknown as TaskRow[]) ?? []).map(mapTaskRow);
+  const tasks = ((data as unknown as TaskRow[]) ?? []).map(mapTaskRow);
+  return tasks.filter((t) => canView(t, userId));
 }
 
-export async function getTask(supabase: DB, id: string): Promise<Task | null> {
+// Renvoie la tâche si userId a le droit de la voir (créateur ou partagée
+// avec lui), sinon null — la page appelante doit alors se comporter comme
+// si la tâche n'existait pas (notFound()), pour ne rien révéler de son
+// existence à quelqu'un qui n'y a pas accès.
+export async function getTask(supabase: DB, id: string, userId: string): Promise<Task | null> {
   const { data, error } = await supabase.from("tasks").select(TASK_SELECT).eq("id", id).maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  return mapTaskRow(data as unknown as TaskRow);
+  const task = mapTaskRow(data as unknown as TaskRow);
+  return canView(task, userId) ? task : null;
 }
 
 export async function getComments(supabase: DB, taskId: string): Promise<Comment[]> {

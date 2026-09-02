@@ -1,6 +1,10 @@
 export type Role = "admin" | "user";
 export type TaskStatus = "todo" | "in_progress" | "done" | "archived";
 export type Visibility = "shared" | "private";
+// "editor" : voit, modifie, change le statut et commente une tâche.
+// "viewer" : voit et commente, sans pouvoir la modifier. Voir
+// src/lib/access.ts pour les règles de contrôle d'accès associées.
+export type ShareRole = "editor" | "viewer";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom";
 // Ordre volontairement alphabétique (reflète l'ordre d'affichage demandé) ;
 // voir src/lib/categories.ts pour les libellés et icônes associés.
@@ -52,6 +56,9 @@ export interface Task {
   category: Category;
   created_by: string;
   created_at: string;
-  assignees?: Profile[];
+  // Personnes avec qui la tâche est partagée (le créateur n'y figure pas
+  // forcément dans ce tableau côté type, mais l'est toujours en base — voir
+  // src/lib/access.ts). Chaque entrée porte son rôle de partage.
+  assignees?: Array<Profile & { role: ShareRole }>;
   tags?: Tag[];
 }

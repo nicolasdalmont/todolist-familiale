@@ -6,6 +6,7 @@ import { getProfiles, getTags, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 import { IconArrowLeft } from "@/components/Icons";
+import { canEdit } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,11 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
   if (!profile) redirect("/login");
 
   const supabase = createAdminClient();
-  const task = await getTask(supabase, params.id);
-  if (!task) notFound();
+  const task = await getTask(supabase, params.id, profile.id);
+  // Pas de vue "lecture seule" du formulaire : un lecteur qui n'a pas le
+  // droit de modifier la tâche est traité comme si cette page n'existait
+  // pas, plutôt que de lui montrer un formulaire désactivé.
+  if (!task || !canEdit(task, profile.id)) notFound();
 
   const [profiles, allTags] = await Promise.all([getProfiles(supabase), getTags(supabase)]);
 

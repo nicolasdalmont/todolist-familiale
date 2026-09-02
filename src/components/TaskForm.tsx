@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
 import { toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
-import type { Profile, Tag, Task, TaskStatus, Visibility } from "@/lib/types";
-import { IconLock, IconPlus, IconUsers } from "./Icons";
+import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
+import { IconPlus } from "./Icons";
+
+// Les trois niveaux d'accès proposés pour chaque membre de la famille
+// (hors créateur, qui a toujours accès complet — voir src/lib/access.ts).
+const SHARE_OPTIONS: { value: "none" | ShareRole; label: string }[] = [
+  { value: "none", label: "Aucun accès" },
+  { value: "viewer", label: "Lecture seule" },
+  { value: "editor", label: "Assigné(e)" },
+];
 
 export function TaskForm({
   mode,
@@ -22,13 +30,25 @@ export function TaskForm({
   task?: Task;
 }) {
   const router = useRouter();
-  const [visibility, setVisibility] = useState<Visibility>(task?.visibility ?? "shared");
   const [recurrenceType, setRecurrenceType] = useState(task?.recurrence?.type ?? "none");
   const [category, setCategory] = useState(task?.category ?? DEFAULT_CATEGORY);
   const [tagOptions, setTagOptions] = useState(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)));
   const [selectedTags, setSelectedTags] = useState(() => new Set((task?.tags ?? []).map((t) => t.name)));
   const [newTag, setNewTag] = useState("");
-  const assignedIds = new Set((task?.assignees ?? []).map((a) => a.id));
+
+  // Le créateur (celui qui crée la tâche, ou son créateur d'origine en
+  // modification) a toujours un accès complet et n'apparaît pas dans la
+  // liste de partage ci-dessous — imposé côté serveur de toute façon.
+  const creatorId = mode === "edit" && task ? task.created_by : currentUserId;
+  const shareable = profiles.filter((p) => p.id !== creatorId);
+  const [shareRoles, setShareRoles] = useState<Record<string, "none" | ShareRole>>(() => {
+    const initial: Record<string, "none" | ShareRole> = {};
+    for (const p of shareable) {
+      const existing = task?.assignees?.find((a) => a.id === p.id);
+      initial[p.id] = existing?.role ?? "none";
+    }
+    return initial;
+  });
 
   const action = mode === "edit" ? updateTaskAction : createTaskAction;
 
@@ -54,7 +74,6 @@ export function TaskForm({
   return (
     <form action={action} className="pb-6">
       {mode === "edit" && task ? <input type="hidden" name="taskId" value={task.id} /> : null}
-      <input type="hidden" name="visibility" value={visibility} />
       <input type="hidden" name="category" value={category} />
 
       <div className="mb-4">
@@ -163,31 +182,6 @@ export function TaskForm({
       )}
 
       <div className="mb-4">
-        <label className="mb-1.5 block text-[13px] font-bold">Visibilité</label>
-        <div className="flex overflow-hidden rounded-xl border border-line">
-          <button
-            type="button"
-            onClick={() => setVisibility("shared")}
-            className={`flex flex-1 items-center justify-center gap-1.5 border-r border-line py-2.5 text-[13.5px] font-semibold ${
-              visibility === "shared" ? "bg-brand text-white" : "text-ink-muted"
-            }`}
-          >
-            <IconUsers className="h-4 w-4" /> Partagée
-          </button>
-          <button
-            type="button"
-            onClick={() => setVisibility("private")}
-            className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold ${
-              visibility === "private" ? "bg-brand text-white" : "text-ink-muted"
-            }`}
-          >
-            <IconLock className="h-4 w-4" /> Privée
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-ink-muted">Une tâche privée n&apos;est visible que par toi.</p>
-      </div>
-
-      <div className="mb-4">
         <label className="mb-1.5 block text-[13px] font-bold">Tags</label>
         <div className="flex flex-wrap gap-1.5">
           {tagOptions.map((name) => (
@@ -231,29 +225,42 @@ export function TaskForm({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1.5 block text-[13px] font-bold">Assigné(e)s</label>
+        <label className="mb-1.5 block text-[13px] font-bold">Partager avec</label>
+        <p className="mb-2 text-xs text-ink-muted">
+          Une tâche est privée par défaut (visible seulement par toi). Choisis pour chaque personne si elle peut
+          juste la voir (et commenter) ou aussi la modifier.
+        </p>
         <div className="flex flex-col gap-2">
-          {profiles.map((p) => {
-            const isCreator = p.id === currentUserId;
-            const checkedByDefault = task ? assignedIds.has(p.id) : isCreator;
+          {shareable.map((p) => {
+            const role = shareRoles[p.id] ?? "none";
             return (
-              <label
+              <div
                 key={p.id}
-                className="flex items-center gap-2.5 rounded-xl border border-line px-2.5 py-2 text-sm font-medium"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-2.5 py-2"
               >
-                <input
-                  type="checkbox"
-                  name="assignees"
-                  value={p.id}
-                  defaultChecked={checkedByDefault}
-                  disabled={mode === "create" && isCreator}
-                  className="h-4 w-4"
-                />
-                {p.name}
-                {mode === "create" && isCreator ? (
-                  <span className="text-xs text-ink-muted">(créateur — assigné automatiquement)</span>
-                ) : null}
-              </label>
+                <span className="text-sm font-medium">{p.name}</span>
+                <div className="flex overflow-hidden rounded-lg border border-line text-[11.5px] font-bold">
+                  {SHARE_OPTIONS.map((opt, i) => (
+                    <label key={opt.value} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`role-${p.id}`}
+                        value={opt.value}
+                        checked={role === opt.value}
+                        onChange={() => setShareRoles((prev) => ({ ...prev, [p.id]: opt.value }))}
+                        className="peer sr-only"
+                      />
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1.5 ${i > 0 ? "border-l border-line" : ""} ${
+                          role === opt.value ? "bg-brand text-white" : "bg-surface text-ink-muted"
+                        }`}
+                      >
+                        {opt.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             );
           })}
         </div>

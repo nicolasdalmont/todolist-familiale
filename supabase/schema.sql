@@ -46,7 +46,10 @@ create table public.tasks (
   recurrence jsonb default '{"type":"none"}',
   status text not null default 'todo'
     check (status in ('todo', 'in_progress', 'done', 'archived')),
-  visibility text not null default 'shared'
+  -- Recalculée automatiquement par l'application (jamais saisie
+  -- directement) à partir du partage effectif dans task_assignees :
+  -- "private" si seul le créateur y a accès, "shared" sinon.
+  visibility text not null default 'private'
     check (visibility in ('shared', 'private')),
   -- Catégorie principale de la tâche, valeurs fixes (voir
   -- src/lib/categories.ts pour les libellés/icônes affichés).
@@ -59,6 +62,12 @@ create table public.tasks (
 create table public.task_assignees (
   task_id uuid references public.tasks(id) on delete cascade,
   user_id uuid references public.users(id) on delete cascade,
+  -- "editor" (défaut) : voit, modifie et change le statut de la tâche.
+  -- "viewer" : voit et commente la tâche, sans pouvoir la modifier.
+  -- Le créateur d'une tâche est toujours "editor" (imposé côté
+  -- application). La colonne "visibility" de "tasks" est recalculée
+  -- automatiquement à partir de ce partage — voir src/lib/access.ts.
+  role text not null default 'editor' check (role in ('editor', 'viewer')),
   primary key (task_id, user_id)
 );
 

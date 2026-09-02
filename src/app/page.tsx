@@ -17,7 +17,9 @@ export default async function HomePage() {
   if (!profile) redirect("/login");
 
   const supabase = createAdminClient();
-  const tasks = await getTasks(supabase);
+  // getTasks ne renvoie que les tâches visibles par profile.id (créées par
+  // lui, ou partagées avec lui) — voir src/lib/access.ts.
+  const tasks = await getTasks(supabase, profile.id);
 
   return (
     <div className="min-h-screen bg-paper">

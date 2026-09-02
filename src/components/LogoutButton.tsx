@@ -1,11 +1,13 @@
 "use client";
 
 import { signOutAction } from "@/lib/actions";
+import { FormPendingBridge } from "@/components/PendingOverlay";
 import { IconPower } from "./Icons";
 
 export function LogoutButton() {
   return (
     <form action={signOutAction}>
+      <FormPendingBridge />
       <button
         type="submit"
         title="Se déconnecter"

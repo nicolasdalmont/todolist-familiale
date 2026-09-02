@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { loginAction, setPasswordAction } from "@/lib/actions";
+import { useGlobalTransition } from "@/components/PendingOverlay";
 import { Avatar } from "./Avatar";
 import { IconArrowLeft, IconCheck } from "./Icons";
 import type { Profile } from "@/lib/types";
@@ -11,7 +12,7 @@ type Step =
   | { name: "auth"; profile: Profile; changingPassword: boolean };
 
 export function LoginForm({ profiles }: { profiles: Profile[] }) {
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useGlobalTransition();
   const [step, setStep] = useState<Step>({ name: "pick" });
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");

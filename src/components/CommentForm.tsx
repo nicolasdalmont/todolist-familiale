@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { addCommentAction } from "@/lib/actions";
+import { useGlobalTransition } from "@/components/PendingOverlay";
 
 export function CommentForm({ taskId }: { taskId: string }) {
   const [value, setValue] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useGlobalTransition();
   const router = useRouter();
 
   function handleSubmit(event: FormEvent) {

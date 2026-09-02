@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   addChecklistItemAction,
   deleteChecklistItemAction,
   toggleChecklistItemAction,
 } from "@/lib/actions";
+import { useGlobalTransition } from "@/components/PendingOverlay";
 import type { ChecklistItem } from "@/lib/types";
 import { IconCheck, IconChecklist, IconX } from "./Icons";
 
@@ -24,7 +25,7 @@ export function ChecklistSection({
   editable: boolean;
 }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useGlobalTransition();
   const [newLabel, setNewLabel] = useState("");
 
   // Rien à afficher pour un lecteur si la checklist est vide — pas la peine

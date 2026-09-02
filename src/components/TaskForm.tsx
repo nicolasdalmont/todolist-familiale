@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
+import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOverlay";
 import { toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
 import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
@@ -30,6 +31,7 @@ export function TaskForm({
   task?: Task;
 }) {
   const router = useRouter();
+  const [, startTransition] = useGlobalTransition();
   const [recurrenceType, setRecurrenceType] = useState(task?.recurrence?.type ?? "none");
   const [category, setCategory] = useState(task?.category ?? DEFAULT_CATEGORY);
   const [tagOptions, setTagOptions] = useState(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)));
@@ -73,6 +75,7 @@ export function TaskForm({
 
   return (
     <form action={action} className="pb-6">
+      <FormPendingBridge />
       {mode === "edit" && task ? <input type="hidden" name="taskId" value={task.id} /> : null}
       <input type="hidden" name="category" value={category} />
 
@@ -294,12 +297,14 @@ export function TaskForm({
         {mode === "edit" && task ? (
           <button
             type="button"
-            onClick={async () => {
+            onClick={() => {
               if (!confirm("Supprimer définitivement cette tâche ?")) return;
-              const formData = new FormData();
-              formData.set("taskId", task.id);
-              await deleteTaskAction(formData);
-              router.push("/tasks");
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.set("taskId", task.id);
+                await deleteTaskAction(formData);
+                router.push("/tasks");
+              });
             }}
             className="w-full rounded-xl bg-rose-50 py-3 text-[14.5px] font-bold text-rose-600"
           >

@@ -1,8 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setStatusAction } from "@/lib/actions";
+import { useGlobalTransition } from "@/components/PendingOverlay";
 import { STATUS_LABELS } from "@/lib/format";
 import type { TaskStatus } from "@/lib/types";
 
@@ -17,7 +17,7 @@ const ACTIVE_STYLES: Record<TaskStatus, string> = {
 
 export function StatusButtons({ taskId, current }: { taskId: string; current: TaskStatus }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, startTransition] = useGlobalTransition();
 
   function handleClick(status: TaskStatus) {
     startTransition(async () => {

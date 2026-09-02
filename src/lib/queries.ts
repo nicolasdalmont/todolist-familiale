@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Comment, Profile, ShareRole, Tag, Task } from "./types";
+import type { Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canView } from "./access";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -110,6 +110,47 @@ export async function getComments(supabase: DB, taskId: string): Promise<Comment
 
   if (error) throw new Error(error.message);
   return (data as unknown as Comment[]) ?? [];
+}
+
+// Statistiques par utilisateur pour l'écran admin (src/app/admin/page.tsx) :
+// dernière connexion, et 4 compteurs de tâches créées — total et sur les 7
+// derniers jours, chacun ventilé privé/partagé (sur le champ dérivé
+// tasks.visibility, voir src/lib/access.ts). On compte tout ce que
+// created_by = cet utilisateur, sans filtrer par canView : l'admin doit
+// voir l'activité réelle de chacun, pas seulement ce qui lui est partagé à
+// lui — mais on ne sélectionne jamais le titre/la description d'une tâche,
+// seulement created_by/created_at/visibility, pour ne jamais exposer le
+// contenu d'une tâche privée sur cet écran, seulement des comptages.
+// Calculé côté application plutôt qu'en SQL agrégé : la famille reste une
+// poignée de comptes et quelques dizaines/centaines de tâches tout au
+// plus, donc deux requêtes larges + un regroupement en mémoire restent
+// largement suffisants et évitent une fonction SQL dédiée.
+export async function getUserStats(supabase: DB): Promise<UserStats[]> {
+  const [{ data: users, error: usersError }, { data: tasks, error: tasksError }] = await Promise.all([
+    supabase.from("users").select("id, name, color, last_login_at").order("name"),
+    supabase.from("tasks").select("created_by, created_at, visibility"),
+  ]);
+  if (usersError) throw new Error(usersError.message);
+  if (tasksError) throw new Error(tasksError.message);
+
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  return (users ?? []).map((u) => {
+    const createdByUser = (tasks ?? []).filter((t) => t.created_by === u.id);
+    const isPrivate = (t: { visibility: string }) => t.visibility === "private";
+    const isRecent = (t: { created_at: string }) => new Date(t.created_at).getTime() >= oneWeekAgo;
+
+    return {
+      id: u.id,
+      name: u.name,
+      color: u.color,
+      lastLoginAt: u.last_login_at,
+      totalPrivate: createdByUser.filter(isPrivate).length,
+      totalShared: createdByUser.filter((t) => !isPrivate(t)).length,
+      weekPrivate: createdByUser.filter((t) => isPrivate(t) && isRecent(t)).length,
+      weekShared: createdByUser.filter((t) => !isPrivate(t) && isRecent(t)).length,
+    };
+  });
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

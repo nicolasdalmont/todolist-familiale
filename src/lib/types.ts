@@ -64,3 +64,21 @@ export interface Task {
   assignees?: Array<Omit<Profile, "role"> & { role: ShareRole }>;
   tags?: Tag[];
 }
+
+// Statistiques par utilisateur, réservées à l'écran admin
+// (src/app/admin/page.tsx) — voir getUserStats() dans src/lib/queries.ts.
+// Les compteurs de tâches sont ventilés privé/partagé (sur le champ
+// dérivé Task.visibility, voir access.ts) plutôt qu'un simple total, sur
+// demande explicite de l'utilisateur.
+export interface UserStats {
+  id: string;
+  name: string;
+  color: string;
+  // null : compte jamais reconnecté depuis l'ajout du suivi de connexion
+  // (migration 003_last_login.sql), voir ce fichier pour la nuance.
+  lastLoginAt: string | null;
+  totalPrivate: number;
+  totalShared: number;
+  weekPrivate: number;
+  weekShared: number;
+}

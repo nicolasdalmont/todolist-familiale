@@ -35,6 +35,11 @@ create table public.users (
   -- Passe à true une fois que l'utilisateur a remplacé le mot de passe
   -- temporaire par son propre mot de passe.
   password_set boolean not null default false,
+  -- Horodatage de la dernière connexion réussie (voir recordLogin() dans
+  -- src/lib/auth.ts) ; NULL tant que le compte ne s'est pas reconnecté
+  -- depuis l'ajout de cette colonne (migration 003_last_login.sql).
+  -- Utilisé par l'écran de statistiques admin (src/app/admin/page.tsx).
+  last_login_at timestamptz,
   created_at timestamptz default now()
 );
 

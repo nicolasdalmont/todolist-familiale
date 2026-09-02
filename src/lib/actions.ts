@@ -9,6 +9,7 @@ import {
   clearSessionCookie,
   getSessionUserId,
   hashPassword,
+  recordLogin,
   setSessionCookie,
   verifyPassword,
 } from "@/lib/auth";
@@ -71,6 +72,7 @@ export async function loginAction(
   }
 
   await setSessionCookie(user.id);
+  await recordLogin(user.id);
   redirect("/");
 }
 
@@ -105,6 +107,7 @@ export async function setPasswordAction(
   if (error) return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
 
   await setSessionCookie(userId);
+  await recordLogin(userId);
   redirect("/");
 }
 

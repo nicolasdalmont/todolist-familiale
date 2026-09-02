@@ -223,3 +223,14 @@ export function IconSearch({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Utilisée par le lien "Admin" (Topbar) et l'écran de statistiques, réservé
+// au compte administrateur — voir src/app/admin/page.tsx.
+export function IconBarChart({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3 20h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}

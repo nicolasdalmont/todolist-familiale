@@ -17,6 +17,14 @@ export function Topbar({ user }: { user: Profile }) {
         <Link href="/tasks" className="text-[13px] font-semibold text-ink-muted hover:text-ink">
           Tâches
         </Link>
+        {/* Onglet réservé au compte admin — la page elle-même se protège
+            aussi côté serveur (voir src/app/admin/page.tsx) : masquer ce
+            lien n'est qu'un confort d'affichage, pas le contrôle d'accès. */}
+        {user.role === "admin" ? (
+          <Link href="/admin" className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+            Admin
+          </Link>
+        ) : null}
       </div>
       <div className="flex items-center gap-2.5">
         <Avatar profile={user} />

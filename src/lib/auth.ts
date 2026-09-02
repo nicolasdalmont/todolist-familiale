@@ -64,6 +64,24 @@ export async function setSessionCookie(userId: string): Promise<void> {
   });
 }
 
+// Horodate la connexion réussie d'un utilisateur (colonne
+// users.last_login_at, migration 003_last_login.sql) — utilisé par l'écran
+// de statistiques admin (src/app/admin/page.tsx). Appelé depuis
+// loginAction et setPasswordAction (src/lib/actions.ts), juste après
+// setSessionCookie : les deux représentent une connexion réussie, que le
+// mot de passe soit le mot de passe personnel ou le mot de passe temporaire
+// de première connexion. Ne fait jamais échouer la connexion elle-même si
+// la mise à jour échoue : ce n'est qu'une statistique, pas une condition
+// d'accès.
+export async function recordLogin(userId: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (error) console.warn("Impossible d'enregistrer la dernière connexion :", error.message);
+}
+
 export function clearSessionCookie(): void {
   cookies().set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
 }

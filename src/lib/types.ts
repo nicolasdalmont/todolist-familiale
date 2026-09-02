@@ -58,7 +58,9 @@ export interface Task {
   created_at: string;
   // Personnes avec qui la tâche est partagée (le créateur n'y figure pas
   // forcément dans ce tableau côté type, mais l'est toujours en base — voir
-  // src/lib/access.ts). Chaque entrée porte son rôle de partage.
-  assignees?: Array<Profile & { role: ShareRole }>;
+  // src/lib/access.ts). Chaque entrée porte son rôle de partage
+  // (`shareRole`, à ne pas confondre avec `Profile.role`, le rôle de
+  // compte admin/user de la personne).
+  assignees?: Array<Omit<Profile, "role"> & { role: ShareRole }>;
   tags?: Tag[];
 }

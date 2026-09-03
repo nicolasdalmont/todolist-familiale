@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Tag, Task, Visibility } from "@/lib/types";
+import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
-import { dateKeyFromIso, isOverdue } from "@/lib/format";
+import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
 import { IconAlertTriangle, IconSearch } from "./Icons";
 
@@ -14,6 +14,21 @@ import { IconAlertTriangle, IconSearch } from "./Icons";
 // fourre-tout, pas une catégorie au même titre que les autres.
 const CATEGORY_SELECT_ORDER = [...CATEGORY_ORDER.filter((c) => c !== "autre"), "autre" as const];
 
+// Ordre d'affichage des quatre boutons de statut (ligne 1) — l'ordre
+// naturel du cycle de vie d'une tâche, pas l'ordre alphabétique.
+const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
+
+// Statuts cochés par défaut : tâches actives uniquement (à faire + en
+// cours) — voir l'état `statuses` plus bas.
+const DEFAULT_STATUSES: TaskStatus[] = ["todo", "in_progress"];
+
+// Petite séparation verticale entre deux groupes de filtres sur une même
+// ligne, pour plus de lisibilité (demande explicite de l'utilisateur,
+// 03/09/2026).
+function FilterSeparator() {
+  return <span aria-hidden="true" className="h-5 w-px shrink-0 self-center bg-line" />;
+}
+
 // Filtrage additionnel (portée/statut/catégorie/échéance/partagé-privé/
 // en retard/tags/mots-clefs), appliqué côté client en mémoire par-dessus
 // la liste complète des tâches visibles par l'utilisateur (déjà filtrée
@@ -21,11 +36,13 @@ const CATEGORY_SELECT_ORDER = [...CATEGORY_ORDER.filter((c) => c !== "autre"), "
 // src/app/tasks/page.tsx) : la liste de tâches d'une famille reste petite,
 // et ça évite un aller-retour serveur à chaque frappe/clic.
 //
-// Disposition volontairement rationalisée en 4 lignes (demande explicite
+// Disposition en 4 lignes, chaque ligne pouvant regrouper deux filtres
+// séparés par une barre verticale (`FilterSeparator`, demande explicite
 // de l'utilisateur, 03/09/2026) :
-//   1. Portée (mes tâches / toutes) + statut (actives / tous statuts)
-//   2. Catégorie (liste déroulante, sélection unique) + échéance
-//   3. Partagé/Privé + en retard uniquement
+//   1. Portée (mes tâches / toutes) │ statut (4 boutons à cocher, à
+//      faire + en cours cochés par défaut)
+//   2. Catégorie (liste déroulante, sélection unique) │ échéance
+//   3. Partagé/Privé │ en retard uniquement
 //   4. Tags (sélection multiple)
 export function TaskFilterList({
   tasks,
@@ -52,10 +69,11 @@ export function TaskFilterList({
   // "toutes" (tout ce qui m'est visible, y compris partagé avec moi) et
   // inversement.
   const [scope, setScope] = useState<"mine" | "all">("mine");
-  // Statut par défaut : tâches actives uniquement (à faire + en cours) — un
-  // seul bouton bascule vers tous les statuts (y compris terminées et
-  // archivées).
-  const [statusScope, setStatusScope] = useState<"active" | "all">("active");
+  // Statut par défaut : à faire + en cours cochés (sélection multiple, un
+  // bouton par statut) — reproduit le comportement d'avant la première
+  // rationalisation (03/09/2026), jugé plus pratique à l'usage qu'un seul
+  // bouton à bascule "tous les statuts".
+  const [statuses, setStatuses] = useState<Set<TaskStatus>>(new Set(DEFAULT_STATUSES));
   const [category, setCategory] = useState<string | null>(null);
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
   const [visibility, setVisibility] = useState<Visibility | null>(null);
@@ -73,11 +91,20 @@ export function TaskFilterList({
     });
   }
 
+  function toggleStatus(status: TaskStatus) {
+    setStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((task) => {
       if (scope === "mine" && task.created_by !== currentUserId) return false;
-      if (statusScope === "active" && task.status !== "todo" && task.status !== "in_progress") return false;
+      if (!statuses.has(task.status)) return false;
       if (visibility && task.visibility !== visibility) return false;
       if (category && task.category !== category) return false;
       if (selectedTags.size > 0) {
@@ -102,11 +129,17 @@ export function TaskFilterList({
       }
       return true;
     });
-  }, [tasks, scope, currentUserId, statusScope, visibility, category, selectedTags, dueAtMost, overdueOnly, query]);
+  }, [tasks, scope, currentUserId, statuses, visibility, category, selectedTags, dueAtMost, overdueOnly, query]);
+
+  // Compare l'ensemble courant des statuts cochés à la valeur par défaut
+  // (à faire + en cours), quel que soit l'ordre — un simple `!==` ne
+  // fonctionnerait pas sur deux `Set` distincts.
+  const isDefaultStatuses =
+    statuses.size === DEFAULT_STATUSES.length && DEFAULT_STATUSES.every((s) => statuses.has(s));
 
   const hasActiveFilters =
     scope !== "mine" ||
-    statusScope !== "active" ||
+    !isDefaultStatuses ||
     visibility !== null ||
     category !== null ||
     selectedTags.size > 0 ||
@@ -127,9 +160,9 @@ export function TaskFilterList({
         />
       </div>
 
-      {/* Ligne 1 : portée (mes tâches / toutes) + statut (actives / tous
-          statuts). */}
-      <div className="flex flex-wrap gap-1.5">
+      {/* Ligne 1 : portée (mes tâches / toutes) │ statut (4 boutons à
+          cocher, à faire + en cours par défaut). */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => setScope((prev) => (prev === "mine" ? "all" : "mine"))}
@@ -139,18 +172,22 @@ export function TaskFilterList({
         >
           Toutes les tâches
         </button>
-        <button
-          type="button"
-          onClick={() => setStatusScope((prev) => (prev === "active" ? "all" : "active"))}
-          className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-            statusScope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-          }`}
-        >
-          Tous les statuts
-        </button>
+        <FilterSeparator />
+        {STATUS_ORDER.map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => toggleStatus(status)}
+            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+              statuses.has(status) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+            }`}
+          >
+            {STATUS_LABELS[status]}
+          </button>
+        ))}
       </div>
 
-      {/* Ligne 2 : catégorie (liste déroulante, sélection unique) +
+      {/* Ligne 2 : catégorie (liste déroulante, sélection unique) │
           échéance. */}
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -165,6 +202,8 @@ export function TaskFilterList({
             </option>
           ))}
         </select>
+
+        <FilterSeparator />
 
         <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
           Échéance au plus tard le
@@ -187,8 +226,8 @@ export function TaskFilterList({
         ) : null}
       </div>
 
-      {/* Ligne 3 : partagé/privé + en retard uniquement. */}
-      <div className="flex flex-wrap gap-1.5">
+      {/* Ligne 3 : partagé/privé │ en retard uniquement. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {(
           [
             { value: null, label: "Toutes" },
@@ -207,6 +246,7 @@ export function TaskFilterList({
             {opt.label}
           </button>
         ))}
+        <FilterSeparator />
         <button
           type="button"
           onClick={() => setOverdueOnly((prev) => !prev)}

@@ -90,26 +90,30 @@ export function HomeDashboard({
 
         <Link
           href={`/tasks?dueAtMost=${todayKey}`}
-          className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
+          className="flex items-center gap-2.5 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
             <IconCalendar className="h-4 w-4" />
           </span>
-          <span className="text-[28px] font-extrabold leading-none text-ink">{todayCount}</span>
-          <span className="text-[13px] font-semibold text-ink-muted">
-            {todayCount > 1 ? "Tâches dues aujourd'hui" : "Tâche due aujourd'hui"}
+          <span className="flex flex-col">
+            <span className="text-[22px] font-extrabold leading-none text-ink">{todayCount}</span>
+            <span className="text-[12px] font-semibold leading-snug text-ink-muted">
+              {todayCount > 1 ? "Tâches dues aujourd'hui" : "Tâche due aujourd'hui"}
+            </span>
           </span>
         </Link>
 
         <Link
           href={`/tasks?dueAtMost=${sundayKey}`}
-          className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
+          className="flex items-center gap-2.5 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
             <IconCalendar className="h-4 w-4" />
           </span>
-          <span className="text-[28px] font-extrabold leading-none text-ink">{weekCount}</span>
-          <span className="text-[13px] font-semibold text-ink-muted">Dues cette semaine (dim.)</span>
+          <span className="flex flex-col">
+            <span className="text-[22px] font-extrabold leading-none text-ink">{weekCount}</span>
+            <span className="text-[12px] font-semibold leading-snug text-ink-muted">Dues cette semaine (dim.)</span>
+          </span>
         </Link>
       </div>
 

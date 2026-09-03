@@ -4,10 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTags, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
-import { FilterTabs } from "@/components/FilterTabs";
 import { TaskFilterList } from "@/components/TaskFilterList";
 import { IconPlus } from "@/components/Icons";
-import type { Task } from "@/lib/types";
 
 // Ceinture-bretelles en plus du "cache: no-store" déjà forcé dans le client
 // Supabase admin (voir src/lib/supabase/admin.ts) : garantit qu'aucune
@@ -15,41 +13,33 @@ import type { Task } from "@/lib/types";
 // tâches sur cette page.
 export const dynamic = "force-dynamic";
 
-// "Toutes" = tout ce qui m'est visible (déjà limité par getTasks à ce que
-// je peux voir — voir src/lib/access.ts). "Mes tâches" = uniquement les
-// tâches que j'ai créées (un sous-ensemble : les tâches que d'autres ont
-// partagées avec moi n'y figurent pas). Le statut, la visibilité
-// partagée/privée, la catégorie, les tags, l'échéance et la recherche sont
-// désormais tous des filtres additionnels dans TaskFilterList, pas des
-// onglets séparés.
-function applyFilter(tasks: Task[], filter: string, userId: string): Task[] {
-  if (filter === "mine") return tasks.filter((t) => t.created_by === userId);
-  return tasks;
-}
-
+// La portée (mes tâches / toutes), le statut, la catégorie, les tags,
+// l'échéance, le partagé/privé, "en retard uniquement" et la recherche
+// sont tous des filtres appliqués côté client dans TaskFilterList (voir ce
+// composant) — plus d'onglets ni de paramètre "?filter=" côté serveur
+// (retiré le 03/09/2026, ancien composant FilterTabs.tsx à supprimer sur
+// GitHub, voir le message de livraison). getTasks() reste le seul filtrage
+// serveur : il ne renvoie que ce qui est visible par profile.id (créé par
+// lui, ou partagé avec lui) — voir src/lib/access.ts.
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; dueAtMost?: string; overdue?: string };
+  searchParams: { dueAtMost?: string; overdue?: string };
 }) {
   const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
-  // getTasks ne renvoie que les tâches visibles par profile.id (créées par
-  // lui, ou partagées avec lui) — voir src/lib/access.ts.
   const supabase = createAdminClient();
   const [tasks, allTags] = await Promise.all([getTasks(supabase, profile.id), getTags(supabase)]);
-  const filter = searchParams.filter ?? "all";
-  const filtered = applyFilter(tasks, filter, profile.id);
 
   return (
     <div className="min-h-screen bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
-        <FilterTabs active={filter} />
         <TaskFilterList
-          tasks={filtered}
+          tasks={tasks}
           allTags={allTags}
+          currentUserId={profile.id}
           initialDueAtMost={searchParams.dueAtMost}
           initialOverdueOnly={searchParams.overdue === "1"}
         />

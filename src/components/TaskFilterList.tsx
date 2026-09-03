@@ -1,32 +1,44 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
-import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
-import { dateKeyFromIso, isOverdue, STATUS_LABELS } from "@/lib/format";
+import type { Tag, Task, Visibility } from "@/lib/types";
+import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
+import { dateKeyFromIso, isOverdue } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
 import { IconAlertTriangle, IconSearch } from "./Icons";
 
-// Statuts affichés par défaut (tout sauf "archivée") — reproduit l'ancien
-// comportement de l'onglet "Toutes" du temps où le statut était un onglet
-// séparé plutôt qu'un filtre ici.
-const DEFAULT_STATUSES: TaskStatus[] = ["todo", "in_progress", "done"];
-const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
+// Ordre de la liste déroulante de catégorie : alphabétique comme
+// CATEGORY_ORDER (voir src/lib/categories.ts), sauf "autre" qui est
+// volontairement déplacé en bas de liste plutôt qu'à sa place
+// alphabétique — demandé explicitement, "autre" étant la catégorie
+// fourre-tout, pas une catégorie au même titre que les autres.
+const CATEGORY_SELECT_ORDER = [...CATEGORY_ORDER.filter((c) => c !== "autre"), "autre" as const];
 
-// Filtrage additionnel (statut / partagé-privé / catégorie / tags /
-// mots-clefs / échéance), appliqué côté client par-dessus la portée déjà
-// résolue côté serveur ("Toutes" vs "Mes tâches", voir
-// src/app/tasks/page.tsx). Volontairement en mémoire : la liste de tâches
-// d'une famille reste petite, et ça évite un aller-retour serveur à chaque
-// frappe.
+// Filtrage additionnel (portée/statut/catégorie/échéance/partagé-privé/
+// en retard/tags/mots-clefs), appliqué côté client en mémoire par-dessus
+// la liste complète des tâches visibles par l'utilisateur (déjà filtrée
+// par canView côté serveur — voir src/lib/access.ts et
+// src/app/tasks/page.tsx) : la liste de tâches d'une famille reste petite,
+// et ça évite un aller-retour serveur à chaque frappe/clic.
+//
+// Disposition volontairement rationalisée en 4 lignes (demande explicite
+// de l'utilisateur, 03/09/2026) :
+//   1. Portée (mes tâches / toutes) + statut (actives / tous statuts)
+//   2. Catégorie (liste déroulante, sélection unique) + échéance
+//   3. Partagé/Privé + en retard uniquement
+//   4. Tags (sélection multiple)
 export function TaskFilterList({
   tasks,
   allTags,
+  currentUserId,
   initialDueAtMost,
   initialOverdueOnly,
 }: {
   tasks: Task[];
   allTags: Tag[];
+  // Sert le filtre de portée (ligne 1) : "mes tâches" par défaut ne garde
+  // que task.created_by === currentUserId.
+  currentUserId: string;
   // Pré-remplit le filtre d'échéance, passé en "?dueAtMost=YYYY-MM-DD" par
   // les tuiles du tableau de bord (voir HomeDashboard.tsx) — ex. "toutes
   // les tâches ouvertes dont l'échéance est aujourd'hui au plus tard".
@@ -36,12 +48,19 @@ export function TaskFilterList({
   initialOverdueOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  // Portée par défaut : mes tâches uniquement — un seul bouton bascule vers
+  // "toutes" (tout ce qui m'est visible, y compris partagé avec moi) et
+  // inversement.
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  // Statut par défaut : tâches actives uniquement (à faire + en cours) — un
+  // seul bouton bascule vers tous les statuts (y compris terminées et
+  // archivées).
+  const [statusScope, setStatusScope] = useState<"active" | "all">("active");
   const [category, setCategory] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
-  const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
-  const [statuses, setStatuses] = useState<Set<TaskStatus>>(new Set(DEFAULT_STATUSES));
   const [visibility, setVisibility] = useState<Visibility | null>(null);
+  const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 
@@ -54,19 +73,11 @@ export function TaskFilterList({
     });
   }
 
-  function toggleStatus(status: TaskStatus) {
-    setStatuses((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
-  }
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((task) => {
-      if (!statuses.has(task.status)) return false;
+      if (scope === "mine" && task.created_by !== currentUserId) return false;
+      if (statusScope === "active" && task.status !== "todo" && task.status !== "in_progress") return false;
       if (visibility && task.visibility !== visibility) return false;
       if (category && task.category !== category) return false;
       if (selectedTags.size > 0) {
@@ -91,11 +102,11 @@ export function TaskFilterList({
       }
       return true;
     });
-  }, [tasks, statuses, visibility, category, selectedTags, dueAtMost, query]);
+  }, [tasks, scope, currentUserId, statusScope, visibility, category, selectedTags, dueAtMost, overdueOnly, query]);
 
   const hasActiveFilters =
-    statuses.size !== DEFAULT_STATUSES.length ||
-    !DEFAULT_STATUSES.every((s) => statuses.has(s)) ||
+    scope !== "mine" ||
+    statusScope !== "active" ||
     visibility !== null ||
     category !== null ||
     selectedTags.size > 0 ||
@@ -116,48 +127,67 @@ export function TaskFilterList({
         />
       </div>
 
+      {/* Ligne 1 : portée (mes tâches / toutes) + statut (actives / tous
+          statuts). */}
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
-          onClick={() => setCategory(null)}
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-            category === null ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+          onClick={() => setScope((prev) => (prev === "mine" ? "all" : "mine"))}
+          className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+            scope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
           }`}
         >
-          Toutes catégories
+          Toutes les tâches
         </button>
-        {CATEGORY_ORDER.map((c) => {
-          const Icon = CATEGORY_ICONS[c];
-          return (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setCategory((prev) => (prev === c ? null : c))}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                category === c ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABELS[c]}
-            </button>
-          );
-        })}
+        <button
+          type="button"
+          onClick={() => setStatusScope((prev) => (prev === "active" ? "all" : "active"))}
+          className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+            statusScope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+          }`}
+        >
+          Tous les statuts
+        </button>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {STATUS_ORDER.map((s) => (
+      {/* Ligne 2 : catégorie (liste déroulante, sélection unique) +
+          échéance. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={category ?? ""}
+          onChange={(e) => setCategory(e.target.value || null)}
+          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] font-semibold text-ink outline-none focus:border-brand"
+        >
+          <option value="">Toutes catégories</option>
+          {CATEGORY_SELECT_ORDER.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABELS[c]}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
+          Échéance au plus tard le
+        </label>
+        <input
+          id="dueAtMost"
+          type="date"
+          value={dueAtMost}
+          onChange={(e) => setDueAtMost(e.target.value)}
+          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
+        />
+        {dueAtMost ? (
           <button
-            key={s}
             type="button"
-            onClick={() => toggleStatus(s)}
-            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-              statuses.has(s) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-            }`}
+            onClick={() => setDueAtMost("")}
+            className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
           >
-            {STATUS_LABELS[s]}
+            Effacer
           </button>
-        ))}
+        ) : null}
       </div>
 
+      {/* Ligne 3 : partagé/privé + en retard uniquement. */}
       <div className="flex flex-wrap gap-1.5">
         {(
           [
@@ -188,6 +218,7 @@ export function TaskFilterList({
         </button>
       </div>
 
+      {/* Ligne 4 : tags (sélection multiple). */}
       {tagNames.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {tagNames.map((name) => (
@@ -204,28 +235,6 @@ export function TaskFilterList({
           ))}
         </div>
       ) : null}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
-          Échéance au plus tard le
-        </label>
-        <input
-          id="dueAtMost"
-          type="date"
-          value={dueAtMost}
-          onChange={(e) => setDueAtMost(e.target.value)}
-          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
-        />
-        {dueAtMost ? (
-          <button
-            type="button"
-            onClick={() => setDueAtMost("")}
-            className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
-          >
-            Effacer
-          </button>
-        ) : null}
-      </div>
 
       <div className="flex flex-col gap-2.5">
         {filtered.length === 0 ? (

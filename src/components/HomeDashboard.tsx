@@ -112,7 +112,7 @@ export function HomeDashboard({
           </span>
           <span className="flex flex-col">
             <span className="text-[22px] font-extrabold leading-none text-ink">{weekCount}</span>
-            <span className="text-[12px] font-semibold leading-snug text-ink-muted">Dues cette semaine (dim.)</span>
+            <span className="text-[12px] font-semibold leading-snug text-ink-muted">Dues cette semaine</span>
           </span>
         </Link>
       </div>

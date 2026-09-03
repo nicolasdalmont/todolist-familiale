@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ChecklistItem, Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ActivityLogEntry, ChecklistItem, Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canView } from "./access";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -159,6 +159,46 @@ export async function getUserStats(supabase: DB): Promise<UserStats[]> {
       weekShared: createdByUser.filter((t) => !isPrivate(t) && isRecent(t)).length,
     };
   });
+}
+
+// Fil "Activité du jour" de l'écran d'accueil (voir
+// src/components/ActivityFeed.tsx et migration 005_activity_log.sql).
+// `taskIds` doit déjà être limité aux tâches visibles par l'utilisateur
+// courant (typiquement le résultat de getTasks(), déjà filtré par
+// canView — voir src/lib/access.ts) : cette fonction ne refait pas cette
+// vérification, elle se contente de restreindre la requête à ces id.
+// `sinceIso` borne la fenêtre récupérée (ex. les dernières 48h) ; le
+// regroupement "aujourd'hui uniquement" et par acteur/type/tâche se fait
+// ensuite côté client dans ActivityFeed.tsx, sur le même principe que les
+// compteurs du tableau de bord (voir la note sur le fuseau horaire dans
+// src/lib/format.ts) — un Server Component tournant à l'heure UTC de
+// Vercel ne peut pas fiabiliment déterminer "aujourd'hui" dans le fuseau
+// réel de la famille.
+export async function getRecentActivity(
+  supabase: DB,
+  taskIds: string[],
+  sinceIso: string
+): Promise<ActivityLogEntry[]> {
+  if (taskIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("activity_log")
+    .select(`id, task_id, task_title, actor_id, type, detail, created_at, actor:users(id, name, color)`)
+    .in("task_id", taskIds)
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  // La table peut ne pas encore exister si supabase/migrations/
+  // 005_activity_log.sql n'a pas encore été appliquée en base — dégrade en
+  // liste vide plutôt que de faire échouer tout l'écran d'accueil (même
+  // principe de tolérance qu'à l'écriture, voir logActivity dans
+  // src/lib/actions.ts).
+  if (error) {
+    console.error("getRecentActivity:", error.message);
+    return [];
+  }
+  return (data as unknown as ActivityLogEntry[]) ?? [];
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

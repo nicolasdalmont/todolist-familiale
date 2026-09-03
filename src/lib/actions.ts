@@ -13,9 +13,9 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@/lib/auth";
-import { computeNextOccurrence } from "@/lib/format";
+import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
 import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
-import type { Recurrence, ShareRole } from "@/lib/types";
+import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
 
 async function syncTaskTags(supabase: ReturnType<typeof createAdminClient>, taskId: string, tagNames: string[]) {
   const tagIds = await upsertTagIds(supabase, tagNames);
@@ -42,6 +42,38 @@ function parseShareRoles(formData: FormData, creatorId: string): Map<string, Sha
   }
   roles.set(creatorId, "editor");
   return roles;
+}
+
+// --- Journal d'activité --------------------------------------------------
+//
+// Alimente le fil "Activité du jour" de l'écran d'accueil
+// (src/components/ActivityFeed.tsx) : trace une action faite sur une tâche
+// pour informer les autres personnes qui y ont accès de ce qui s'y passe.
+// N'est appelé qu'avec une tâche `shared` (au moins une autre personne que
+// le créateur y a accès) — sur une tâche privée, personne d'autre ne
+// pourrait de toute façon voir cette activité, inutile de l'écrire.
+//
+// Écriture volontairement non bloquante : si la table `activity_log`
+// n'existe pas encore (supabase/migrations/005_activity_log.sql pas encore
+// appliquée) ou pour toute autre erreur d'écriture, on logue côté serveur
+// et on continue plutôt que de faire échouer l'action principale (créer une
+// tâche, commenter, etc.), qui elle doit toujours réussir.
+async function logActivity(
+  supabase: ReturnType<typeof createAdminClient>,
+  params: { taskId: string; actorId: string; type: ActivityType; taskTitle: string; detail?: string | null }
+) {
+  try {
+    const { error } = await supabase.from("activity_log").insert({
+      task_id: params.taskId,
+      actor_id: params.actorId,
+      type: params.type,
+      task_title: params.taskTitle,
+      detail: params.detail ?? null,
+    });
+    if (error) console.error("logActivity:", error.message);
+  } catch (e) {
+    console.error("logActivity:", e);
+  }
 }
 
 function parseRecurrence(formData: FormData): Recurrence {
@@ -162,6 +194,10 @@ export async function createTaskAction(formData: FormData) {
 
   await syncTaskTags(supabase, task.id, tagNames);
 
+  if (visibility === "shared") {
+    await logActivity(supabase, { taskId: task.id, actorId: userId, type: "task_created", taskTitle: title });
+  }
+
   revalidatePath("/");
   revalidatePath("/tasks");
   redirect(`/tasks/${task.id}`);
@@ -212,6 +248,10 @@ export async function updateTaskAction(formData: FormData) {
 
   await syncTaskTags(supabase, taskId, tagNames);
 
+  if (visibility === "shared") {
+    await logActivity(supabase, { taskId, actorId: userId, type: "task_updated", taskTitle: title });
+  }
+
   revalidatePath("/");
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
@@ -258,6 +298,16 @@ export async function setStatusAction(taskId: string, status: string) {
 
   const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
   if (error) throw new Error(error.message);
+
+  if (task.visibility === "shared") {
+    await logActivity(supabase, {
+      taskId,
+      actorId: userId,
+      type: "status_changed",
+      taskTitle: task.title,
+      detail: STATUS_LABELS[status as TaskStatus] ?? status,
+    });
+  }
 
   if (status === "done" && task.recurrence && task.recurrence.type !== "none") {
     const next = computeNextOccurrence(task.due_at, task.recurrence);
@@ -327,6 +377,10 @@ export async function addCommentAction(formData: FormData) {
   const { error } = await supabase.from("comments").insert({ task_id: taskId, author_id: userId, body });
   if (error) throw new Error(error.message);
 
+  if (access.visibility === "shared") {
+    await logActivity(supabase, { taskId, actorId: userId, type: "comment_added", taskTitle: access.title ?? "" });
+  }
+
   revalidatePath(`/tasks/${taskId}`);
 }
 
@@ -358,6 +412,10 @@ export async function deleteCommentAction(taskId: string, commentId: string) {
   const { error } = await supabase.from("comments").delete().eq("id", commentId);
   if (error) throw new Error(error.message);
 
+  if (access.visibility === "shared") {
+    await logActivity(supabase, { taskId, actorId: userId, type: "comment_deleted", taskTitle: access.title ?? "" });
+  }
+
   revalidatePath(`/tasks/${taskId}`);
 }
 
@@ -385,6 +443,16 @@ export async function addChecklistItemAction(formData: FormData) {
   const { error } = await supabase.from("checklist_items").insert({ task_id: taskId, label });
   if (error) throw new Error(error.message);
 
+  if (access.visibility === "shared") {
+    await logActivity(supabase, {
+      taskId,
+      actorId: userId,
+      type: "checklist_item_added",
+      taskTitle: access.title ?? "",
+      detail: label,
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
@@ -400,13 +468,27 @@ export async function toggleChecklistItemAction(taskId: string, itemId: string, 
 
   // Le filtre .eq("task_id", taskId) est une ceinture-bretelles : garantit
   // qu'un itemId ne peut agir que sur la tâche pour laquelle l'accès vient
-  // d'être vérifié, même si itemId provenait d'ailleurs.
-  const { error } = await supabase
+  // d'être vérifié, même si itemId provenait d'ailleurs. .select().single()
+  // récupère le libellé de l'item pour le journal d'activité, sans requête
+  // supplémentaire.
+  const { data: updated, error } = await supabase
     .from("checklist_items")
     .update({ done })
     .eq("id", itemId)
-    .eq("task_id", taskId);
+    .eq("task_id", taskId)
+    .select("label")
+    .single();
   if (error) throw new Error(error.message);
+
+  if (access.visibility === "shared") {
+    await logActivity(supabase, {
+      taskId,
+      actorId: userId,
+      type: done ? "checklist_item_checked" : "checklist_item_unchecked",
+      taskTitle: access.title ?? "",
+      detail: updated?.label ?? null,
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/tasks");
@@ -421,8 +503,27 @@ export async function deleteChecklistItemAction(taskId: string, itemId: string) 
   const access = await getTaskAccess(supabase, taskId, userId);
   if (!access.exists || !access.canEdit) return;
 
+  // Le libellé est récupéré avant suppression : il n'existera plus pour le
+  // journal d'activité une fois la ligne supprimée.
+  const { data: item } = await supabase
+    .from("checklist_items")
+    .select("label")
+    .eq("id", itemId)
+    .eq("task_id", taskId)
+    .maybeSingle();
+
   const { error } = await supabase.from("checklist_items").delete().eq("id", itemId).eq("task_id", taskId);
   if (error) throw new Error(error.message);
+
+  if (access.visibility === "shared") {
+    await logActivity(supabase, {
+      taskId,
+      actorId: userId,
+      type: "checklist_item_removed",
+      taskTitle: access.title ?? "",
+      detail: item?.label ?? null,
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/tasks");

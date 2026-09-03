@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTasks } from "@/lib/queries";
+import { getRecentActivity, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { IconPlus } from "@/components/Icons";
@@ -21,11 +21,24 @@ export default async function HomePage() {
   // lui, ou partagées avec lui) — voir src/lib/access.ts.
   const tasks = await getTasks(supabase, profile.id);
 
+  // Fenêtre large (48h) récupérée côté serveur ; le fil n'affiche ensuite
+  // que "aujourd'hui" (clé de date locale calculée côté client, voir
+  // ActivityFeed.tsx) — même principe que les compteurs du tableau de bord
+  // pour éviter un décalage de fuseau horaire près de minuit. Restreint aux
+  // tâches déjà filtrées par canView ci-dessus : impossible de voir
+  // l'activité d'une tâche à laquelle on n'a pas accès.
+  const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const activity = await getRecentActivity(
+    supabase,
+    tasks.map((t) => t.id),
+    sinceIso
+  );
+
   return (
     <div className="min-h-screen bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
-        <HomeDashboard profile={profile} tasks={tasks} />
+        <HomeDashboard profile={profile} tasks={tasks} activity={activity} />
       </main>
       <Link
         href="/tasks/new"

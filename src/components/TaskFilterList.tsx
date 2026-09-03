@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
-import { dateKeyFromIso, STATUS_LABELS } from "@/lib/format";
+import { dateKeyFromIso, isOverdue, STATUS_LABELS } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
-import { IconSearch } from "./Icons";
+import { IconAlertTriangle, IconSearch } from "./Icons";
 
 // Statuts affichés par défaut (tout sauf "archivée") — reproduit l'ancien
 // comportement de l'onglet "Toutes" du temps où le statut était un onglet
@@ -23,6 +23,7 @@ export function TaskFilterList({
   tasks,
   allTags,
   initialDueAtMost,
+  initialOverdueOnly,
 }: {
   tasks: Task[];
   allTags: Tag[];
@@ -30,11 +31,15 @@ export function TaskFilterList({
   // les tuiles du tableau de bord (voir HomeDashboard.tsx) — ex. "toutes
   // les tâches ouvertes dont l'échéance est aujourd'hui au plus tard".
   initialDueAtMost?: string;
+  // Pré-active le filtre "en retard uniquement", passé en "?overdue=1" par
+  // la tuile "En retard" du tableau de bord (voir HomeDashboard.tsx).
+  initialOverdueOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
+  const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(new Set(DEFAULT_STATUSES));
   const [visibility, setVisibility] = useState<Visibility | null>(null);
 
@@ -76,6 +81,10 @@ export function TaskFilterList({
         // chronologique, sans se soucier de l'heure exacte.
         if (!task.due_at || dateKeyFromIso(task.due_at) > dueAtMost) return false;
       }
+      // Même définition du retard que la tuile "En retard" du tableau de
+      // bord (voir isOverdue() dans src/lib/format.ts) : ni terminée, ni
+      // archivée, échéance dépassée.
+      if (overdueOnly && !isOverdue(task.due_at, task.status)) return false;
       if (q) {
         const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
@@ -91,6 +100,7 @@ export function TaskFilterList({
     category !== null ||
     selectedTags.size > 0 ||
     dueAtMost.length > 0 ||
+    overdueOnly ||
     query.trim().length > 0;
 
   return (
@@ -167,6 +177,15 @@ export function TaskFilterList({
             {opt.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setOverdueOnly((prev) => !prev)}
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+            overdueOnly ? "border-rose-300 bg-rose-50 text-rose-600" : "border-line bg-surface text-ink-muted"
+          }`}
+        >
+          <IconAlertTriangle className="h-3.5 w-3.5" /> En retard uniquement
+        </button>
       </div>
 
       {tagNames.length > 0 ? (

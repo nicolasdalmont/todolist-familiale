@@ -30,7 +30,7 @@ function applyFilter(tasks: Task[], filter: string, userId: string): Task[] {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; dueAtMost?: string };
+  searchParams: { filter?: string; dueAtMost?: string; overdue?: string };
 }) {
   const profile = await getCurrentUser();
   if (!profile) redirect("/login");
@@ -47,7 +47,12 @@ export default async function TasksPage({
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
         <FilterTabs active={filter} />
-        <TaskFilterList tasks={filtered} allTags={allTags} initialDueAtMost={searchParams.dueAtMost} />
+        <TaskFilterList
+          tasks={filtered}
+          allTags={allTags}
+          initialDueAtMost={searchParams.dueAtMost}
+          initialOverdueOnly={searchParams.overdue === "1"}
+        />
       </main>
       <Link
         href="/tasks/new"

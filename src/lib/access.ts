@@ -35,16 +35,42 @@ export function computeVisibility(creatorId: string, shareUserIds: string[]): Vi
 // à recharger toute la tâche avec ses jointures — utilisé par les Server
 // Actions (modifier/supprimer/changer le statut/commenter) qui n'ont pas
 // déjà la tâche en mémoire. Renvoie exists:false si la tâche n'existe plus.
+//
+// Renvoie aussi `title`/`visibility` : pratique pour les appelants qui
+// n'ont pas non plus la tâche en mémoire mais en ont besoin pour journaliser
+// une activité (voir logActivity dans src/lib/actions.ts) — évite une
+// deuxième requête. `visibility` sert notamment à ne journaliser une action
+// que si la tâche est effectivement partagée (au moins une autre personne
+// que le créateur y a accès), pas sur une tâche privée où personne d'autre
+// ne pourrait de toute façon voir l'activité.
 export async function getTaskAccess(
   supabase: DB,
   taskId: string,
   userId: string
-): Promise<{ exists: boolean; createdBy?: string; canView: boolean; canEdit: boolean }> {
-  const { data: task } = await supabase.from("tasks").select("id, created_by").eq("id", taskId).maybeSingle();
+): Promise<{
+  exists: boolean;
+  createdBy?: string;
+  title?: string;
+  visibility?: Visibility;
+  canView: boolean;
+  canEdit: boolean;
+}> {
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("id, created_by, title, visibility")
+    .eq("id", taskId)
+    .maybeSingle();
   if (!task) return { exists: false, canView: false, canEdit: false };
 
   if (task.created_by === userId) {
-    return { exists: true, createdBy: task.created_by, canView: true, canEdit: true };
+    return {
+      exists: true,
+      createdBy: task.created_by,
+      title: task.title,
+      visibility: task.visibility,
+      canView: true,
+      canEdit: true,
+    };
   }
 
   const { data: share } = await supabase
@@ -54,6 +80,22 @@ export async function getTaskAccess(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!share) return { exists: true, createdBy: task.created_by, canView: false, canEdit: false };
-  return { exists: true, createdBy: task.created_by, canView: true, canEdit: share.role === "editor" };
+  if (!share) {
+    return {
+      exists: true,
+      createdBy: task.created_by,
+      title: task.title,
+      visibility: task.visibility,
+      canView: false,
+      canEdit: false,
+    };
+  }
+  return {
+    exists: true,
+    createdBy: task.created_by,
+    title: task.title,
+    visibility: task.visibility,
+    canView: true,
+    canEdit: share.role === "editor",
+  };
 }

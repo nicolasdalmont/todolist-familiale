@@ -2,22 +2,32 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import type { Profile, Task } from "@/lib/types";
-import { dateKeyFromDate, dateKeyFromIso, upcomingSunday } from "@/lib/format";
-import { IconArrowLeft, IconCalendar } from "./Icons";
+import type { ActivityLogEntry, Profile, Task } from "@/lib/types";
+import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
+import { ActivityFeed } from "./ActivityFeed";
+import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
-// Calcule les deux compteurs "Aujourd'hui" / "Cette semaine" côté client
-// (voir la note dans src/lib/format.ts sur le fuseau horaire) à partir de
-// la liste complète des tâches déjà chargée côté serveur — aucun aller-
-// retour réseau supplémentaire.
-export function HomeDashboard({ profile, tasks }: { profile: Profile; tasks: Task[] }) {
-  const { todayCount, weekCount, todayKey, sundayKey, todayLabel } = useMemo(() => {
+// Calcule les trois compteurs "En retard" / "Aujourd'hui" / "Cette semaine"
+// côté client (voir la note dans src/lib/format.ts sur le fuseau horaire) à
+// partir de la liste complète des tâches déjà chargée côté serveur — aucun
+// aller-retour réseau supplémentaire.
+export function HomeDashboard({
+  profile,
+  tasks,
+  activity,
+}: {
+  profile: Profile;
+  tasks: Task[];
+  activity: ActivityLogEntry[];
+}) {
+  const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel } = useMemo(() => {
     const now = new Date();
     const todayKey = dateKeyFromDate(now);
     const sunday = upcomingSunday(now);
     const sundayKey = dateKeyFromDate(sunday);
 
-    // "Tâches ouvertes" : ni terminées, ni archivées.
+    // "Tâches ouvertes" : ni terminées, ni archivées — aucun des trois
+    // compteurs de l'accueil ne compte une tâche terminée ou archivée.
     const open = tasks.filter((t) => t.status === "todo" || t.status === "in_progress");
 
     const todayCount = open.filter((t) => t.due_at && dateKeyFromIso(t.due_at) === todayKey).length;
@@ -27,10 +37,16 @@ export function HomeDashboard({ profile, tasks }: { profile: Profile; tasks: Tas
     const weekCount = open.filter(
       (t) => t.due_at && dateKeyFromIso(t.due_at) >= todayKey && dateKeyFromIso(t.due_at) <= sundayKey
     ).length;
+    // Même définition du retard que partout ailleurs dans l'appli (badge
+    // "En retard" sur la carte de tâche et l'écran de détail — voir
+    // isOverdue() dans src/lib/format.ts) : échéance dépassée et tâche ni
+    // terminée ni archivée. isOverdue() exclut déjà "done"/"archived", donc
+    // pas besoin de repartir de `open` ici.
+    const overdueCount = tasks.filter((t) => isOverdue(t.due_at, t.status)).length;
 
     const todayLabel = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
-    return { todayCount, weekCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
+    return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
   }, [tasks]);
 
   return (
@@ -41,6 +57,37 @@ export function HomeDashboard({ profile, tasks }: { profile: Profile; tasks: Tas
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        {/* Tuile "En retard" en pleine largeur : la plus urgente des trois,
+            mise en avant en rouge dès qu'elle contient quelque chose — même
+            palette que le badge "En retard" déjà utilisé sur la carte de
+            tâche et l'écran de détail (voir src/components/Badge.tsx). */}
+        <Link
+          href="/tasks?overdue=1"
+          className={`col-span-2 flex items-center gap-3 rounded-2xl border p-4 shadow-sm transition ${
+            overdueCount > 0
+              ? "border-rose-200 bg-rose-50 hover:border-rose-300"
+              : "border-line bg-surface hover:border-brand/50"
+          }`}
+        >
+          <span
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
+              overdueCount > 0 ? "bg-rose-100 text-rose-600" : "bg-brand-soft text-brand-dark"
+            }`}
+          >
+            <IconAlertTriangle className="h-4 w-4" />
+          </span>
+          <span
+            className={`text-[28px] font-extrabold leading-none ${overdueCount > 0 ? "text-rose-600" : "text-ink"}`}
+          >
+            {overdueCount}
+          </span>
+          <span
+            className={`text-[13px] font-semibold ${overdueCount > 0 ? "text-rose-600" : "text-ink-muted"}`}
+          >
+            {overdueCount > 1 ? "Tâches en retard" : "Tâche en retard"}
+          </span>
+        </Link>
+
         <Link
           href={`/tasks?dueAtMost=${todayKey}`}
           className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
@@ -65,6 +112,8 @@ export function HomeDashboard({ profile, tasks }: { profile: Profile; tasks: Tas
           <span className="text-[13px] font-semibold text-ink-muted">Dues cette semaine (dim.)</span>
         </Link>
       </div>
+
+      <ActivityFeed activities={activity} currentUserId={profile.id} />
 
       <Link
         href="/tasks"

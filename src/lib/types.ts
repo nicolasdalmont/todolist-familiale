@@ -78,6 +78,36 @@ export interface Task {
   checklist?: ChecklistItem[];
 }
 
+// Type d'événement du journal d'activité (voir migration
+// 005_activity_log.sql et src/lib/actions.ts, fonction logActivity) — sert
+// aussi de clé de gabarit de message dans src/components/ActivityFeed.tsx.
+export type ActivityType =
+  | "task_created"
+  | "task_updated"
+  | "status_changed"
+  | "comment_added"
+  | "comment_deleted"
+  | "checklist_item_added"
+  | "checklist_item_checked"
+  | "checklist_item_unchecked"
+  | "checklist_item_removed";
+
+// Une ligne du journal d'activité — voir getRecentActivity() dans
+// src/lib/queries.ts. N'est jamais renvoyée que pour des tâches déjà
+// vérifiées visibles par l'utilisateur courant (canView) ; `actor` est
+// `null` si le compte de l'auteur a été supprimé depuis (colonne
+// actor_id en "on delete set null").
+export interface ActivityLogEntry {
+  id: string;
+  task_id: string;
+  task_title: string;
+  actor_id: string;
+  type: ActivityType;
+  detail: string | null;
+  created_at: string;
+  actor?: Pick<Profile, "id" | "name" | "color"> | null;
+}
+
 // Statistiques par utilisateur, réservées à l'écran admin
 // (src/app/admin/page.tsx) — voir getUserStats() dans src/lib/queries.ts.
 // Les compteurs de tâches sont ventilés privé/partagé (sur le champ

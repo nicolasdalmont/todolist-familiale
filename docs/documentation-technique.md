@@ -333,9 +333,16 @@ l'interface. Libellés et icônes associées centralisés dans
 `src/lib/categories.ts`. Affichée sur la carte de tâche et l'écran de
 détail.
 
-### 6.3 Récurrence
+### 6.3 Échéance et récurrence
 
-Stockée en JSON dans `tasks.recurrence` : `{ type: "none" | "daily" |
+**Échéance** (`tasks.due_at`, `timestamptz` nullable) : optionnelle. Le
+formulaire de tâche (`TaskForm.tsx`) affiche un `<input datetime-local>`
+contrôlé, avec un lien **« Retirer l'échéance »** qui le vide — la saisie
+vide est traduite en `due_at = null` par les Server Actions
+(`dueAtRaw ? … : null`). Saisie et affichage sont en heure de Paris (voir
+8.1).
+
+**Récurrence** stockée en JSON dans `tasks.recurrence` : `{ type: "none" | "daily" |
 "weekly" | "monthly" | "custom", interval?, unit?: "days"|"weeks"|"months" }`.
 Quand une tâche récurrente passe à `done`
 (`setStatusAction` dans `src/lib/actions.ts`, après vérification

@@ -34,6 +34,10 @@ export function TaskForm({
   const [, startTransition] = useGlobalTransition();
   const [recurrenceType, setRecurrenceType] = useState(task?.recurrence?.type ?? "none");
   const [category, setCategory] = useState(task?.category ?? DEFAULT_CATEGORY);
+  // Champ contrôlé pour pouvoir le vider via le bouton "Retirer" : l'effacer
+  // renvoie une échéance vide, que les Server Actions traduisent en
+  // due_at = null (voir createTaskAction / updateTaskAction, actions.ts).
+  const [dueAt, setDueAt] = useState(task ? toDatetimeLocalValue(task.due_at) : "");
   const [tagOptions, setTagOptions] = useState(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)));
   const [selectedTags, setSelectedTags] = useState(() => new Set((task?.tags ?? []).map((t) => t.name)));
   const [newTag, setNewTag] = useState("");
@@ -108,14 +112,26 @@ export function TaskForm({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1.5 block text-[13px] font-bold" htmlFor="dueAt">
-          Échéance
-        </label>
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <label className="block text-[13px] font-bold" htmlFor="dueAt">
+            Échéance
+          </label>
+          {dueAt ? (
+            <button
+              type="button"
+              onClick={() => setDueAt("")}
+              className="text-[12px] font-semibold text-ink-muted underline"
+            >
+              Retirer l&apos;échéance
+            </button>
+          ) : null}
+        </div>
         <input
           id="dueAt"
           name="dueAt"
           type="datetime-local"
-          defaultValue={task ? toDatetimeLocalValue(task.due_at) : ""}
+          value={dueAt}
+          onChange={(e) => setDueAt(e.target.value)}
           className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         />
       </div>

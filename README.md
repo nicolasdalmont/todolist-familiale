@@ -43,9 +43,10 @@ sans appel réseau à Supabase.
 - **Première connexion** : l'utilisateur choisit son profil, entre le mot
   de passe temporaire, puis définit immédiatement son propre mot de passe
   dans le même écran. `password_set` passe alors à `true`.
-- **Changer son mot de passe** : lien "Changer mon mot de passe" sur
-  l'écran de connexion (après avoir choisi son profil) — demande le mot de
-  passe actuel puis le nouveau.
+- **Changer son mot de passe** : soit depuis l'écran de connexion (lien
+  "Changer mon mot de passe", après avoir choisi son profil), soit une fois
+  connecté depuis l'écran "Mon compte" (clic sur son avatar). Les deux
+  demandent le mot de passe actuel puis le nouveau.
 - **Mot de passe oublié** : l'administrateur redéfinit un
   `password_hash` temporaire directement en base (SQL Editor Supabase) et
   repasse `password_set` à `false` — l'utilisateur retombe alors sur

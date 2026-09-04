@@ -27,7 +27,9 @@ export function Topbar({ user }: { user: Profile }) {
         ) : null}
       </div>
       <div className="flex items-center gap-2.5">
-        <Avatar profile={user} />
+        <Link href="/compte" title="Mon compte" className="rounded-full hover:opacity-80">
+          <Avatar profile={user} />
+        </Link>
         <LogoutButton />
       </div>
     </header>

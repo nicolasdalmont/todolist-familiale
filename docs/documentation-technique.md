@@ -97,8 +97,11 @@ Entièrement maison, décrite dans `src/lib/auth.ts` et `src/middleware.ts` :
   (prénom + avatar) → mot de passe. Si `password_set = false` (première
   connexion), le même écran demande le mot de passe temporaire puis fait
   saisir immédiatement un mot de passe personnel (`setPasswordAction`).
-  Un lien "Changer mon mot de passe" permet de le faire à tout moment
-  après connexion.
+- **Changer son mot de passe** : depuis l'écran de connexion (lien
+  "Changer mon mot de passe", `setPasswordAction`) ou, une fois connecté,
+  depuis l'écran "Mon compte" (`/compte`, `changePasswordAction` — voir
+  6.14). Les deux vérifient le mot de passe actuel ; la version connectée
+  ne rouvre pas de session (le cookie JWT ne dépend pas du hash).
 - **Création de compte** : pas d'interface dédiée — se fait en SQL direct
   dans Supabase (voir README, section "Authentification"). Claude peut
   précalculer le hash scrypt d'un mot de passe temporaire sur demande.
@@ -793,6 +796,23 @@ l'utilisateur choisit son agenda et enregistre.
   pas transmise pour l'instant (évolution possible via le paramètre
   `recur=RRULE:…`).
 
+### 6.14 Mon compte (`/compte`, 04/09/2026)
+
+Écran accessible en cliquant sur son avatar dans la `Topbar`. Affiche
+l'identité (prénom, rôle) et une section **« Modifier mon mot de passe »**
+(`AccountPasswordForm.tsx` → `changePasswordAction`). Jusqu'ici le
+changement de mot de passe n'était possible que depuis l'écran de
+connexion.
+
+`changePasswordAction` (`src/lib/actions.ts`) tire l'identité de la
+session (pas d'un paramètre client), vérifie le mot de passe actuel, écrit
+le nouveau hash, et **ne rouvre pas de session** : le cookie JWT est signé
+avec `SESSION_SECRET`, indépendamment du mot de passe, donc il reste
+valable. Renvoie `{ ok }` ou `{ error }` sans redirection.
+
+Cet écran hébergera aussi la gestion des **notifications push** (opt-in par
+appareil) — voir la feuille de route notifications.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -803,6 +823,7 @@ l'utilisateur choisit son agenda et enregistre.
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à Google Agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
+| `/compte` | Mon compte : identité + « Modifier mon mot de passe » (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
 
@@ -1007,6 +1028,7 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/components/HomeDashboard.tsx` | Compteurs de l'écran d'accueil (en retard/aujourd'hui/cette semaine) |
 | `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |
+| `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |

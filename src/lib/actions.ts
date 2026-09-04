@@ -144,6 +144,37 @@ export async function setPasswordAction(
   redirect("/");
 }
 
+// Changement de mot de passe par un utilisateur déjà connecté (écran
+// "Mon compte", src/app/compte/page.tsx). Contrairement à setPasswordAction
+// — appelé depuis l'écran de connexion — l'identité vient de la session et
+// non d'un paramètre, et on ne rouvre pas de session ni ne redirige : le
+// cookie JWT reste valable (il ne dépend pas du hash du mot de passe).
+export async function changePasswordAction(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ error?: string; ok?: boolean }> {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  if (newPassword.length < 6) {
+    return { error: "Le mot de passe doit contenir au moins 6 caractères." };
+  }
+
+  const supabase = createAdminClient();
+  const user = await getUserWithPasswordHash(supabase, userId);
+  if (!user || !verifyPassword(currentPassword, user.password_hash)) {
+    return { error: "Mot de passe actuel incorrect." };
+  }
+
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash: hashPassword(newPassword), password_set: true })
+    .eq("id", userId);
+  if (error) return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+
+  return { ok: true };
+}
+
 export async function signOutAction() {
   clearSessionCookie();
   redirect("/login");

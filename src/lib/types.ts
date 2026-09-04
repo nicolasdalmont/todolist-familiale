@@ -117,9 +117,11 @@ export interface UserStats {
   id: string;
   name: string;
   color: string;
-  // null : compte jamais reconnecté depuis l'ajout du suivi de connexion
-  // (migration 003_last_login.sql), voir ce fichier pour la nuance.
-  lastLoginAt: string | null;
+  // Dernière activité (dernier rendu de page authentifié), colonne
+  // users.last_login_at — voir touchLastSeen() dans src/lib/auth.ts.
+  // null : compte jamais vu depuis l'ajout du suivi (migration
+  // 003_last_login.sql).
+  lastSeenAt: string | null;
   totalPrivate: number;
   totalShared: number;
   weekPrivate: number;

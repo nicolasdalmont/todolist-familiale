@@ -98,8 +98,10 @@ create table public.users (
   -- temporaire par son propre mot de passe.
   password_set boolean not null default false,
   created_at timestamptz default now(),
-  -- Dernière connexion réussie (voir recordLogin() dans src/lib/auth.ts),
-  -- migration 003_last_login.sql. Utilisée par l'écran /admin.
+  -- Dernière activité : dernier rendu de page authentifié, rafraîchi au
+  -- plus une fois toutes les 15 min par touchLastSeen() dans
+  -- src/lib/auth.ts (et à chaque connexion via recordLogin()). Migration
+  -- 003_last_login.sql. Affichée sur l'écran /admin.
   last_login_at timestamptz
 );
 

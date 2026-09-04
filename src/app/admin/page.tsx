@@ -40,10 +40,11 @@ export default async function AdminStatsPage() {
                   <div className="text-[15px] font-bold">{u.name}</div>
                 </div>
                 <div className="text-right text-[11.5px] leading-tight text-ink-muted">
+                  <div className="text-[10px] uppercase tracking-wide">Dernière activité</div>
                   <div className="font-semibold text-ink">
-                    {u.lastLoginAt ? relativeTime(u.lastLoginAt) : "Jamais reconnecté"}
+                    {u.lastSeenAt ? relativeTime(u.lastSeenAt) : "Jamais vu"}
                   </div>
-                  {u.lastLoginAt ? <div>{formatDate(u.lastLoginAt)}</div> : null}
+                  {u.lastSeenAt ? <div>{formatDate(u.lastSeenAt)}</div> : null}
                 </div>
               </div>
 

@@ -164,7 +164,7 @@ formulaire de tâche.
 | `role` | text | `admin` \| `user` |
 | `color` | text | Couleur hex de l'avatar (une par utilisateur) |
 | `password_set` | boolean | `false` = mot de passe temporaire pas encore remplacé |
-| `last_login_at` | timestamptz, nullable | Dernière connexion réussie — voir 6.9 (écran admin) |
+| `last_login_at` | timestamptz, nullable | Dernière activité (dernier rendu de page authentifié, rafraîchi ≤ 1×/15 min) — voir 6.9 |
 | `created_at` | timestamptz | |
 
 **`tasks`** — une tâche.
@@ -557,7 +557,7 @@ pousse spontanément un onglet déjà chargé à recharger son code JS.
 autres dans `Topbar.tsx` ; page elle-même protégée côté serveur par un
 `notFound()` sinon, même logique que les autres pages restreintes de
 l'appli — voir 6.1). Affiche, pour chaque membre de la famille : sa
-dernière connexion (`users.last_login_at`, migration
+dernière activité (`users.last_login_at`, migration
 `003_last_login.sql`), et 4 compteurs de tâches créées, ventilés sur deux
 axes — total / 7 derniers jours, et privées / partagées (sur le champ
 dérivé `tasks.visibility`, voir 6.1) — présentés sous forme d'un petit
@@ -569,16 +569,26 @@ tâches** — point vérifié explicitement à la demande de l'utilisateur.
 `getUserStats()` (`src/lib/queries.ts`) ne sélectionne que
 `created_by, created_at, visibility` sur la table `tasks` (aucun titre,
 description, catégorie ou autre) ; l'écran `/admin` n'affiche que le nom
-de la personne, ses 4 compteurs et sa dernière connexion. Même un compte
+de la personne, ses 4 compteurs et sa dernière activité. Même un compte
 admin ne voit donc jamais, sur cet écran, le contenu d'une tâche privée
 d'un autre membre — cohérent avec le modèle "privée par défaut" de la
 section 6.1, que cet écran ne contourne pas.
 
-`last_login_at` reste `NULL` pour les comptes qui ne se sont pas
-reconnectés depuis l'application de la migration 003 (pas d'historique de
-connexion enregistré avant son ajout) — affiché comme "Jamais reconnecté"
-plutôt que de laisser croire, à tort, qu'un compte actif depuis longtemps
-ne s'est jamais connecté.
+**"Dernière activité" plutôt que "dernière connexion".** La session dure
+180 jours (`SESSION_DURATION` dans `src/lib/auth.ts`) : un membre peut
+utiliser l'appli tous les jours sans jamais repasser par l'écran de
+connexion, donc horodater uniquement `loginAction`/`setPasswordAction`
+laissait `last_login_at` figé sur la dernière saisie de mot de passe
+(souvent des semaines en arrière). `getCurrentUser()` rafraîchit donc
+`last_login_at` à **chaque rendu de page authentifié**, via
+`touchLastSeen()`, mais au plus **une fois toutes les 15 minutes** par
+personne (comparaison avec la valeur courante avant écriture) et sans
+jamais bloquer l'affichage si l'écriture échoue. La colonne garde son nom
+`last_login_at` (pas de migration) mais représente désormais la dernière
+fois où la personne a ouvert une page de l'appli.
+
+`last_login_at` reste `NULL` pour les comptes jamais vus depuis
+l'application de la migration 003 — affiché comme "Jamais vu".
 
 ### 6.10 Checklist par tâche
 

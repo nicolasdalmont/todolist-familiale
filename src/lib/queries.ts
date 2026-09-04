@@ -124,7 +124,7 @@ export async function getComments(supabase: DB, taskId: string): Promise<Comment
 }
 
 // Statistiques par utilisateur pour l'écran admin (src/app/admin/page.tsx) :
-// dernière connexion, et 4 compteurs de tâches créées — total et sur les 7
+// dernière activité, et 4 compteurs de tâches créées — total et sur les 7
 // derniers jours, chacun ventilé privé/partagé (sur le champ dérivé
 // tasks.visibility, voir src/lib/access.ts). On compte tout ce que
 // created_by = cet utilisateur, sans filtrer par canView : l'admin doit
@@ -155,7 +155,7 @@ export async function getUserStats(supabase: DB): Promise<UserStats[]> {
       id: u.id,
       name: u.name,
       color: u.color,
-      lastLoginAt: u.last_login_at,
+      lastSeenAt: u.last_login_at,
       totalPrivate: createdByUser.filter(isPrivate).length,
       totalShared: createdByUser.filter((t) => !isPrivate(t)).length,
       weekPrivate: createdByUser.filter((t) => isPrivate(t) && isRecent(t)).length,

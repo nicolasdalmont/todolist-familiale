@@ -65,14 +65,15 @@ export async function setSessionCookie(userId: string): Promise<void> {
 }
 
 // Horodate la connexion réussie d'un utilisateur (colonne
-// users.last_login_at, migration 003_last_login.sql) — utilisé par l'écran
-// de statistiques admin (src/app/admin/page.tsx). Appelé depuis
-// loginAction et setPasswordAction (src/lib/actions.ts), juste après
-// setSessionCookie : les deux représentent une connexion réussie, que le
-// mot de passe soit le mot de passe personnel ou le mot de passe temporaire
-// de première connexion. Ne fait jamais échouer la connexion elle-même si
-// la mise à jour échoue : ce n'est qu'une statistique, pas une condition
-// d'accès.
+// users.last_login_at, migration 003_last_login.sql) — affichée sur
+// l'écran de statistiques admin (src/app/admin/page.tsx) comme "dernière
+// activité". Appelé depuis loginAction et setPasswordAction
+// (src/lib/actions.ts), juste après setSessionCookie. La date est ensuite
+// maintenue à jour au fil de l'usage par touchLastSeen() ci-dessous : sans
+// ça, la session durant 180 jours, la colonne resterait figée sur la
+// dernière saisie de mot de passe. Ne fait jamais échouer la connexion
+// elle-même si la mise à jour échoue : ce n'est qu'une statistique, pas
+// une condition d'accès.
 export async function recordLogin(userId: string): Promise<void> {
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -80,6 +81,31 @@ export async function recordLogin(userId: string): Promise<void> {
     .update({ last_login_at: new Date().toISOString() })
     .eq("id", userId);
   if (error) console.warn("Impossible d'enregistrer la dernière connexion :", error.message);
+}
+
+// Rafraîchit users.last_login_at ("dernière activité" de l'écran /admin) au
+// fil de la navigation. La session dure 180 jours (SESSION_DURATION) : un
+// membre peut donc utiliser l'appli tous les jours sans jamais repasser
+// par loginAction, ce qui laissait la colonne bloquée sur la date de sa
+// dernière saisie de mot de passe. On réécrit donc la date à chaque rendu
+// de page authentifié (appelé par getCurrentUser), mais au plus une fois
+// toutes les 15 minutes, et sans jamais bloquer l'affichage si l'écriture
+// échoue.
+const LAST_SEEN_REFRESH_MS = 15 * 60 * 1000;
+
+async function touchLastSeen(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  currentValue: string | null
+): Promise<void> {
+  const last = currentValue ? Date.parse(currentValue) : 0;
+  if (Date.now() - last < LAST_SEEN_REFRESH_MS) return;
+
+  const { error } = await supabase
+    .from("users")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (error) console.warn("Impossible de rafraîchir la dernière activité :", error.message);
 }
 
 export function clearSessionCookie(): void {
@@ -108,9 +134,14 @@ export async function getCurrentUser(): Promise<Profile | null> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("users")
-    .select("id, name, role, color, password_set, created_at")
+    .select("id, name, role, color, password_set, created_at, last_login_at")
     .eq("id", userId)
     .maybeSingle();
 
-  return (data as Profile | null) ?? null;
+  if (!data) return null;
+
+  await touchLastSeen(supabase, userId, (data.last_login_at as string | null) ?? null);
+
+  const { last_login_at: _lastSeen, ...profile } = data;
+  return profile as Profile;
 }

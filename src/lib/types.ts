@@ -112,6 +112,22 @@ export interface ActivityLogEntry {
   actor?: Pick<Profile, "id" | "name" | "color"> | null;
 }
 
+// Notification « À ton attention » (fil de l'écran d'accueil — voir
+// src/components/AttentionFeed.tsx, src/lib/notifications.ts et migration
+// 006_notifications.sql). `title` est une phrase prête à afficher ; `body`
+// est un détail secondaire optionnel. `read_at` NULL = non lue.
+export type NotificationType = "task_shared" | "comment_added" | "status_changed" | "due_soon";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  task_id: string | null;
+  title: string;
+  body: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
 // Statistiques par utilisateur, réservées à l'écran admin
 // (src/app/admin/page.tsx) — voir getUserStats() dans src/lib/queries.ts.
 // Les compteurs de tâches sont ventilés privé/partagé (sur le champ

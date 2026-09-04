@@ -137,6 +137,7 @@ Deux sources complémentaires, toutes deux dans `supabase/` :
    - `003_last_login.sql` — colonne `users.last_login_at` (voir 6.9).
    - `004_checklist.sql` — table `checklist_items` (voir 6.10).
    - `005_activity_log.sql` — table `activity_log` (voir 6.12).
+   - `006_notifications.sql` — table `notifications` (voir 6.15).
 
 Toute nouvelle évolution du schéma passe par un nouveau fichier numéroté
 dans `supabase/migrations/` (voir section 10), et `recreate_full_schema.sql`
@@ -220,15 +221,22 @@ suppression du compte de son auteur, mais devient alors invisible dans le
 fil — voir 6.12). `task_title` est dénormalisé (recopié au moment de
 l'action) plutôt que résolu par jointure à la lecture.
 
+**`notifications`** — notifications « À ton attention » par utilisateur
+(`id`, `user_id`, `type`, `task_id` nullable, `title`, `body`, `read_at`,
+`created_at`) — voir 6.15 et migration `006_notifications.sql`. `user_id`
+et `task_id` sont en `on delete cascade`. `title` est une phrase prête à
+afficher (dénormalisée, comme `activity_log.task_title`).
+
 Toutes les tables ont `row level security` activé et **aucune policy** —
 voir section 3.
 
 ### 5.3 Script de reconstruction intégrale (`supabase/recreate_full_schema.sql`, 04/09/2026)
 
-Ce script est **complet et exécutable tel quel** : il recrée les 8 tables
+Ce script est **complet et exécutable tel quel** : il recrée les 9 tables
 actuelles (`users`, `tasks`, `task_assignees`, `comments`, `tags`,
-`task_tags`, `checklist_items`, `activity_log`), les deux index de
-`activity_log`, active RLS partout sans policy, et sème un compte
+`task_tags`, `checklist_items`, `activity_log`, `notifications`), les index
+de `activity_log` et `notifications`, active RLS partout sans policy, et
+sème un compte
 administrateur de secours (`Admin`, mot de passe temporaire `bonjour2026`)
 plus les 9 tags de départ. **À n'utiliser qu'en cas de sinistre** (base
 perdue/corrompue, nouvel environnement de secours) : c'est un reset complet
@@ -413,8 +421,10 @@ contrairement à la suppression d'une tâche entière.
 ### 6.6 Écran d'accueil (`/`)
 
 Message de bienvenue ("Bonjour, {Prénom}" + date du jour), trois tuiles
-cliquables (`HomeDashboard.tsx`) et, en dessous, un fil "Activité du jour"
-(`ActivityFeed.tsx`) — voir 6.12. Les compteurs sont calculés **côté
+cliquables (`HomeDashboard.tsx`), puis le fil **« À ton attention »**
+(`AttentionFeed.tsx` — voir 6.15, affiché seulement s'il y a au moins une
+notification) et enfin le fil « Activité du jour » (`ActivityFeed.tsx`) —
+voir 6.12. Les compteurs sont calculés **côté
 client** (voir 8.1 sur la raison de ce choix) à partir de la liste de
 tâches déjà filtrée par `getTasks` (donc uniquement les tâches visibles
 par l'utilisateur connecté — voir 6.1) :
@@ -813,6 +823,46 @@ valable. Renvoie `{ ok }` ou `{ error }` sans redirection.
 Cet écran hébergera aussi la gestion des **notifications push** (opt-in par
 appareil) — voir la feuille de route notifications.
 
+### 6.15 Notifications « À ton attention » (`AttentionFeed`, 04/09/2026)
+
+Fil affiché **sous les compteurs de l'écran d'accueil**, au-dessus de
+« Activité du jour » (6.12). C'est le **miroir in-app des notifications** :
+il existe indépendamment des push web (à venir) et reste visible dès qu'il
+y a au moins une notification, que les push soient activés ou non.
+
+**Modèle** : table `notifications` (migration `006_notifications.sql`) —
+`user_id`, `type`, `task_id` (nullable, `on delete cascade`), `title`
+(phrase prête à afficher), `body` (détail optionnel), `read_at`.
+
+**Écriture** : `src/lib/notifications.ts`, appelé depuis les Server Actions
+en même temps que `logActivity`, de façon non bloquante :
+
+- `notifyUser(supabase, { userId, type, taskId?, title, body? })` — point
+  d'entrée unique (enverra aussi le push web à terme).
+- `notifyTaskParticipants(supabase, { taskId, excludeUserId, … })` —
+  fan-out vers créateur + assigné(e)s + lecteurs, moins l'auteur de
+  l'action.
+
+**Événements couverts** :
+
+| Type | Déclencheur | Destinataires |
+|---|---|---|
+| `task_shared` | `createTaskAction` (partage) / `updateTaskAction` (personne nouvellement ajoutée) | les personnes ajoutées |
+| `comment_added` | `addCommentAction` sur une tâche partagée | participants sauf l'auteur |
+| `status_changed` | `setStatusAction` sur une tâche partagée | participants sauf l'auteur |
+| `due_soon` | *(à venir, Vercel Cron)* | assigné(e)s de la tâche |
+
+Un changement de statut fait depuis le **formulaire de modification**
+(`updateTaskAction`) n'émet pas de `status_changed` — seul le bouton de
+statut de l'écran de détail (`setStatusAction`, le chemin courant) le fait.
+
+**Lecture / affichage** : `getMyNotifications()` (`src/lib/queries.ts`,
+30 dernières) → `AttentionFeed.tsx`. Chaque ligne renvoie vers
+`/tasks/[id]` ; les non lues sont mises en avant (bordure `brand`, pastille
+de compteur) ; **« Tout marquer comme lu »** appelle
+`markNotificationsReadAction` (`read_at = now()` sur les non lues de
+l'utilisateur).
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -1000,7 +1050,8 @@ sur toutes les plateformes. Icône PWA regénérable via
   chaque migration dans `recreate_full_schema.sql` pour qu'il reste le
   reflet fidèle de la structure. Migrations à ce jour :
   `001_categories_and_tags.sql`, `002_sharing_roles.sql`,
-  `003_last_login.sql`, `004_checklist.sql`, `005_activity_log.sql`.
+  `003_last_login.sql`, `004_checklist.sql`, `005_activity_log.sql`,
+  `006_notifications.sql`.
 - **Variables d'environnement** (Vercel → Project Settings → Environment
   Variables, type "Secret") : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
   (Supabase → Project Settings → API), `SESSION_SECRET` (chaîne aléatoire
@@ -1029,6 +1080,8 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |
 | `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
+| `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications (voir 6.15) |
+| `src/components/AttentionFeed.tsx` | Fil « À ton attention » sous les compteurs de l'accueil (voir 6.15) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |

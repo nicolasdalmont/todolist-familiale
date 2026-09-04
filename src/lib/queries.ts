@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ActivityLogEntry, ChecklistItem, Comment, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ActivityLogEntry, ChecklistItem, Comment, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canView } from "./access";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -206,6 +206,29 @@ export async function getRecentActivity(
     return [];
   }
   return (data as unknown as ActivityLogEntry[]) ?? [];
+}
+
+// Fil « À ton attention » de l'écran d'accueil (src/components/
+// AttentionFeed.tsx) : les N dernières notifications de l'utilisateur, plus
+// récentes d'abord. Tolère l'absence de la table (migration 006 pas encore
+// appliquée) en dégradant en liste vide, comme getRecentActivity().
+export async function getMyNotifications(
+  supabase: DB,
+  userId: string,
+  limit = 30
+): Promise<NotificationItem[]> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id, type, task_id, title, body, read_at, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("getMyNotifications:", error.message);
+    return [];
+  }
+  return (data as unknown as NotificationItem[]) ?? [];
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

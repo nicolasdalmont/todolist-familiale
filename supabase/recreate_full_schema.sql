@@ -12,7 +12,7 @@
 -- (001 à 005) et documentées dans docs/documentation-technique.md.
 --
 -- CE QUE CE SCRIPT FAIT :
---   - Recrée les 8 tables de l'application avec leurs colonnes, valeurs par
+--   - Recrée les 9 tables de l'application avec leurs colonnes, valeurs par
 --     défaut, contraintes CHECK et clés primaires/étrangères actuelles.
 --   - Réactive Row Level Security sur chacune, SANS AUCUNE POLICY — c'est
 --     le choix délibéré de ce projet (voir section 3 de la doc technique) :
@@ -72,6 +72,7 @@
 --    inoffensif si absent.
 -- ---------------------------------------------------------------------
 
+drop table if exists public.notifications cascade;
 drop table if exists public.activity_log cascade;
 drop table if exists public.checklist_items cascade;
 drop table if exists public.task_tags cascade;
@@ -187,12 +188,27 @@ create table public.activity_log (
   created_at timestamptz not null default now()
 );
 
+-- Notifications « À ton attention » par utilisateur, alimente le fil sous
+-- les compteurs de l'écran d'accueil (src/components/AttentionFeed.tsx).
+-- Écrites par src/lib/notifications.ts. Migration 006_notifications.sql.
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  type text not null,
+  task_id uuid references public.tasks(id) on delete cascade,
+  title text not null,
+  body text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------------------
 -- 3. Index
 -- ---------------------------------------------------------------------
 
 create index if not exists activity_log_task_id_idx on public.activity_log(task_id);
 create index if not exists activity_log_created_at_idx on public.activity_log(created_at);
+create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
 
 -- ---------------------------------------------------------------------
 -- 4. Row Level Security — activé partout, aucune policy nulle part (voir
@@ -209,6 +225,7 @@ alter table public.tags enable row level security;
 alter table public.task_tags enable row level security;
 alter table public.checklist_items enable row level security;
 alter table public.activity_log enable row level security;
+alter table public.notifications enable row level security;
 
 -- ---------------------------------------------------------------------
 -- 5. Amorçage minimal — un seul compte administrateur pour pouvoir se

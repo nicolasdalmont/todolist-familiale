@@ -2,10 +2,11 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import type { ActivityLogEntry, Profile, Task } from "@/lib/types";
+import type { ActivityLogEntry, NotificationItem, Profile, Task } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
 import { ActivityFeed } from "./ActivityFeed";
+import { AttentionFeed } from "./AttentionFeed";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
 // Calcule les trois compteurs "En retard" / "Aujourd'hui" / "Cette semaine"
@@ -16,10 +17,12 @@ export function HomeDashboard({
   profile,
   tasks,
   activity,
+  notifications,
 }: {
   profile: Profile;
   tasks: Task[];
   activity: ActivityLogEntry[];
+  notifications: NotificationItem[];
 }) {
   const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel } = useMemo(() => {
     const now = new Date();
@@ -122,6 +125,8 @@ export function HomeDashboard({
           </span>
         </Link>
       </div>
+
+      <AttentionFeed notifications={notifications} />
 
       <ActivityFeed activities={activity} currentUserId={profile.id} />
 

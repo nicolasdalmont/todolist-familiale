@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth";
 import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
 import { parisWallTimeToUtcIso } from "@/lib/timezone";
+import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
 import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
 
@@ -228,6 +229,20 @@ export async function createTaskAction(formData: FormData) {
 
   if (visibility === "shared") {
     await logActivity(supabase, { taskId: task.id, actorId: userId, type: "task_created", taskTitle: title });
+    // Notifier chaque personne avec qui la tâche est partagée (hors créateur).
+    const who = await actorName(supabase, userId);
+    await Promise.all(
+      Array.from(shareRoles.keys())
+        .filter((id) => id !== userId)
+        .map((id) =>
+          notifyUser(supabase, {
+            userId: id,
+            type: "task_shared",
+            taskId: task.id,
+            title: `${who} t'a partagé « ${title} »`,
+          })
+        )
+    );
   }
 
   revalidatePath("/");
@@ -273,6 +288,14 @@ export async function updateTaskAction(formData: FormData) {
     .eq("id", taskId);
   if (error) throw new Error(error.message);
 
+  // Partage effectif avant modification, pour ne notifier que les personnes
+  // réellement ajoutées par cette modification (pas celles déjà présentes).
+  const { data: prevAssignees } = await supabase
+    .from("task_assignees")
+    .select("user_id")
+    .eq("task_id", taskId);
+  const previouslyShared = new Set((prevAssignees ?? []).map((a) => a.user_id as string));
+
   await supabase.from("task_assignees").delete().eq("task_id", taskId);
   const rows = Array.from(shareRoles.entries()).map(([id, role]) => ({ task_id: taskId, user_id: id, role }));
   const { error: assignError } = await supabase.from("task_assignees").insert(rows);
@@ -282,6 +305,22 @@ export async function updateTaskAction(formData: FormData) {
 
   if (visibility === "shared") {
     await logActivity(supabase, { taskId, actorId: userId, type: "task_updated", taskTitle: title });
+    const newlyShared = Array.from(shareRoles.keys()).filter(
+      (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
+    );
+    if (newlyShared.length > 0) {
+      const who = await actorName(supabase, userId);
+      await Promise.all(
+        newlyShared.map((id) =>
+          notifyUser(supabase, {
+            userId: id,
+            type: "task_shared",
+            taskId,
+            title: `${who} t'a partagé « ${title} »`,
+          })
+        )
+      );
+    }
   }
 
   revalidatePath("/");
@@ -332,12 +371,20 @@ export async function setStatusAction(taskId: string, status: string) {
   if (error) throw new Error(error.message);
 
   if (task.visibility === "shared") {
+    const statusLabel = STATUS_LABELS[status as TaskStatus] ?? status;
     await logActivity(supabase, {
       taskId,
       actorId: userId,
       type: "status_changed",
       taskTitle: task.title,
-      detail: STATUS_LABELS[status as TaskStatus] ?? status,
+      detail: statusLabel,
+    });
+    const who = await actorName(supabase, userId);
+    await notifyTaskParticipants(supabase, {
+      taskId,
+      excludeUserId: userId,
+      type: "status_changed",
+      title: `${who} a mis « ${task.title} » en « ${statusLabel} »`,
     });
   }
 
@@ -411,8 +458,17 @@ export async function addCommentAction(formData: FormData) {
 
   if (access.visibility === "shared") {
     await logActivity(supabase, { taskId, actorId: userId, type: "comment_added", taskTitle: access.title ?? "" });
+    const who = await actorName(supabase, userId);
+    await notifyTaskParticipants(supabase, {
+      taskId,
+      excludeUserId: userId,
+      type: "comment_added",
+      title: `${who} a commenté « ${access.title ?? "une tâche"} »`,
+      body: body.length > 140 ? `${body.slice(0, 137)}…` : body,
+    });
   }
 
+  revalidatePath("/");
   revalidatePath(`/tasks/${taskId}`);
 }
 
@@ -560,4 +616,24 @@ export async function deleteChecklistItemAction(taskId: string, itemId: string) 
   revalidatePath("/");
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
+}
+
+// --- Notifications --------------------------------------------------------
+
+// Marque toutes les notifications non lues de l'utilisateur courant comme
+// lues (bouton « Tout marquer comme lu » du fil « À ton attention » —
+// src/components/AttentionFeed.tsx).
+export async function markNotificationsReadAction() {
+  const userId = await getSessionUserId();
+  if (!userId) return;
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (error) console.error("markNotificationsReadAction:", error.message);
+
+  revalidatePath("/");
 }

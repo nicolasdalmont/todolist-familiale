@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getRecentActivity, getTasks } from "@/lib/queries";
+import { getMyNotifications, getRecentActivity, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { IconPlus } from "@/components/Icons";
@@ -28,17 +28,20 @@ export default async function HomePage() {
   // tâches déjà filtrées par canView ci-dessus : impossible de voir
   // l'activité d'une tâche à laquelle on n'a pas accès.
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-  const activity = await getRecentActivity(
-    supabase,
-    tasks.map((t) => t.id),
-    sinceIso
-  );
+  const [activity, notifications] = await Promise.all([
+    getRecentActivity(
+      supabase,
+      tasks.map((t) => t.id),
+      sinceIso
+    ),
+    getMyNotifications(supabase, profile.id),
+  ]);
 
   return (
     <div className="min-h-screen bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
-        <HomeDashboard profile={profile} tasks={tasks} activity={activity} />
+        <HomeDashboard profile={profile} tasks={tasks} activity={activity} notifications={notifications} />
       </main>
       <Link
         href="/tasks/new"

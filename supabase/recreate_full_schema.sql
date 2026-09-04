@@ -12,7 +12,7 @@
 -- (001 à 005) et documentées dans docs/documentation-technique.md.
 --
 -- CE QUE CE SCRIPT FAIT :
---   - Recrée les 9 tables de l'application avec leurs colonnes, valeurs par
+--   - Recrée les 10 tables de l'application avec leurs colonnes, valeurs par
 --     défaut, contraintes CHECK et clés primaires/étrangères actuelles.
 --   - Réactive Row Level Security sur chacune, SANS AUCUNE POLICY — c'est
 --     le choix délibéré de ce projet (voir section 3 de la doc technique) :
@@ -72,6 +72,7 @@
 --    inoffensif si absent.
 -- ---------------------------------------------------------------------
 
+drop table if exists public.push_subscriptions cascade;
 drop table if exists public.notifications cascade;
 drop table if exists public.activity_log cascade;
 drop table if exists public.checklist_items cascade;
@@ -202,6 +203,19 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
+-- Abonnements aux notifications push web, un par appareil où la personne a
+-- activé les notifications (opt-in, écran "Mon compte"). Migration
+-- 007_push_subscriptions.sql.
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------------------
 -- 3. Index
 -- ---------------------------------------------------------------------
@@ -209,6 +223,7 @@ create table public.notifications (
 create index if not exists activity_log_task_id_idx on public.activity_log(task_id);
 create index if not exists activity_log_created_at_idx on public.activity_log(created_at);
 create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions(user_id);
 
 -- ---------------------------------------------------------------------
 -- 4. Row Level Security — activé partout, aucune policy nulle part (voir
@@ -226,6 +241,7 @@ alter table public.task_tags enable row level security;
 alter table public.checklist_items enable row level security;
 alter table public.activity_log enable row level security;
 alter table public.notifications enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 -- ---------------------------------------------------------------------
 -- 5. Amorçage minimal — un seul compte administrateur pour pouvoir se

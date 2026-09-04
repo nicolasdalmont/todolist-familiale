@@ -138,6 +138,8 @@ Deux sources complémentaires, toutes deux dans `supabase/` :
    - `004_checklist.sql` — table `checklist_items` (voir 6.10).
    - `005_activity_log.sql` — table `activity_log` (voir 6.12).
    - `006_notifications.sql` — table `notifications` (voir 6.15).
+   - `007_push_subscriptions.sql` — table `push_subscriptions` (voir 6.15
+     et la feuille de route notifications).
 
 Toute nouvelle évolution du schéma passe par un nouveau fichier numéroté
 dans `supabase/migrations/` (voir section 10), et `recreate_full_schema.sql`
@@ -227,16 +229,24 @@ l'action) plutôt que résolu par jointure à la lecture.
 et `task_id` sont en `on delete cascade`. `title` est une phrase prête à
 afficher (dénormalisée, comme `activity_log.task_title`).
 
+**`push_subscriptions`** — abonnements aux notifications push web, un par
+appareil où la personne a activé les notifications (`id`, `user_id`,
+`endpoint` unique, `p256dh`, `auth`, `user_agent`, `created_at`) — voir
+6.15 et migration `007_push_subscriptions.sql`. `endpoint` et les clés
+`p256dh`/`auth` sont fournis par le navigateur au moment de l'abonnement
+(`pushManager.subscribe()`) ; purgée automatiquement par `sendPushToUser()`
+si l'endpoint répond 404/410 (abonnement révoqué).
+
 Toutes les tables ont `row level security` activé et **aucune policy** —
 voir section 3.
 
 ### 5.3 Script de reconstruction intégrale (`supabase/recreate_full_schema.sql`, 04/09/2026)
 
-Ce script est **complet et exécutable tel quel** : il recrée les 9 tables
+Ce script est **complet et exécutable tel quel** : il recrée les 10 tables
 actuelles (`users`, `tasks`, `task_assignees`, `comments`, `tags`,
-`task_tags`, `checklist_items`, `activity_log`, `notifications`), les index
-de `activity_log` et `notifications`, active RLS partout sans policy, et
-sème un compte
+`task_tags`, `checklist_items`, `activity_log`, `notifications`,
+`push_subscriptions`), les index de `activity_log`, `notifications` et
+`push_subscriptions`, active RLS partout sans policy, et sème un compte
 administrateur de secours (`Admin`, mot de passe temporaire `bonjour2026`)
 plus les 9 tags de départ. **À n'utiliser qu'en cas de sinistre** (base
 perdue/corrompue, nouvel environnement de secours) : c'est un reset complet
@@ -827,8 +837,8 @@ appareil) — voir la feuille de route notifications.
 
 Fil affiché **sous les compteurs de l'écran d'accueil**, au-dessus de
 « Activité du jour » (6.12). C'est le **miroir in-app des notifications** :
-il existe indépendamment des push web (à venir) et reste visible dès qu'il
-y a au moins une notification, que les push soient activés ou non.
+il existe indépendamment des push web et reste visible dès qu'il y a au
+moins une notification, que les push soient activés ou non.
 
 **Modèle** : table `notifications` (migration `006_notifications.sql`) —
 `user_id`, `type`, `task_id` (nullable, `on delete cascade`), `title`
@@ -838,10 +848,25 @@ y a au moins une notification, que les push soient activés ou non.
 en même temps que `logActivity`, de façon non bloquante :
 
 - `notifyUser(supabase, { userId, type, taskId?, title, body? })` — point
-  d'entrée unique (enverra aussi le push web à terme).
+  d'entrée unique. Écrit la ligne `notifications`, **puis** appelle
+  `sendPushToUser()` (`src/lib/push.ts`) pour envoyer un push web à chaque
+  appareil où la personne a activé les notifications (table
+  `push_subscriptions`, migration `007_push_subscriptions.sql`) — no-op
+  silencieux tant qu'elle n'en a activé aucun. L'envoi et l'écriture sont
+  chacun indépendamment non bloquants.
 - `notifyTaskParticipants(supabase, { taskId, excludeUserId, … })` —
   fan-out vers créateur + assigné(e)s + lecteurs, moins l'auteur de
   l'action.
+
+**Envoi du push** (`sendPushToUser()`, protocole Web Push standard —
+RFC 8291/8292, aucun service tiers) : signe la requête avec les clés VAPID
+(`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`,
+générées une fois avec `npx web-push generate-vapid-keys` — voir section
+10) et purge automatiquement un abonnement mort (réponse 404/410).
+**L'activation côté client (écran « Mon compte », service worker) n'est
+pas encore livrée** — voir la feuille de route notifications : la
+plomberie d'envoi est prête, `push_subscriptions` reste vide tant que ce
+flux n'existe pas, donc aucun push n'est réellement délivré pour l'instant.
 
 **Événements couverts** :
 
@@ -1051,12 +1076,16 @@ sur toutes les plateformes. Icône PWA regénérable via
   reflet fidèle de la structure. Migrations à ce jour :
   `001_categories_and_tags.sql`, `002_sharing_roles.sql`,
   `003_last_login.sql`, `004_checklist.sql`, `005_activity_log.sql`,
-  `006_notifications.sql`.
+  `006_notifications.sql`, `007_push_subscriptions.sql`.
 - **Variables d'environnement** (Vercel → Project Settings → Environment
   Variables, type "Secret") : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
   (Supabase → Project Settings → API), `SESSION_SECRET` (chaîne aléatoire
-  générée une fois, ex. `openssl rand -base64 48`). Détail dans
-  `.env.example` et `README.md`.
+  générée une fois, ex. `openssl rand -base64 48`), et depuis les
+  notifications push (voir 6.15) `NEXT_PUBLIC_VAPID_PUBLIC_KEY` /
+  `VAPID_PRIVATE_KEY` (générées une fois avec
+  `npx web-push generate-vapid-keys`) et `VAPID_SUBJECT`
+  (`mailto:quelqu'un@exemple.fr`). Détail dans `.env.example` et
+  `README.md`.
 
 ## 11. Inventaire des fichiers principaux
 
@@ -1080,7 +1109,8 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |
 | `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
-| `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications (voir 6.15) |
+| `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications + déclenchement du push (voir 6.15) |
+| `src/lib/push.ts` | `sendPushToUser()` — envoi Web Push (clés VAPID), purge des abonnements morts (voir 6.15) |
 | `src/components/AttentionFeed.tsx` | Fil « À ton attention » sous les compteurs de l'accueil (voir 6.15) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |

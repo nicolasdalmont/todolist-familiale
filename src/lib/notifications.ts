@@ -1,16 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotificationType } from "./types";
+import { sendPushToUser } from "./push";
 
 type DB = SupabaseClient<any, "public", any>;
 
-// Point d'entrée unique pour « prévenir quelqu'un ». Crée une notification
+// Point d'entrée unique pour « prévenir quelqu'un » : crée une notification
 // « À ton attention » (fil de l'écran d'accueil, src/components/
-// AttentionFeed.tsx). Écriture volontairement non bloquante, comme
-// logActivity() dans src/lib/actions.ts : une erreur ici (table absente,
-// etc.) ne doit jamais faire échouer l'action principale qui la déclenche.
+// AttentionFeed.tsx) et, si la personne a activé les notifications sur au
+// moins un appareil (table push_subscriptions — voir migration
+// 007_push_subscriptions.sql), envoie aussi un push web
+// (sendPushToUser(), src/lib/push.ts). Sans abonnement, ce second envoi
+// est un no-op silencieux — c'est le cas tant que l'écran d'activation
+// (« Mon compte ») n'existe pas encore.
 //
-// À terme, cette fonction enverra aussi un push web à l'utilisateur (voir
-// la feuille de route notifications).
+// Les deux écritures sont volontairement non bloquantes, comme
+// logActivity() dans src/lib/actions.ts : une erreur ici (table absente,
+// clés VAPID manquantes, etc.) ne doit jamais faire échouer l'action
+// principale qui la déclenche.
 export async function notifyUser(
   supabase: DB,
   params: {
@@ -33,6 +39,12 @@ export async function notifyUser(
   } catch (e) {
     console.error("notifyUser:", e);
   }
+
+  await sendPushToUser(supabase, params.userId, {
+    title: params.title,
+    body: params.body,
+    url: params.taskId ? `/tasks/${params.taskId}` : "/",
+  });
 }
 
 // Notifie tous les participants d'une tâche (créateur + assignés + lecteurs)

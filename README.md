@@ -61,13 +61,16 @@ personnel via l'écran de première connexion.
 
 ## Variables d'environnement
 
-À définir dans Vercel (Project Settings → Environment Variables, type
-**Secret** pour les trois, voir `.env.example`) :
+À définir dans Vercel (Project Settings → Environment Variables, voir
+`.env.example`) :
 
 ```
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SESSION_SECRET=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
 ```
 
 `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` viennent de Supabase → Project
@@ -76,6 +79,16 @@ chaîne aléatoire longue à générer soi-même (ex. `openssl rand -base64 48`)
 elle signe les cookies de session, donc la garder secrète et ne jamais la
 changer sans effet de bord (tout changement déconnecte tous les
 utilisateurs).
+
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` sont la paire de clés
+des notifications push web (protocole standard, aucun compte/service tiers
+à créer) — à générer une fois avec `npx web-push generate-vapid-keys` et à
+garder ensuite, ne pas régénérer (ça invaliderait tous les abonnements déjà
+enregistrés). `VAPID_SUBJECT` est un contact `mailto:...` transmis au
+service push en cas de souci de délivrabilité, jamais affiché aux
+utilisateurs. Toutes les six en type **Secret**, sauf
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` qui doit rester en clair (le préfixe
+`NEXT_PUBLIC_` l'expose intentionnellement au navigateur).
 
 ## Schéma de base de données
 

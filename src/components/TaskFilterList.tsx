@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
+import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
 import { IconAlertTriangle, IconChevronDown, IconSearch } from "./Icons";
 
@@ -102,7 +103,13 @@ export function TaskFilterList({
   tasks: Task[];
   allTags: Tag[];
   // Sert le filtre de portée (ligne 1) : "mes tâches" par défaut ne garde
-  // que task.created_by === currentUserId.
+  // que les tâches dont l'utilisateur est responsable — canEdit(task,
+  // currentUserId), voir src/lib/access.ts : créateur, ou assigné(e) avec
+  // droit de modification. Même définition que les compteurs de l'accueil
+  // (HomeDashboard.tsx) — corrigé le 04/09/2026 pour que cliquer sur un
+  // compteur (qui atterrit sur cette portée par défaut) affiche toujours
+  // exactement ce qu'il comptait, ni plus ni moins. Exclut les tâches où
+  // l'utilisateur est seulement en lecture seule.
   currentUserId: string;
   // Pré-remplit le filtre d'échéance, passé en "?dueAtMost=YYYY-MM-DD" par
   // les tuiles du tableau de bord (voir HomeDashboard.tsx) — ex. "toutes
@@ -113,13 +120,12 @@ export function TaskFilterList({
   initialOverdueOnly?: boolean;
 }) {
   // Arrivée depuis une tuile de l'accueil : ces tuiles comptent les tâches
-  // dont on est responsable (canEdit — créateur ou assigné(e) avec droit de
-  // modification, voir HomeDashboard.tsx et src/lib/access.ts), plus large
-  // que la portée "mes tâches" (créateur uniquement). Forcer "Toutes les
-  // tâches" ici garde le nombre affiché cohérent avec celui de la tuile
-  // cliquée (corrigé le 04/09/2026, après signalement d'un écart) ; et
-  // comme le clic sur une tuile est une intention explicite ("montre-moi
-  // exactement ça"), on ignore aussi tout filtre précédemment mémorisé.
+  // dont on est responsable (canEdit, voir HomeDashboard.tsx) — exactement
+  // la définition de la portée "mes tâches" par défaut (voir plus bas), donc
+  // rien à forcer sur la portée elle-même. On ignore en revanche tout
+  // filtre précédemment mémorisé (catégorie, tags, etc.) : le clic sur une
+  // tuile est une intention explicite ("montre-moi exactement ça"), pas la
+  // reprise d'une session de filtrage antérieure.
   const cameFromTile = Boolean(initialOverdueOnly) || Boolean(initialDueAtMost);
 
   // États initialisés à leurs valeurs par défaut habituelles (identiques à
@@ -135,9 +141,11 @@ export function TaskFilterList({
   // lignes de filtres — dépliable au besoin via le bouton dédié.
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Portée par défaut : mes tâches uniquement — un seul bouton bascule vers
-  // "toutes" (tout ce qui m'est visible, y compris partagé avec moi) et
-  // inversement.
-  const [scope, setScope] = useState<"mine" | "all">(cameFromTile ? "all" : "mine");
+  // "toutes" (tout ce qui m'est visible, y compris en lecture seule) et
+  // inversement. "mine" est toujours la valeur initiale, y compris depuis
+  // une tuile de l'accueil (cameFromTile) : elle correspond déjà à ce que
+  // la tuile a compté, pas besoin de la forcer.
+  const [scope, setScope] = useState<"mine" | "all">("mine");
   // Statut par défaut : à faire + en cours cochés (sélection multiple, un
   // bouton par statut) — reproduit le comportement d'avant la première
   // rationalisation (03/09/2026), jugé plus pratique à l'usage qu'un seul
@@ -210,7 +218,7 @@ export function TaskFilterList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((task) => {
-      if (scope === "mine" && task.created_by !== currentUserId) return false;
+      if (scope === "mine" && !canEdit(task, currentUserId)) return false;
       if (!statuses.has(task.status)) return false;
       if (visibility && task.visibility !== visibility) return false;
       if (category && task.category !== category) return false;

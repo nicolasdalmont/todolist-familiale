@@ -448,10 +448,12 @@ par l'utilisateur connecté — voir 6.1), puis restreinte aux tâches dont il
 est **responsable** : créées par lui, ou partagées avec lui avec droit de
 modification (« Assigné(e) ») — jamais celles en lecture seule (« Lecture
 seule »), même définition que `canEdit()` (`src/lib/access.ts`). Correctif
-du 04/09/2026 : avant ça, "En retard" comptait aussi les tâches en lecture
-seule, que la liste des tâches (portée par défaut "mes tâches",
-`TaskFilterList.tsx`) n'affiche pas — d'où un chiffre sur la tuile
-supérieur à ce qu'on trouvait en cliquant dessus.
+du 04/09/2026, en deux temps : d'abord restreint les compteurs à
+`canEdit()` (ils comptaient aussi les tâches en lecture seule), puis
+aligné la portée par défaut "mes tâches" de la liste (`TaskFilterList.tsx`,
+voir 6.7) sur cette même définition — les deux affichent donc désormais
+toujours le même chiffre, cliquer sur une tuile atterrit sur exactement ce
+qu'elle comptait.
 
 - **En retard** (ajoutée le 03/09/2026) : nombre de tâches dont
   l'échéance est dépassée, ni terminées ni archivées — même définition
@@ -523,24 +525,21 @@ l'autre, plutôt que de rester côte à côte séparé par une barre qui
 n'aurait plus de sens dans cette disposition empilée) :
 
 1. **Portée │ statut** :
-   - **Portée** : par défaut **mes tâches** uniquement
-     (`task.created_by === currentUserId`, prop `currentUserId` transmis
-     par `tasks/page.tsx`) ; le bouton "Toutes les tâches" bascule vers
-     tout ce qui est visible par l'utilisateur (y compris partagé avec
-     lui — `canView`, portée la plus large), et inversement.
-     **Forcée sur "Toutes les tâches" en arrivant depuis une tuile de
-     l'accueil** (`?overdue=1` ou `?dueAtMost=...`, `cameFromTile` dans
-     `TaskFilterList.tsx`, 04/09/2026) — ignore alors aussi tout filtre
-     mémorisé (voir plus bas). Cette portée reste néanmoins **plus large**
-     que `canEdit()`, utilisé par les compteurs de l'accueil (6.6) : elle
-     inclut aussi les tâches où l'utilisateur est en **lecture seule**, que
-     `canEdit()` exclut. Écart connu et **non résolu avec exactitude** : la
-     liste ouverte depuis une tuile peut donc afficher un peu **plus**
-     d'éléments que ce que la tuile comptait (ex. une tâche en lecture
-     seule en retard). Les deux seules valeurs de portée disponibles
-     aujourd'hui sont "mes tâches" (trop strict) et "toutes" (trop large) ;
-     un filtre calé exactement sur `canEdit()` réglerait ça mais n'existe
-     pas encore.
+   - **Portée** : par défaut **mes tâches** uniquement — `canEdit(task,
+     currentUserId)` (`src/lib/access.ts`), prop `currentUserId` transmis
+     par `tasks/page.tsx` : créateur, ou assigné(e) avec droit de
+     modification, jamais une tâche où l'utilisateur n'est qu'en lecture
+     seule. Le bouton "Toutes les tâches" bascule vers tout ce qui est
+     visible par l'utilisateur (`canView`, y compris en lecture seule),
+     et inversement. **Même définition que les compteurs de l'accueil**
+     (`canEdit()`, voir 6.6) — corrigé le 04/09/2026, en remplacement de
+     l'ancienne portée (`task.created_by === currentUserId` seul, qui
+     excluait à tort les tâches assignées créées par quelqu'un d'autre) :
+     un compteur de l'accueil et la liste qu'on obtient en cliquant dessus
+     affichent désormais toujours le même total, sans avoir besoin de
+     forcer explicitement une portée particulière en arrivant depuis une
+     tuile (`cameFromTile` dans `TaskFilterList.tsx` continue seulement à
+     ignorer tout filtre mémorisé dans ce cas — voir plus bas).
    - **Statut** : quatre boutons à cocher indépendamment (À faire, En
      cours, Terminée, Archivée — `STATUS_ORDER`/`STATUS_LABELS` dans
      `src/lib/format.ts`), sélection multiple comme les tags. **À faire**

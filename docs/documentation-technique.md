@@ -830,8 +830,8 @@ le nouveau hash, et **ne rouvre pas de session** : le cookie JWT est signé
 avec `SESSION_SECRET`, indépendamment du mot de passe, donc il reste
 valable. Renvoie `{ ok }` ou `{ error }` sans redirection.
 
-Cet écran hébergera aussi la gestion des **notifications push** (opt-in par
-appareil) — voir la feuille de route notifications.
+Héberge aussi, depuis le 04/09/2026, la section **Notifications**
+(`NotificationsToggle.tsx`) — voir 6.15.
 
 ### 6.15 Notifications « À ton attention » (`AttentionFeed`, 04/09/2026)
 
@@ -863,10 +863,44 @@ RFC 8291/8292, aucun service tiers) : signe la requête avec les clés VAPID
 (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`,
 générées une fois avec `npx web-push generate-vapid-keys` — voir section
 10) et purge automatiquement un abonnement mort (réponse 404/410).
-**L'activation côté client (écran « Mon compte », service worker) n'est
-pas encore livrée** — voir la feuille de route notifications : la
-plomberie d'envoi est prête, `push_subscriptions` reste vide tant que ce
-flux n'existe pas, donc aucun push n'est réellement délivré pour l'instant.
+
+**Activation côté client — opt-in strict, par appareil, rien par défaut**
+(écran « Mon compte », `NotificationsToggle.tsx`) :
+
+- **Détection** : appareil non compatible (`pushSupported()`,
+  `src/lib/push-client.ts`) → message neutre. iOS dans Safari (pas
+  installé, `isIos() && !isStandalone()`) → invite à ajouter l'appli à
+  l'écran d'accueil (le push n'existe pas dans l'onglet Safari, seulement
+  pour la PWA installée, iOS 16.4+). Permission déjà refusée par le
+  navigateur → invite à la réactiver dans ses réglages.
+- **Activer** : `Notification.requestPermission()` → si accordée,
+  `pushManager.subscribe({ applicationServerKey })` avec la clé VAPID
+  publique → l'abonnement est envoyé à `POST /api/push/subscribe`
+  (upsert dans `push_subscriptions`, `onConflict: endpoint`).
+- **Désactiver** : `subscription.unsubscribe()` côté navigateur puis
+  `DELETE /api/push/subscribe`.
+- `/api/push/subscribe` est une **Route Handler**, pas une Server Action :
+  elle est aussi appelée par `public/sw.js` (voir plus bas), qui tourne
+  hors du runtime React et ne peut invoquer aucune Server Action. Exclue
+  du middleware d'authentification (voir 3 et `src/middleware.ts`, même
+  raison que `/api/version`) — la session y est vérifiée directement,
+  401 JSON si absente plutôt qu'une redirection qui casserait un `fetch()`
+  attendant du JSON.
+
+**Réception côté client** (`public/sw.js`) :
+
+- `push` : affiche la notification système (`showNotification`, payload
+  `{ title, body?, url }`) et pose une pastille sur l'icône de l'appli
+  (`navigator.setAppBadge()` — PWA installée, Android/desktop et iOS
+  16.4+ ; appelée sans argument, donc juste "il y a du nouveau", pas un
+  compte exact). La pastille est effacée (`clearAppBadge()`) à l'arrivée
+  sur l'écran d'accueil (`HomeDashboard.tsx`).
+- `notificationclick` : referme la notification et va sur l'URL de la
+  tâche concernée — focus un onglet déjà ouvert si possible, sinon en
+  ouvre un.
+- `pushsubscriptionchange` : réabonnement best-effort si le navigateur
+  fait tourner l'endpoint (rare) ; en cas d'échec, l'abonnement mort sera
+  simplement purgé par `sendPushToUser()` au prochain envoi.
 
 **Événements couverts** :
 
@@ -901,9 +935,12 @@ l'utilisateur).
 | `/compte` | Mon compte : identité + « Modifier mon mot de passe » (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
+| `/api/push/subscribe` | `POST`/`DELETE` : enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) — pas une page, aucune UI |
 
-Toutes les routes sauf `/login` et `/api/version` exigent une session
-valide (appliqué par le middleware) ; `/tasks/[id]` et `/tasks/[id]/edit`
+Toutes les routes sauf `/login`, `/api/version` et `/api/push/subscribe`
+exigent une session valide (appliqué par le middleware — cette dernière
+vérifie la session elle-même, voir 6.15) ; `/tasks/[id]` et
+`/tasks/[id]/edit`
 exigent en plus les droits d'accès décrits en 6.1, et `/admin` exige le
 rôle `admin` (voir 6.9), vérifiés côté serveur indépendamment de toute
 navigation dans l'UI. La racine `/` a hébergé la
@@ -1111,7 +1148,11 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
 | `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications + déclenchement du push (voir 6.15) |
 | `src/lib/push.ts` | `sendPushToUser()` — envoi Web Push (clés VAPID), purge des abonnements morts (voir 6.15) |
+| `src/lib/push-client.ts` | Utilitaires navigateur : abonnement/désabonnement, détection support et iOS non installé (voir 6.15) |
 | `src/components/AttentionFeed.tsx` | Fil « À ton attention » sous les compteurs de l'accueil (voir 6.15) |
+| `src/components/NotificationsToggle.tsx` | Activation/désactivation des notifications sur l'écran « Mon compte » (voir 6.15) |
+| `src/app/api/push/subscribe/route.ts` | Enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) |
+| `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |

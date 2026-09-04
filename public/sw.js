@@ -66,3 +66,87 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// --- Notifications push web (04/09/2026) -----------------------------
+//
+// Voir doc technique §6.15 : envoyées par sendPushToUser() (src/lib/
+// push.ts) via le protocole Web Push standard, payload JSON
+// { title, body?, url }. L'abonnement (activé depuis l'écran "Mon
+// compte") est géré côté client dans src/lib/push-client.ts, enregistré
+// via la Route Handler /api/push/subscribe (pas une Server Action : ce
+// fichier tourne hors du runtime React, il ne peut en invoquer aucune).
+
+self.addEventListener("push", (event) => {
+  let payload = { title: "To-Do List Familiale", body: "", url: "/" };
+  if (event.data) {
+    try {
+      payload = { ...payload, ...event.data.json() };
+    } catch {
+      payload.body = event.data.text();
+    }
+  }
+
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(payload.title, {
+        body: payload.body || undefined,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        data: { url: payload.url || "/" },
+      });
+      // Pastille sur l'icône de l'appli (PWA installée — Android/desktop
+      // "en clair", iOS 16.4+ installé). Appelée sans argument : indique
+      // juste "il y a du nouveau" (un point sur la plupart des launchers),
+      // pas de compte exact — voir la feuille de route notifications pour
+      // la nuance. Best-effort : ignoré silencieusement si non supporté.
+      if ("setAppBadge" in self.navigator) {
+        self.navigator.setAppBadge().catch(() => {});
+      }
+    })()
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const target = new URL(url, self.location.origin).href;
+
+      for (const client of allClients) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        await client.focus();
+        if ("navigate" in client) {
+          await client.navigate(target).catch(() => {});
+        }
+        return;
+      }
+      await self.clients.openWindow(target);
+    })()
+  );
+});
+
+// Rotation d'abonnement déclenchée par le navigateur (rare). Best-effort :
+// si le réabonnement échoue, l'ancien restera simplement mort et sera
+// purgé par sendPushToUser() au prochain envoi (réponse 404/410).
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const oldOptions = event.oldSubscription && event.oldSubscription.options;
+        const subscription = await self.registration.pushManager.subscribe(
+          oldOptions ? { userVisibleOnly: true, applicationServerKey: oldOptions.applicationServerKey } : { userVisibleOnly: true }
+        );
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(subscription.toJSON()),
+        });
+      } catch {
+        // Rien à faire de plus : voir le commentaire ci-dessus.
+      }
+    })()
+  );
+});

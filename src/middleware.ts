@@ -52,7 +52,13 @@ export const config = {
   // depuis l'écran de connexion (pas encore de session) — pas de raison de
   // le faire passer par la vérification de session, ni de risquer qu'une
   // redirection vers /login casse la réponse JSON attendue côté client.
+  //
+  // /api/push exclu pour la même raison : POST/DELETE
+  // /api/push/subscribe (voir src/app/api/push/subscribe/route.ts) est
+  // aussi appelée depuis public/sw.js (handler "pushsubscriptionchange"),
+  // hors du contexte d'un onglet navigateur — la vérification de session
+  // s'y fait directement (401 JSON si absente), pas via une redirection.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version|api/push).*)",
   ],
 };

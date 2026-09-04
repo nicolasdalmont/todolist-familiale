@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
+import { NotificationsToggle } from "@/components/NotificationsToggle";
 import { IconArrowLeft } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,11 @@ export default async function AccountPage() {
             </div>
           </div>
         </div>
+
+        <section className="mb-4 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <h3 className="mb-3 text-sm font-bold">Notifications</h3>
+          <NotificationsToggle />
+        </section>
 
         <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <h3 className="mb-3 text-sm font-bold">Modifier mon mot de passe</h3>

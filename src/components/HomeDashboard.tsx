@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import type { ActivityLogEntry, NotificationItem, Profile, Task } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
@@ -57,6 +57,15 @@ export function HomeDashboard({
 
     return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
   }, [tasks]);
+
+  // Efface la pastille sur l'icône de l'appli (App Badging API, voir
+  // public/sw.js) : arriver sur l'accueil vaut prise de connaissance des
+  // notifications en attente. Best-effort, ignoré si non supporté.
+  useEffect(() => {
+    if ("clearAppBadge" in navigator) {
+      (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge?.().catch(() => {});
+    }
+  }, []);
 
   return (
     <div className="flex flex-col gap-5 pt-2">

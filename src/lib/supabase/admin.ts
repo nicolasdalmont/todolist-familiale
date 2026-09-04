@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Client Supabase "admin", utilisé exclusivement côté serveur avec la clé
 // service_role : cette clé contourne intégralement Row Level Security, ce
-// qui est le choix assumé de cette architecture (voir supabase/schema.sql).
+// qui est le choix assumé de cette architecture (voir
+// supabase/recreate_full_schema.sql).
 // Elle ne doit jamais être exposée au navigateur ni utilisée dans un
 // composant client — uniquement dans des Server Components, Server Actions
 // ou Route Handlers.

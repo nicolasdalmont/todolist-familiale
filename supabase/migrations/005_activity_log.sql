@@ -31,5 +31,6 @@ create index if not exists activity_log_task_id_idx on public.activity_log(task_
 create index if not exists activity_log_created_at_idx on public.activity_log(created_at);
 
 alter table public.activity_log enable row level security;
--- Volontairement aucune policy, comme le reste du schéma (voir schema.sql) :
+-- Volontairement aucune policy, comme le reste du schéma (voir
+-- recreate_full_schema.sql) :
 -- tout passe par le rôle service_role côté serveur Next.js.

@@ -19,7 +19,7 @@ Vercel) partagé en artifact dans la conversation pour le détail des étapes.
 ## Authentification
 
 L'authentification est entièrement maison, sans Supabase Auth : une table
-`users` (voir `supabase/schema.sql`) stocke un prénom et un mot de passe
+`users` (voir `supabase/recreate_full_schema.sql`) stocke un prénom et un mot de passe
 haché (algorithme scrypt, module `crypto` intégré à Node.js — aucune
 dépendance externe). Next.js accède à Supabase exclusivement côté serveur
 avec la clé **service_role**, qui contourne Row Level Security ; RLS reste
@@ -38,7 +38,7 @@ sans appel réseau à Supabase.
   a pas encore d'interface d'administration dans l'application (voir
   ci-dessous), c'est actuellement la seule façon de créer un compte : le
   plus simple est de dupliquer la ligne de bootstrap de
-  `supabase/schema.sql` en changeant `name`, ou de redemander à Claude de
+  `supabase/recreate_full_schema.sql` en changeant `name`, ou de redemander à Claude de
   précalculer un hash pour un nouveau mot de passe temporaire.
 - **Première connexion** : l'utilisateur choisit son profil, entre le mot
   de passe temporaire, puis définit immédiatement son propre mot de passe
@@ -53,10 +53,10 @@ sans appel réseau à Supabase.
 
 ### Bootstrap : premier compte administrateur
 
-`supabase/schema.sql` crée automatiquement un premier utilisateur `Admin`
-avec le mot de passe temporaire **`bonjour2026`**. Se connecter avec ce
-compte puis définir immédiatement un mot de passe personnel via l'écran de
-première connexion.
+`supabase/recreate_full_schema.sql` crée automatiquement un premier
+utilisateur `Admin` avec le mot de passe temporaire **`bonjour2026`**. Se
+connecter avec ce compte puis définir immédiatement un mot de passe
+personnel via l'écran de première connexion.
 
 ## Variables d'environnement
 
@@ -78,11 +78,16 @@ utilisateurs).
 
 ## Schéma de base de données
 
-Voir `supabase/schema.sql` — tables `users`, `tasks`, `task_assignees`
-(assignation multiple), `comments`. RLS est activé sur toutes les tables
-mais sans policy : tout accès légitime passe par le serveur Next.js via la
-clé service_role ; la visibilité partagée/privée est appliquée au niveau
-applicatif (`src/app/page.tsx`), pas par RLS.
+Structure complète et à jour : `supabase/recreate_full_schema.sql`
+(exécutable, réservé à la reconstruction d'un environnement — voir la
+documentation technique §5.3). Évolutions successives appliquées sur la
+base réelle : `supabase/migrations/` (scripts additifs numérotés). Tables
+principales : `users`, `tasks`, `task_assignees` (partage multiple, avec
+rôle), `comments`, `tags`/`task_tags`, `checklist_items`, `activity_log`.
+RLS est activé sur toutes les tables mais sans policy : tout accès légitime
+passe par le serveur Next.js via la clé service_role ; la visibilité
+partagée/privée est appliquée au niveau applicatif (`src/lib/access.ts`),
+pas par RLS.
 
 ## Fonctionnement
 

@@ -1,7 +1,7 @@
 -- Migration additive (ne supprime rien) : ajoute la catégorie principale
 -- des tâches ainsi qu'un système de tags libres. À exécuter une fois dans
 -- le SQL Editor de Supabase, sur la base existante — contrairement à
--- supabase/schema.sql, ce script ne fait aucun "drop table" et préserve les
+-- un script de reset, ce script ne fait aucun "drop table" et préserve les
 -- comptes et tâches déjà créés.
 
 alter table public.tasks

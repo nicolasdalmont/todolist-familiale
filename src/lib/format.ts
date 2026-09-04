@@ -1,4 +1,5 @@
 import type { Recurrence, TaskStatus } from "./types";
+import { APP_TIMEZONE } from "./timezone";
 
 export function initials(name: string): string {
   return name
@@ -12,10 +13,12 @@ export function initials(name: string): string {
 export function formatDate(iso: string | null): string {
   if (!iso) return "Sans échéance";
   const d = new Date(iso);
+  // timeZone explicite : ces fonctions tournent aussi côté serveur (Vercel,
+  // UTC) — voir src/lib/timezone.ts.
   return (
-    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) +
+    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", timeZone: APP_TIMEZONE }) +
     " · " +
-    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: APP_TIMEZONE })
   );
 }
 
@@ -83,41 +86,56 @@ export function computeNextOccurrence(dueAt: string | null, recurrence: Recurren
   }
 }
 
+// Instant (ISO/UTC) → valeur "YYYY-MM-DDTHH:mm" attendue par un
+// <input type="datetime-local">, exprimée en heure de Paris (voir
+// src/lib/timezone.ts) quel que soit le fuseau du navigateur. La conversion
+// retour (saisie → UTC) est faite par parisWallTimeToUtcIso() dans les
+// Server Actions.
 export function toDatetimeLocalValue(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
-// --- Clés de date locale (filtre "échéance", tuiles du tableau de bord) --
+// --- Clés de date "civile" (filtre "échéance", tuiles du tableau de bord) --
 //
-// Volontairement calculées côté client (voir HomeDashboard.tsx et
-// TaskFilterList.tsx, tous deux "use client") plutôt que côté serveur :
-// un Server Component s'exécute avec l'heure/le fuseau du serveur Vercel
-// (UTC), qui ne correspond pas forcément au fuseau réel de la famille —
-// calculer "aujourd'hui"/"cette semaine" côté navigateur évite un décalage
-// d'un jour près de minuit, sur le même principe que isOverdue() déjà
-// utilisé côté client dans TaskCard.
+// Toujours calculées dans le fuseau Europe/Paris (voir src/lib/timezone.ts),
+// que le code tourne côté serveur (Vercel, UTC) ou côté navigateur (dans
+// n'importe quel fuseau) : "aujourd'hui" / "cette semaine" doivent désigner
+// le jour civil de la famille, pas celui du serveur.
 
-// Clé "YYYY-MM-DD" (fuseau local) à partir d'une date ISO — sert à comparer
-// une échéance à une date choisie sans se soucier de l'heure exacte.
+// Clé "YYYY-MM-DD" (jour civil à Paris) à partir d'une date ISO — sert à
+// comparer une échéance à une date choisie sans se soucier de l'heure.
 export function dateKeyFromIso(iso: string): string {
   return dateKeyFromDate(new Date(iso));
 }
 
 export function dateKeyFromDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  // "en-CA" formate en "YYYY-MM-DD".
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
-// Renvoie la date (minuit local) du dimanche de la semaine en cours —
-// aujourd'hui inclus si on est déjà dimanche.
+// Renvoie une date dont le jour civil (à Paris) est le dimanche de la
+// semaine en cours — aujourd'hui inclus si on est déjà dimanche. Seule la
+// clé de date (dateKeyFromDate) de la valeur renvoyée a du sens ; l'heure
+// est fixée à midi UTC, neutre vis-à-vis du fuseau.
 export function upcomingSunday(from: Date): Date {
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const daysUntilSunday = (7 - d.getDay()) % 7; // getDay() : dimanche = 0
-  d.setDate(d.getDate() + daysUntilSunday);
-  return d;
+  const [y, m, d] = dateKeyFromDate(from).split("-").map(Number);
+  const noon = new Date(Date.UTC(y, m - 1, d, 12));
+  noon.setUTCDate(noon.getUTCDate() + ((7 - noon.getUTCDay()) % 7));
+  return noon;
 }

@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
+import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
 
@@ -161,7 +162,7 @@ export async function createTaskAction(formData: FormData) {
 
   const description = String(formData.get("description") || "");
   const dueAtRaw = String(formData.get("dueAt") || "");
-  const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
+  const dueAt = dueAtRaw ? parisWallTimeToUtcIso(dueAtRaw) : null;
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");
   const category = isCategory(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
@@ -223,7 +224,7 @@ export async function updateTaskAction(formData: FormData) {
 
   const description = String(formData.get("description") || "");
   const dueAtRaw = String(formData.get("dueAt") || "");
-  const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
+  const dueAt = dueAtRaw ? parisWallTimeToUtcIso(dueAtRaw) : null;
   const status = String(formData.get("status") || "todo");
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");

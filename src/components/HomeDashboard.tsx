@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import type { ActivityLogEntry, Profile, Task } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
+import { APP_TIMEZONE } from "@/lib/timezone";
 import { ActivityFeed } from "./ActivityFeed";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
@@ -44,7 +45,12 @@ export function HomeDashboard({
     // pas besoin de repartir de `open` ici.
     const overdueCount = tasks.filter((t) => isOverdue(t.due_at, t.status)).length;
 
-    const todayLabel = now.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    const todayLabel = now.toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: APP_TIMEZONE,
+    });
 
     return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
   }, [tasks]);

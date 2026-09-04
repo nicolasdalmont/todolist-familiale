@@ -766,7 +766,9 @@ l'utilisateur choisit son agenda et enregistre.
   web.
 - **Créneau** : un bloc d'**une heure** à partir de l'échéance. L'échéance
   est transmise en UTC (suffixe `Z`) ; Google la reconvertit dans le fuseau
-  de l'agenda de l'utilisateur, aucun calcul de fuseau côté appli.
+  de l'agenda de l'utilisateur. Depuis la refonte fuseau du 04/09/2026
+  (§8.1), l'instant stocké est correct, donc l'événement tombe à la bonne
+  heure de Paris.
 - **Description de l'événement** : la description de la tâche, suivie de
   l'URL absolue de la tâche (reconstruite depuis les en-têtes `host` /
   `x-forwarded-proto` de la requête) pour pouvoir y revenir.
@@ -803,18 +805,43 @@ liste des redirections mises à jour en conséquence).
 
 ## 8. Limites connues et points d'attention
 
-### 8.1 Fuseau horaire
+### 8.1 Fuseau horaire (refonte du 04/09/2026)
 
-Les Server Components s'exécutent avec l'heure du serveur Vercel (UTC),
-qui ne correspond pas forcément au fuseau réel de la famille. Les calculs
-sensibles à "aujourd'hui" (compteurs de l'accueil, fil d'activité du jour,
-filtre d'échéance, badge "en retard") sont donc volontairement effectués
-**côté client** (`isOverdue` dans `TaskCard.tsx`, `HomeDashboard.tsx`,
-`TaskFilterList.tsx`, `ActivityFeed.tsx`) plutôt que côté serveur. Le
-formatage d'affichage des dates (`formatDate` dans `src/lib/format.ts`),
-lui, s'exécute côté serveur et reste donc à l'heure de Vercel — un écart
-d'affichage d'une heure ou deux (mais pas de jour) reste possible sur
-l'heure affichée.
+**L'appli est désormais explicitement en Europe/Paris** de bout en bout —
+`src/lib/timezone.ts`, constante `APP_TIMEZONE`. Les instants restent
+stockés en UTC (`tasks.due_at` est un `timestamptz`) ; toute la conversion
+"heure murale de Paris ⇄ instant UTC" est centralisée :
+
+- **Saisie** : `parisWallTimeToUtcIso()` interprète la valeur du
+  `<input datetime-local>` comme une heure de Paris avant de la stocker
+  (`createTaskAction` / `updateTaskAction`, `src/lib/actions.ts`).
+- **Affichage** : `formatDate()` force `timeZone: "Europe/Paris"` (elle
+  tourne côté serveur, donc à l'heure de Vercel/UTC sans ça).
+- **Pré-remplissage du formulaire** : `toDatetimeLocalValue()` reconvertit
+  l'instant UTC vers l'heure de Paris via `Intl`, quel que soit le fuseau
+  du navigateur.
+- **Clés de jour civil** (`dateKeyFromDate` / `upcomingSunday` — tuiles
+  "aujourd'hui"/"cette semaine", filtre d'échéance, fil d'activité du
+  jour) : calculées dans le fuseau Paris via `Intl`, côté serveur comme
+  côté client. `isOverdue()` compare deux instants, il est
+  indépendant du fuseau.
+
+Le changement d'heure été/hiver (CET +1 / CEST +2) est géré
+automatiquement par `Intl` et par `AT TIME ZONE 'Europe/Paris'` côté
+Postgres — aucun décalage codé en dur.
+
+**Avant cette refonte**, saisie et affichage étaient tous deux naïfs :
+"18:00" saisi était stocké `18:00Z` et réaffiché "18:00", les deux erreurs
+se compensant dans l'appli mais pas ailleurs (lien Google Agenda, §6.13).
+Les 12 échéances déjà en base ont été réalignées le 04/09/2026 par
+`supabase/fix_due_at_timezone_2026-09-04.sql` (script ponctuel, à ne pas
+rejouer).
+
+**Reste une limite mineure** : `computeNextOccurrence()` (régénération
+d'une tâche récurrente, `src/lib/format.ts`) décale l'échéance en UTC —
+une occurrence qui franchit un changement d'heure peut dériver d'1 h en
+heure murale de Paris. Sans conséquence pratique (tâches récurrentes,
+±1 h, deux fois par an).
 
 ### 8.2 Quatre pièges de cache déjà rencontrés et corrigés
 
@@ -957,7 +984,8 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/lib/queries.ts` | Lectures (profils, tâches, tags, commentaires, stats admin, activité — `getRecentActivity`) — filtrées par `access.ts` |
 | `src/lib/actions.ts` | Server Actions (écritures : auth, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`) — vérifiées par `access.ts` |
 | `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`/`ActivityLogEntry`) |
-| `src/lib/format.ts` | Formatage de dates, statuts, récurrence, clés de date locale |
+| `src/lib/format.ts` | Formatage de dates (heure de Paris), statuts, récurrence, clés de jour civil |
+| `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
 | `src/lib/calendar.ts` | `googleCalendarUrl()` — lien de création d'événement Google Agenda depuis une tâche (voir 6.13) |
 | `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline |
@@ -975,3 +1003,4 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/components/CommentThread.tsx` | Fil de commentaires + suppression (auteur ou créateur de la tâche — voir 6.5) |
 | `supabase/recreate_full_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
 | `supabase/migrations/` | Évolutions additives appliquées sur la base réelle |
+| `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée, à ne pas rejouer (voir 8.1) |

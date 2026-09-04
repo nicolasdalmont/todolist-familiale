@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { googleCalendarUrl } from "@/lib/calendar";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getComments, getProfile, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -35,6 +37,17 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   const overdue = isOverdue(task.due_at, task.status);
   const CategoryIcon = CATEGORY_ICONS[task.category];
   const editable = canEdit(task, profile.id);
+
+  // Lien "Ajouter à Google Agenda" (null si la tâche n'a pas d'échéance).
+  // L'URL absolue de la tâche, glissée dans la description de l'événement,
+  // est reconstruite depuis les en-têtes de la requête.
+  const requestHeaders = headers();
+  const host = requestHeaders.get("host");
+  const proto = requestHeaders.get("x-forwarded-proto") ?? "https";
+  const calendarUrl = googleCalendarUrl(
+    task,
+    host ? `${proto}://${host}/tasks/${task.id}` : undefined
+  );
   const editors = (task.assignees ?? []).filter((a) => a.role === "editor");
   const viewers = (task.assignees ?? []).filter((a) => a.role === "viewer");
 
@@ -50,15 +63,28 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
             <IconArrowLeft className="h-4 w-4" />
           </Link>
           <h2 className="text-lg font-extrabold">Détail de la tâche</h2>
-          {editable ? (
-            <Link
-              href={`/tasks/${task.id}/edit`}
-              className="ml-auto rounded-lg p-1.5 hover:bg-sand"
-              title="Modifier"
-            >
-              <IconPencil className="h-[18px] w-[18px]" />
-            </Link>
-          ) : null}
+          <div className="ml-auto flex items-center gap-0.5">
+            {calendarUrl ? (
+              <a
+                href={calendarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg p-1.5 hover:bg-sand"
+                title="Ajouter à Google Agenda"
+              >
+                <IconCalendar className="h-[18px] w-[18px]" />
+              </a>
+            ) : null}
+            {editable ? (
+              <Link
+                href={`/tasks/${task.id}/edit`}
+                className="rounded-lg p-1.5 hover:bg-sand"
+                title="Modifier"
+              >
+                <IconPencil className="h-[18px] w-[18px]" />
+              </Link>
+            ) : null}
+          </div>
         </div>
 
         <div className="mb-4 rounded-2xl border border-line bg-surface p-[18px] shadow-sm">

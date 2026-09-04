@@ -752,6 +752,32 @@ tâche Impôts en « Terminée »". Si le fil est vide pour la journée, un
 message neutre ("Aucune activité partagée aujourd'hui.") s'affiche à la
 place plutôt que de faire disparaître la section.
 
+### 6.13 Ajouter une tâche à Google Agenda (04/09/2026)
+
+L'écran de détail d'une tâche **datée** affiche, à côté de l'icône crayon
+« Modifier », une icône calendrier qui ouvre le formulaire de création
+d'événement de Google Agenda **pré-rempli** (titre, créneau, description) —
+l'utilisateur choisit son agenda et enregistre.
+
+- **Aucune API, aucun OAuth, aucun secret.** `googleCalendarUrl()`
+  (`src/lib/calendar.ts`) construit une simple URL
+  `https://calendar.google.com/calendar/render?action=TEMPLATE&…`. Sur
+  mobile, le lien ouvre l'application Google Agenda ; sur desktop, l'onglet
+  web.
+- **Créneau** : un bloc d'**une heure** à partir de l'échéance. L'échéance
+  est transmise en UTC (suffixe `Z`) ; Google la reconvertit dans le fuseau
+  de l'agenda de l'utilisateur, aucun calcul de fuseau côté appli.
+- **Description de l'événement** : la description de la tâche, suivie de
+  l'URL absolue de la tâche (reconstruite depuis les en-têtes `host` /
+  `x-forwarded-proto` de la requête) pour pouvoir y revenir.
+- **Tâche sans échéance** : l'icône n'est pas affichée (rien à planifier).
+- **Accessible à tous ceux qui voient la tâche** (y compris en lecture
+  seule) : c'est leur propre agenda, aucune écriture côté appli.
+- **Copie ponctuelle** : une modification ultérieure de la tâche (titre,
+  échéance) ne met pas l'événement à jour. La récurrence de la tâche n'est
+  pas transmise pour l'instant (évolution possible via le paramètre
+  `recur=RRULE:…`).
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -760,7 +786,7 @@ place plutôt que de faire disparaître la section.
 | `/` | Écran d'accueil (message de bienvenue, compteurs, activité du jour) |
 | `/tasks` | Liste des tâches (onglets, recherche, filtres) |
 | `/tasks/new` | Formulaire de création |
-| `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires) — 404 si l'utilisateur n'a pas `canView` |
+| `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à Google Agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
@@ -932,6 +958,7 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/lib/actions.ts` | Server Actions (écritures : auth, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`) — vérifiées par `access.ts` |
 | `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`/`ActivityLogEntry`) |
 | `src/lib/format.ts` | Formatage de dates, statuts, récurrence, clés de date locale |
+| `src/lib/calendar.ts` | `googleCalendarUrl()` — lien de création d'événement Google Agenda depuis une tâche (voir 6.13) |
 | `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage par personne |

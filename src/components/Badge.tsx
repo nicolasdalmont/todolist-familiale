@@ -11,7 +11,15 @@ const STATUS_STYLES: Record<TaskStatus, string> = {
 
 export function StatusBadge({ status }: { status: TaskStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11.5px] font-bold ${STATUS_STYLES[status]}`}>
+    // shrink-0 + whitespace-nowrap : dans une ligne flex sans retour à la
+    // ligne (ex. titre + pastille de statut sur TaskCard.tsx), un titre
+    // long pouvait sinon écraser la pastille jusqu'à faire retourner son
+    // propre texte à la ligne (bulle "À faire" cassée en deux) plutôt que
+    // de laisser le titre, lui, s'enrouler sur plusieurs lignes — corrigé
+    // le 04/09/2026, signalé sur mobile.
+    <span
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-bold ${STATUS_STYLES[status]}`}
+    >
       {STATUS_LABELS[status]}
     </span>
   );
@@ -24,7 +32,10 @@ const VISIBILITY_STYLES: Record<Visibility, string> = {
 
 export function VisibilityBadge({ visibility }: { visibility: Visibility }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-bold ${VISIBILITY_STYLES[visibility]}`}>
+    // shrink-0 + whitespace-nowrap : voir la note dans StatusBadge ci-dessus.
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-bold ${VISIBILITY_STYLES[visibility]}`}
+    >
       {visibility === "shared" ? (
         <>
           <IconUsers className="h-3 w-3" /> Partagée
@@ -40,7 +51,8 @@ export function VisibilityBadge({ visibility }: { visibility: Visibility }) {
 
 export function OverdueBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11.5px] font-bold text-rose-600">
+    // shrink-0 + whitespace-nowrap : voir la note dans StatusBadge ci-dessus.
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-rose-50 px-2.5 py-1 text-[11.5px] font-bold text-rose-600">
       <IconAlertTriangle className="h-3 w-3" /> En retard
     </span>
   );

@@ -26,7 +26,14 @@ export function TaskCard({ task }: { task: Task }) {
       className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className={`text-[15px] font-bold leading-snug ${task.status === "done" ? "text-ink-muted line-through" : "text-ink"}`}>
+        {/* min-w-0 : laisse le titre s'enrouler sur plusieurs lignes pour
+            céder de la place à la pastille de statut plutôt que de la
+            pousser hors de la ligne (StatusBadge est shrink-0, voir
+            Badge.tsx) — corrigé le 04/09/2026, signalé sur mobile avec un
+            titre long. */}
+        <span
+          className={`min-w-0 text-[15px] font-bold leading-snug ${task.status === "done" ? "text-ink-muted line-through" : "text-ink"}`}
+        >
           {task.title}
         </span>
         <StatusBadge status={task.status} />

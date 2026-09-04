@@ -308,6 +308,15 @@ tâche de qui peut seulement la consulter. L'écran de détail
 (`/tasks/[id]`) fait déjà cette séparation, avec deux lignes libellées
 ("Assigné(e)s" / "Lecture seule").
 
+**Pastilles qui ne se cassent plus sur mobile (`Badge.tsx`, 04/09/2026)** :
+`StatusBadge`/`VisibilityBadge`/`OverdueBadge` sont désormais `shrink-0`
++ `whitespace-nowrap`. Signalé sur `TaskCard.tsx` : sur un titre long, la
+ligne titre + pastille de statut (`flex` sans retour à la ligne) réduisait
+la pastille elle-même faute de place, cassant son texte en deux lignes
+("À" / "faire") plutôt que de laisser le **titre** s'enrouler — le titre a
+en complément `min-w-0` pour cette raison. Vérifié en isolant les deux
+rendus (avant/après) à 375px de large.
+
 Le créateur d'une tâche a toujours les deux droits (voir/modifier), qu'il
 figure ou non explicitement dans la liste de partage. **Le champ
 `tasks.visibility` (`shared`/`private`) n'est plus saisi manuellement** :

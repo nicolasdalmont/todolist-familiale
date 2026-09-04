@@ -101,9 +101,19 @@ self.addEventListener("push", (event) => {
       // payload.badgeCount est absent : setAppBadge() sans argument se
       // rabat alors sur un indicateur générique ("il y a du nouveau", un
       // point sur la plupart des launchers) plutôt que rien du tout.
-      // Best-effort : ignoré silencieusement si l'API n'est pas supportée.
+      // Best-effort : l'échec ne doit jamais empêcher l'affichage de la
+      // notification ci-dessus (déjà passée). try/catch plutôt qu'un
+      // simple .catch() : certaines implémentations peuvent lever une
+      // exception synchrone plutôt que renvoyer une promesse rejetée.
+      // Le message reste loggué (visible seulement via l'inspecteur Web
+      // distant de Safari, Réglages > Safari > Avancé > Inspecteur Web,
+      // puis Mac > Safari > Développer) plutôt qu'avalé en silence.
       if ("setAppBadge" in self.navigator) {
-        self.navigator.setAppBadge(payload.badgeCount).catch(() => {});
+        try {
+          await self.navigator.setAppBadge(payload.badgeCount);
+        } catch (err) {
+          console.error("setAppBadge (push):", err);
+        }
       }
     })()
   );

@@ -72,11 +72,10 @@ export function HomeDashboard({
       setAppBadge?: (count?: number) => Promise<void>;
       clearAppBadge?: () => Promise<void>;
     };
-    if (total > 0) {
-      nav.setAppBadge?.(total).catch(() => {});
-    } else {
-      nav.clearAppBadge?.().catch(() => {});
-    }
+    // Best-effort : loggué plutôt qu'avalé en silence si l'appel échoue
+    // (utile pour un diagnostic via l'inspecteur Web distant de Safari).
+    const action = total > 0 ? nav.setAppBadge?.(total) : nav.clearAppBadge?.();
+    action?.catch((err) => console.error("setAppBadge (accueil) :", err));
   }, [overdueCount, notifications]);
 
   return (

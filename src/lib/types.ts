@@ -76,6 +76,10 @@ export interface Task {
   // checklist pour cette tâche — TaskCard.tsx n'affiche alors aucun
   // indicateur d'avancement.
   checklist?: ChecklistItem[];
+  // Nombre de commentaires sur la tâche (agrégat `comments(count)` de
+  // getTasks/getTask, voir src/lib/queries.ts). Affiché sur la carte de
+  // tâche s'il est > 0.
+  commentCount?: number;
 }
 
 // Type d'événement du journal d'activité (voir migration

@@ -4,7 +4,7 @@ import { formatDate, isOverdue } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
 import { Avatar } from "./Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "./Badge";
-import { IconCalendar, IconRepeat } from "./Icons";
+import { IconCalendar, IconChat, IconRepeat } from "./Icons";
 
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task.due_at, task.status);
@@ -36,6 +36,11 @@ export function TaskCard({ task }: { task: Task }) {
         )}
         <VisibilityBadge visibility={task.visibility} />
         {task.recurrence && task.recurrence.type !== "none" && <IconRepeat className="h-3.5 w-3.5" />}
+        {task.commentCount ? (
+          <span className="flex items-center gap-1" title={`${task.commentCount} commentaire${task.commentCount > 1 ? "s" : ""}`}>
+            <IconChat className="h-3.5 w-3.5" /> {task.commentCount}
+          </span>
+        ) : null}
       </div>
       {task.tags && task.tags.length > 0 ? (
         <div className="flex flex-wrap gap-1">

@@ -380,6 +380,12 @@ apparaît juste sous le champ de saisie, sans avoir à faire défiler.
 Ajouter un commentaire est accessible à quiconque a `canView` sur la
 tâche (créateur, assigné(e), ou personne en lecture seule) — voir 6.1.
 
+La **carte de tâche** (`TaskCard.tsx`, liste `/tasks`) affiche une icône
+bulle + le nombre de commentaires quand il est > 0. Le compte vient de
+l'agrégat PostgREST `comments(count)` ajouté à `TASK_SELECT`
+(`src/lib/queries.ts`, exposé en `Task.commentCount`) — pas de requête
+supplémentaire.
+
 **Suppression d'un commentaire (02/09/2026)** : un commentaire peut être
 supprimé par **son propre auteur**, ou par **le créateur de la tâche**
 (qui reste responsable de sa tâche et peut ainsi modérer les commentaires

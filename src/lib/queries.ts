@@ -57,9 +57,12 @@ interface TaskRow extends Task {
   task_assignees: { role: ShareRole; users: Profile }[] | null;
   task_tags: { tags: Tag }[] | null;
   checklist_items: ChecklistItem[] | null;
+  // Agrégat PostgREST `comments(count)` : renvoyé sous forme de tableau
+  // d'un seul objet `{ count }` (0 si aucun commentaire).
+  comments: { count: number }[] | null;
 }
 
-const TASK_SELECT = `*, task_assignees(role, users(${PROFILE_COLUMNS})), task_tags(tags(id, name)), checklist_items(id, label, done, created_at)`;
+const TASK_SELECT = `*, task_assignees(role, users(${PROFILE_COLUMNS})), task_tags(tags(id, name)), checklist_items(id, label, done, created_at), comments(count)`;
 
 function mapTaskRow(row: TaskRow): Task {
   return {
@@ -68,6 +71,7 @@ function mapTaskRow(row: TaskRow): Task {
       .filter((a) => a.users)
       .map((a) => ({ ...a.users, role: a.role })),
     tags: (row.task_tags ?? []).map((t) => t.tags).filter(Boolean),
+    commentCount: row.comments?.[0]?.count ?? 0,
     // PostgREST ne garantit pas l'ordre d'une ressource imbriquée sans
     // .order() dédié côté requête ; trier ici (en mémoire, quelques items
     // au plus) est plus simple que de chaîner un .order(foreignTable: ...)

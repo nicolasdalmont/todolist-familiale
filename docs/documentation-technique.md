@@ -887,14 +887,30 @@ générées une fois avec `npx web-push generate-vapid-keys` — voir section
   401 JSON si absente plutôt qu'une redirection qui casserait un `fetch()`
   attendant du JSON.
 
+**Pastille de l'icône de l'appli (App Badge, 04/09/2026)** : affiche
+**notifications non lues + tâches en retard visibles par l'utilisateur**
+(même définition de "en retard" que partout ailleurs — `isOverdue()`,
+`src/lib/format.ts`). Calculée par `getBadgeCount()` (`src/lib/
+queries.ts`, réutilise `getTasks()` déjà filtré par `canView`) à deux
+moments :
+
+- **Au chargement de l'écran d'accueil** (`HomeDashboard.tsx`) : calcul
+  local, sans requête supplémentaire (`tasks`/`notifications` déjà chargés
+  par la page) — `navigator.setAppBadge(total)` ou `clearAppBadge()` si 0.
+  C'est ce qui remet la pastille à jour dès qu'on a lu ses notifications
+  ou traité ses tâches en retard.
+- **À chaque envoi de push** (`sendPushToUser()`, `src/lib/push.ts`) : le
+  total à cet instant est inclus dans le payload (`badgeCount`), pour que
+  la pastille soit juste même si l'appli n'a pas été rouverte depuis.
+
 **Réception côté client** (`public/sw.js`) :
 
 - `push` : affiche la notification système (`showNotification`, payload
-  `{ title, body?, url }`) et pose une pastille sur l'icône de l'appli
-  (`navigator.setAppBadge()` — PWA installée, Android/desktop et iOS
-  16.4+ ; appelée sans argument, donc juste "il y a du nouveau", pas un
-  compte exact). La pastille est effacée (`clearAppBadge()`) à l'arrivée
-  sur l'écran d'accueil (`HomeDashboard.tsx`).
+  `{ title, body?, url, badgeCount? }`) et pose la pastille avec
+  `navigator.setAppBadge(payload.badgeCount)` (PWA installée,
+  Android/desktop et iOS 16.4+). Si `badgeCount` est absent (échec du
+  calcul côté serveur), `setAppBadge()` sans argument affiche un
+  indicateur générique plutôt que rien.
 - `notificationclick` : referme la notification et va sur l'URL de la
   tâche concernée — focus un onglet déjà ouvert si possible, sinon en
   ouvre un.

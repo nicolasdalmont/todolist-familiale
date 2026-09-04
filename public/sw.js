@@ -77,7 +77,7 @@ self.addEventListener("fetch", (event) => {
 // fichier tourne hors du runtime React, il ne peut en invoquer aucune).
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "To-Do List Familiale", body: "", url: "/" };
+  let payload = { title: "To-Do List Familiale", body: "", url: "/", badgeCount: undefined };
   if (event.data) {
     try {
       payload = { ...payload, ...event.data.json() };
@@ -94,13 +94,16 @@ self.addEventListener("push", (event) => {
         badge: "/icons/icon-192.png",
         data: { url: payload.url || "/" },
       });
-      // Pastille sur l'icône de l'appli (PWA installée — Android/desktop
-      // "en clair", iOS 16.4+ installé). Appelée sans argument : indique
-      // juste "il y a du nouveau" (un point sur la plupart des launchers),
-      // pas de compte exact — voir la feuille de route notifications pour
-      // la nuance. Best-effort : ignoré silencieusement si non supporté.
+      // Pastille sur l'icône de l'appli (PWA installée — Android/desktop,
+      // iOS 16.4+ installé) : notifications non lues + tâches en retard,
+      // calculé côté serveur au moment de l'envoi (getBadgeCount(), voir
+      // src/lib/queries.ts et src/lib/push.ts). Si ce calcul a échoué,
+      // payload.badgeCount est absent : setAppBadge() sans argument se
+      // rabat alors sur un indicateur générique ("il y a du nouveau", un
+      // point sur la plupart des launchers) plutôt que rien du tout.
+      // Best-effort : ignoré silencieusement si l'API n'est pas supportée.
       if ("setAppBadge" in self.navigator) {
-        self.navigator.setAppBadge().catch(() => {});
+        self.navigator.setAppBadge(payload.badgeCount).catch(() => {});
       }
     })()
   );

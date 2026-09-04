@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getBadgeCount } from "./queries";
 
 type DB = SupabaseClient<any, "public", any>;
 
@@ -64,10 +65,18 @@ export async function sendPushToUser(
     return;
   }
 
+  // Compte à afficher sur la pastille de l'icône (voir getBadgeCount(),
+  // src/lib/queries.ts, et le handler "push" de public/sw.js) : notifs non
+  // lues + tâches en retard, à l'instant de cet envoi. Best-effort — si le
+  // calcul échoue, le service worker se rabat sur un indicateur générique
+  // (setAppBadge() sans argument) plutôt que de bloquer l'envoi du push.
+  const badgeCount = await getBadgeCount(supabase, userId).catch(() => undefined);
+
   const message = JSON.stringify({
     title: payload.title,
     body: payload.body ?? undefined,
     url: payload.url ?? "/",
+    badgeCount,
   });
 
   await Promise.all(

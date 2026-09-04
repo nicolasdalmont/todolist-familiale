@@ -58,14 +58,26 @@ export function HomeDashboard({
     return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
   }, [tasks]);
 
-  // Efface la pastille sur l'icône de l'appli (App Badging API, voir
-  // public/sw.js) : arriver sur l'accueil vaut prise de connaissance des
-  // notifications en attente. Best-effort, ignoré si non supporté.
+  // Pose la pastille sur l'icône de l'appli (App Badging API — voir aussi
+  // le handler "push" de public/sw.js, qui la met à jour de son côté à
+  // chaque notification reçue) : notifications "À ton attention" non lues
+  // + tâches en retard, même calcul que getBadgeCount() côté serveur
+  // (src/lib/queries.ts). Recalculée à chaque arrivée sur l'accueil, donc
+  // remise à jour dès qu'on a lu les notifications ou traité les tâches en
+  // retard. Best-effort, ignoré si l'API n'est pas supportée.
   useEffect(() => {
-    if ("clearAppBadge" in navigator) {
-      (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge?.().catch(() => {});
+    const unreadCount = notifications.filter((n) => !n.read_at).length;
+    const total = overdueCount + unreadCount;
+    const nav = navigator as Navigator & {
+      setAppBadge?: (count?: number) => Promise<void>;
+      clearAppBadge?: () => Promise<void>;
+    };
+    if (total > 0) {
+      nav.setAppBadge?.(total).catch(() => {});
+    } else {
+      nav.clearAppBadge?.().catch(() => {});
     }
-  }, []);
+  }, [overdueCount, notifications]);
 
   return (
     <div className="flex flex-col gap-5 pt-2">

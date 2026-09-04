@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ActivityLogEntry, ChecklistItem, Comment, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canView } from "./access";
+import { isOverdue } from "./format";
 
 type DB = SupabaseClient<any, "public", any>;
 
@@ -229,6 +230,24 @@ export async function getMyNotifications(
     return [];
   }
   return (data as unknown as NotificationItem[]) ?? [];
+}
+
+// Nombre à afficher sur la pastille de l'icône de l'appli (App Badge, voir
+// public/sw.js et HomeDashboard.tsx) : notifications "À ton attention" non
+// lues + tâches en retard visibles par l'utilisateur (même définition que
+// isOverdue(), utilisée partout ailleurs dans l'appli — badge "En retard"
+// de la carte de tâche, compteur de l'accueil, etc.). Réutilise getTasks()
+// (déjà filtré par canView, voir src/lib/access.ts) plutôt que de dupliquer
+// la logique de visibilité dans une requête dédiée : le volume de tâches
+// d'une famille reste faible, la clarté prime sur la micro-optimisation.
+export async function getBadgeCount(supabase: DB, userId: string): Promise<number> {
+  const [unreadRes, tasks] = await Promise.all([
+    supabase.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null),
+    getTasks(supabase, userId),
+  ]);
+  const unread = unreadRes.error ? 0 : unreadRes.count ?? 0;
+  const overdue = tasks.filter((t) => isOverdue(t.due_at, t.status)).length;
+  return unread + overdue;
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

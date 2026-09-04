@@ -73,14 +73,18 @@ export function TaskCard({ task }: { task: Task }) {
         </div>
       ) : null}
       {editors.length > 0 || viewers.length > 0 ? (
-        <div className="flex items-center gap-3">
-          {editors.length > 0 ? (
-            <div className="flex -space-x-2">
-              {editors.map((a) => (
-                <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
-              ))}
-            </div>
-          ) : null}
+        // justify-between plutôt qu'un simple espacement : cale les
+        // vignettes "lecture seule" tout à droite de la carte, pas juste
+        // décalées après celles des assigné(e)s — le premier groupe
+        // (assigné(e)s) est toujours rendu, même vide, pour garantir deux
+        // éléments flex et donc ce calage même s'il n'y a exceptionnellement
+        // aucun assigné(e) (en pratique le créateur en est toujours un).
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex -space-x-2">
+            {editors.map((a) => (
+              <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
+            ))}
+          </div>
           {viewers.length > 0 ? (
             <div className="flex -space-x-2">
               {viewers.map((a) => (

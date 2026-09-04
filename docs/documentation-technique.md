@@ -436,7 +436,14 @@ notification) et enfin le fil « Activité du jour » (`ActivityFeed.tsx`) —
 voir 6.12. Les compteurs sont calculés **côté
 client** (voir 8.1 sur la raison de ce choix) à partir de la liste de
 tâches déjà filtrée par `getTasks` (donc uniquement les tâches visibles
-par l'utilisateur connecté — voir 6.1) :
+par l'utilisateur connecté — voir 6.1), puis restreinte aux tâches dont il
+est **responsable** : créées par lui, ou partagées avec lui avec droit de
+modification (« Assigné(e) ») — jamais celles en lecture seule (« Lecture
+seule »), même définition que `canEdit()` (`src/lib/access.ts`). Correctif
+du 04/09/2026 : avant ça, "En retard" comptait aussi les tâches en lecture
+seule, que la liste des tâches (portée par défaut "mes tâches",
+`TaskFilterList.tsx`) n'affiche pas — d'où un chiffre sur la tuile
+supérieur à ce qu'on trouvait en cliquant dessus.
 
 - **En retard** (ajoutée le 03/09/2026) : nombre de tâches dont
   l'échéance est dépassée, ni terminées ni archivées — même définition
@@ -512,7 +519,13 @@ n'aurait plus de sens dans cette disposition empilée) :
      (`task.created_by === currentUserId`, prop `currentUserId` transmis
      par `tasks/page.tsx`) ; le bouton "Toutes les tâches" bascule vers
      tout ce qui est visible par l'utilisateur (y compris partagé avec
-     lui), et inversement.
+     lui), et inversement. Note : cette portée est **plus stricte** que le
+     filtre `canEdit()` utilisé par les compteurs de l'accueil (6.6) — elle
+     ne garde que les tâches **créées** par l'utilisateur, pas celles
+     partagées avec lui en tant qu'assigné(e). Une tâche qui compte dans
+     "En retard" parce qu'on peut la modifier (assigné, pas créateur)
+     n'apparaît donc pas dans "Mes tâches" par défaut, seulement en basculant
+     sur "Toutes les tâches" — écart connu, pas encore aligné.
    - **Statut** : quatre boutons à cocher indépendamment (À faire, En
      cours, Terminée, Archivée — `STATUS_ORDER`/`STATUS_LABELS` dans
      `src/lib/format.ts`), sélection multiple comme les tags. **À faire**
@@ -887,11 +900,13 @@ générées une fois avec `npx web-push generate-vapid-keys` — voir section
   attendant du JSON.
 
 **Pastille de l'icône de l'appli (App Badge, 04/09/2026)** : affiche
-**notifications non lues + tâches en retard visibles par l'utilisateur**
-(même définition de "en retard" que partout ailleurs — `isOverdue()`,
-`src/lib/format.ts`). Calculée par `getBadgeCount()` (`src/lib/
-queries.ts`, réutilise `getTasks()` déjà filtré par `canView`) à deux
-moments :
+**notifications non lues + tâches en retard dont l'utilisateur est
+responsable** (créateur, ou assigné avec droit de modification —
+`canEdit()`, `src/lib/access.ts`, pas les tâches en lecture seule ;
+`isOverdue()` pour "en retard", `src/lib/format.ts` — même double
+définition que les compteurs de l'accueil, voir 6.6). Calculée par
+`getBadgeCount()` (`src/lib/queries.ts`, réutilise `getTasks()` déjà
+filtré par `canView`) à deux moments :
 
 - **Au chargement de l'écran d'accueil** (`HomeDashboard.tsx`) : calcul
   local, sans requête supplémentaire (`tasks`/`notifications` déjà chargés

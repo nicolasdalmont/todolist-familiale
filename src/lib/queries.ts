@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ActivityLogEntry, ChecklistItem, Comment, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
-import { canView } from "./access";
+import { canEdit, canView } from "./access";
 import { isOverdue } from "./format";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -246,7 +246,12 @@ export async function getBadgeCount(supabase: DB, userId: string): Promise<numbe
     getTasks(supabase, userId),
   ]);
   const unread = unreadRes.error ? 0 : unreadRes.count ?? 0;
-  const overdue = tasks.filter((t) => isOverdue(t.due_at, t.status)).length;
+  // Comme les compteurs de l'écran d'accueil (HomeDashboard.tsx) : ne compte
+  // que les tâches en retard dont l'utilisateur est responsable (créateur ou
+  // assigné avec droit de modification), pas celles en lecture seule —
+  // même définition, canEdit() (src/lib/access.ts), pour que la pastille et
+  // la tuile "En retard" affichent toujours le même chiffre.
+  const overdue = tasks.filter((t) => canEdit(t, userId) && isOverdue(t.due_at, t.status)).length;
   return unread + overdue;
 }
 

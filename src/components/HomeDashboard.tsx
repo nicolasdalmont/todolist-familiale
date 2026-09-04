@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ActivityLogEntry, NotificationItem, Profile, Task } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
+import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
@@ -30,9 +31,23 @@ export function HomeDashboard({
     const sunday = upcomingSunday(now);
     const sundayKey = dateKeyFromDate(sunday);
 
+    // Les trois compteurs ne portent que sur les tâches dont je suis
+    // responsable — créées par moi, ou partagées avec moi avec droit de
+    // modification ("Assigné(e)", voir TaskForm.tsx) — jamais celles où je
+    // suis seulement en lecture seule ("Lecture seule") : je ne peux de
+    // toute façon pas les traiter, les compter donne un chiffre qui ne
+    // correspond à rien d'actionnable. Même définition que canEdit()
+    // (src/lib/access.ts, aussi utilisée pour les boutons de statut et le
+    // lien "modifier"), pour rester cohérent avec la portée par défaut
+    // "mes tâches" de la liste (TaskFilterList.tsx) — comportement corrigé
+    // le 04/09/2026 après un signalement : le compteur "En retard" comptait
+    // une tâche en lecture seule que la liste, elle, n'affichait pas par
+    // défaut.
+    const mine = tasks.filter((t) => canEdit(t, profile.id));
+
     // "Tâches ouvertes" : ni terminées, ni archivées — aucun des trois
     // compteurs de l'accueil ne compte une tâche terminée ou archivée.
-    const open = tasks.filter((t) => t.status === "todo" || t.status === "in_progress");
+    const open = mine.filter((t) => t.status === "todo" || t.status === "in_progress");
 
     const todayCount = open.filter((t) => t.due_at && dateKeyFromIso(t.due_at) === todayKey).length;
     // "Cette semaine" = du jour même jusqu'à dimanche inclus (semaine
@@ -46,7 +61,7 @@ export function HomeDashboard({
     // isOverdue() dans src/lib/format.ts) : échéance dépassée et tâche ni
     // terminée ni archivée. isOverdue() exclut déjà "done"/"archived", donc
     // pas besoin de repartir de `open` ici.
-    const overdueCount = tasks.filter((t) => isOverdue(t.due_at, t.status)).length;
+    const overdueCount = mine.filter((t) => isOverdue(t.due_at, t.status)).length;
 
     const todayLabel = now.toLocaleDateString("fr-FR", {
       weekday: "long",
@@ -56,7 +71,7 @@ export function HomeDashboard({
     });
 
     return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
-  }, [tasks]);
+  }, [tasks, profile.id]);
 
   // Pose la pastille sur l'icône de l'appli (App Badging API — voir aussi
   // le handler "push" de public/sw.js, qui la met à jour de son côté à

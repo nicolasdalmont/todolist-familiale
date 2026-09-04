@@ -27,7 +27,7 @@ export function CommentForm({ taskId }: { taskId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="sticky bottom-0 mt-3.5 flex gap-2 bg-paper pb-1 pt-1.5">
+    <form onSubmit={handleSubmit} className="mb-3.5 mt-1 flex gap-2">
       <input
         type="text"
         value={value}

@@ -365,10 +365,13 @@ librement ensuite.
 
 ### 6.5 Commentaires
 
-Fil de discussion simple par tâche (`comments`), affiché du plus ancien
-au plus récent, sans édition une fois posté. Ajouter un commentaire est
-accessible à quiconque a `canView` sur la tâche (créateur, assigné(e), ou
-personne en lecture seule) — voir 6.1.
+Fil de discussion simple par tâche (`comments`), sans édition une fois
+posté. Le champ d'ajout est en **tête** du fil et les commentaires sont
+affichés **du plus récent au plus haut** (tri `created_at` descendant
+dans `getComments`, `src/lib/queries.ts`) : le dernier commentaire posté
+apparaît juste sous le champ de saisie, sans avoir à faire défiler.
+Ajouter un commentaire est accessible à quiconque a `canView` sur la
+tâche (créateur, assigné(e), ou personne en lecture seule) — voir 6.1.
 
 **Suppression d'un commentaire (02/09/2026)** : un commentaire peut être
 supprimé par **son propre auteur**, ou par **le créateur de la tâche**

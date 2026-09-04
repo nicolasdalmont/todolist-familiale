@@ -42,6 +42,8 @@ export function CommentThread({
         Commentaires
       </h3>
 
+      <CommentForm taskId={taskId} />
+
       {comments.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line py-10 text-center text-sm text-ink-muted">
           Aucun commentaire pour l&apos;instant.
@@ -78,8 +80,6 @@ export function CommentThread({
           })}
         </div>
       )}
-
-      <CommentForm taskId={taskId} />
     </div>
   );
 }

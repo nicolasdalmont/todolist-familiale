@@ -109,12 +109,15 @@ export async function getTask(supabase: DB, id: string, userId: string): Promise
   return canView(task, userId) ? task : null;
 }
 
+// Commentaires triés du plus récent au plus ancien : le fil est affiché
+// avec le formulaire d'ajout en tête (voir src/components/CommentThread.tsx),
+// donc le dernier commentaire apparaît juste sous le champ de saisie.
 export async function getComments(supabase: DB, taskId: string): Promise<Comment[]> {
   const { data, error } = await supabase
     .from("comments")
     .select(`*, author:users(${PROFILE_COLUMNS})`)
     .eq("task_id", taskId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
   return (data as unknown as Comment[]) ?? [];

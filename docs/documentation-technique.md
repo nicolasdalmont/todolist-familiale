@@ -519,13 +519,20 @@ n'aurait plus de sens dans cette disposition empilée) :
      (`task.created_by === currentUserId`, prop `currentUserId` transmis
      par `tasks/page.tsx`) ; le bouton "Toutes les tâches" bascule vers
      tout ce qui est visible par l'utilisateur (y compris partagé avec
-     lui), et inversement. Note : cette portée est **plus stricte** que le
-     filtre `canEdit()` utilisé par les compteurs de l'accueil (6.6) — elle
-     ne garde que les tâches **créées** par l'utilisateur, pas celles
-     partagées avec lui en tant qu'assigné(e). Une tâche qui compte dans
-     "En retard" parce qu'on peut la modifier (assigné, pas créateur)
-     n'apparaît donc pas dans "Mes tâches" par défaut, seulement en basculant
-     sur "Toutes les tâches" — écart connu, pas encore aligné.
+     lui — `canView`, portée la plus large), et inversement.
+     **Forcée sur "Toutes les tâches" en arrivant depuis une tuile de
+     l'accueil** (`?overdue=1` ou `?dueAtMost=...`, `cameFromTile` dans
+     `TaskFilterList.tsx`, 04/09/2026) — ignore alors aussi tout filtre
+     mémorisé (voir plus bas). Cette portée reste néanmoins **plus large**
+     que `canEdit()`, utilisé par les compteurs de l'accueil (6.6) : elle
+     inclut aussi les tâches où l'utilisateur est en **lecture seule**, que
+     `canEdit()` exclut. Écart connu et **non résolu avec exactitude** : la
+     liste ouverte depuis une tuile peut donc afficher un peu **plus**
+     d'éléments que ce que la tuile comptait (ex. une tâche en lecture
+     seule en retard). Les deux seules valeurs de portée disponibles
+     aujourd'hui sont "mes tâches" (trop strict) et "toutes" (trop large) ;
+     un filtre calé exactement sur `canEdit()` réglerait ça mais n'existe
+     pas encore.
    - **Statut** : quatre boutons à cocher indépendamment (À faire, En
      cours, Terminée, Archivée — `STATUS_ORDER`/`STATUS_LABELS` dans
      `src/lib/format.ts`), sélection multiple comme les tags. **À faire**
@@ -570,6 +577,33 @@ que la famille n'a aucune tâche" de "aucun résultat à cause des filtres
 choisis") tient compte de tous ces critères, y compris l'écart par rapport
 aux valeurs par défaut (portée "mes tâches", statuts {à faire, en cours}
 — comparaison d'ensembles, pas une simple égalité de valeur).
+
+**Mémorisation du filtre pour la session du navigateur (04/09/2026).**
+Sans rien de plus, ouvrir une tâche puis revenir en arrière démonte et
+remonte `TaskFilterList` (route différente, `/tasks/[id]`) : les 8
+critères repartiraient de leurs valeurs par défaut à chaque retour sur
+`/tasks`, obligeant à refaire son filtrage. `sessionStorage`
+(`todolist:tasks-filters`) conserve désormais l'état choisi tant que
+l'onglet/l'appli reste ouvert(e) — pas `localStorage`, qui survivrait à
+une fermeture, ce qui n'est pas ce qui est demandé.
+
+- **Écriture** : un `useEffect` sérialise l'état courant (portée, statuts,
+  catégorie, échéance, partagé/privé, en retard uniquement, tags, texte de
+  recherche) à chaque changement.
+- **Lecture** : restaurée par un second `useEffect`, exécuté **une seule
+  fois après le premier rendu**, jamais dans les `useState` d'initialisation
+  eux-mêmes — `sessionStorage` n'existe pas côté serveur, l'y lire aurait
+  créé un désaccord entre le HTML rendu par le serveur (Server Component,
+  sans accès à `sessionStorage`) et le premier rendu client, source
+  classique d'avertissement d'hydratation React.
+- **Ignorée en arrivant depuis une tuile de l'accueil** (`cameFromTile` —
+  voir portée ci-dessus) : les valeurs de l'URL (`?overdue=1`,
+  `?dueAtMost=`) priment alors sur tout ce qui aurait pu être mémorisé, un
+  clic sur une tuile étant une intention explicite ("montre-moi exactement
+  ça").
+- Échec silencieux si `sessionStorage` est indisponible (navigation
+  privée, quota) : le filtre ne survit simplement pas à la navigation,
+  sans rien bloquer.
 
 ### 6.8 Rafraîchissement automatique à l'ouverture
 
@@ -1184,7 +1218,7 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage par personne |
-| `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statut actifs/catégorie/échéance/partagé-privé/en retard/tags), séparateurs verticaux masqués sur mobile — plus de `FilterTabs.tsx`, retiré le 03/09/2026 |
+| `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statut actifs/catégorie/échéance/partagé-privé/en retard/tags), séparateurs verticaux masqués sur mobile — plus de `FilterTabs.tsx`, retiré le 03/09/2026 ; filtre mémorisé en `sessionStorage` (voir 6.7) |
 | `src/components/HomeDashboard.tsx` | Compteurs de l'écran d'accueil (en retard/aujourd'hui/cette semaine) |
 | `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |

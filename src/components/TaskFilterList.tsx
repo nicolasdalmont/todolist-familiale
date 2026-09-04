@@ -1,11 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
 import { IconAlertTriangle, IconChevronDown, IconSearch } from "./Icons";
+
+// Mémorisation du filtre (04/09/2026) : ouvrir puis fermer une tâche
+// démonte et remonte ce composant (route différente, /tasks/[id]) — sans
+// rien de plus, les 8 useState ci-dessous repartiraient de leurs valeurs
+// par défaut à chaque retour sur /tasks. sessionStorage restaure l'état
+// choisi tant que l'onglet/l'appli reste ouvert(e) (contrairement à
+// localStorage, qui survivrait à une fermeture — pas ce qui est demandé),
+// sans aller-retour serveur ni contexte React à faire traverser une
+// frontière de route.
+const FILTER_STORAGE_KEY = "todolist:tasks-filters";
+
+interface PersistedFilters {
+  scope: "mine" | "all";
+  statuses: TaskStatus[];
+  category: string | null;
+  dueAtMost: string;
+  visibility: Visibility | null;
+  overdueOnly: boolean;
+  selectedTags: string[];
+  query: string;
+}
+
+function readPersistedFilters(): Partial<PersistedFilters> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(FILTER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    // Stockage indisponible (navigation privée, quota...) : pas de filtre
+    // restauré, sans conséquence bloquante.
+    return null;
+  }
+}
+
+function writePersistedFilters(filters: PersistedFilters): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+  } catch {
+    // Idem : le filtre ne survivra simplement pas à la navigation.
+  }
+}
 
 // Ordre de la liste déroulante de catégorie : alphabétique comme
 // CATEGORY_ORDER (voir src/lib/categories.ts), sauf "autre" qui est
@@ -70,6 +112,23 @@ export function TaskFilterList({
   // la tuile "En retard" du tableau de bord (voir HomeDashboard.tsx).
   initialOverdueOnly?: boolean;
 }) {
+  // Arrivée depuis une tuile de l'accueil : ces tuiles comptent les tâches
+  // dont on est responsable (canEdit — créateur ou assigné(e) avec droit de
+  // modification, voir HomeDashboard.tsx et src/lib/access.ts), plus large
+  // que la portée "mes tâches" (créateur uniquement). Forcer "Toutes les
+  // tâches" ici garde le nombre affiché cohérent avec celui de la tuile
+  // cliquée (corrigé le 04/09/2026, après signalement d'un écart) ; et
+  // comme le clic sur une tuile est une intention explicite ("montre-moi
+  // exactement ça"), on ignore aussi tout filtre précédemment mémorisé.
+  const cameFromTile = Boolean(initialOverdueOnly) || Boolean(initialDueAtMost);
+
+  // États initialisés à leurs valeurs par défaut habituelles (identiques à
+  // ce que rend le serveur, pas de sessionStorage ici) : seuls
+  // initialDueAtMost/initialOverdueOnly, déjà connus du serveur via l'URL,
+  // influencent ce premier rendu. Le filtre mémorisé, lui, n'est restauré
+  // qu'après coup (voir l'effet juste en dessous) — le lire dès ces
+  // useState créerait un désaccord entre le HTML rendu par le serveur
+  // (qui ne connaît pas sessionStorage) et le premier rendu client.
   const [query, setQuery] = useState("");
   // Volet "Filtres" replié par défaut (demande explicite de l'utilisateur,
   // 03/09/2026) : l'écran s'ouvre sur une liste plus courte, sans les 4
@@ -78,7 +137,7 @@ export function TaskFilterList({
   // Portée par défaut : mes tâches uniquement — un seul bouton bascule vers
   // "toutes" (tout ce qui m'est visible, y compris partagé avec moi) et
   // inversement.
-  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const [scope, setScope] = useState<"mine" | "all">(cameFromTile ? "all" : "mine");
   // Statut par défaut : à faire + en cours cochés (sélection multiple, un
   // bouton par statut) — reproduit le comportement d'avant la première
   // rationalisation (03/09/2026), jugé plus pratique à l'usage qu'un seul
@@ -89,6 +148,44 @@ export function TaskFilterList({
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+
+  // Restaure, une fois le rendu initial passé (donc uniquement côté
+  // client — sessionStorage n'existe pas côté serveur, voir la note
+  // ci-dessus), le filtre laissé par la visite précédente de /tasks dans
+  // cet onglet. Ignoré si on arrive depuis une tuile de l'accueil : les
+  // valeurs de l'URL priment sur tout ce qui aurait pu être mémorisé.
+  useEffect(() => {
+    if (cameFromTile) return;
+    const persisted = readPersistedFilters();
+    if (!persisted) return;
+    if (persisted.query !== undefined) setQuery(persisted.query);
+    if (persisted.scope) setScope(persisted.scope);
+    if (persisted.statuses) setStatuses(new Set(persisted.statuses));
+    if (persisted.category !== undefined) setCategory(persisted.category);
+    if (persisted.dueAtMost !== undefined) setDueAtMost(persisted.dueAtMost);
+    if (persisted.visibility !== undefined) setVisibility(persisted.visibility);
+    if (persisted.overdueOnly !== undefined) setOverdueOnly(persisted.overdueOnly);
+    if (persisted.selectedTags) setSelectedTags(new Set(persisted.selectedTags));
+    // Volontairement exécuté une seule fois, au montage — cameFromTile ne
+    // change pas pendant la vie du composant (dérivé des props initiales).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Réenregistre l'état courant à chaque changement, pour le retrouver au
+  // prochain montage de ce composant tant que l'onglet/l'appli reste
+  // ouvert(e) — notamment après avoir ouvert puis refermé une tâche.
+  useEffect(() => {
+    writePersistedFilters({
+      scope,
+      statuses: Array.from(statuses),
+      category,
+      dueAtMost,
+      visibility,
+      overdueOnly,
+      selectedTags: Array.from(selectedTags),
+      query,
+    });
+  }, [scope, statuses, category, dueAtMost, visibility, overdueOnly, selectedTags, query]);
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 

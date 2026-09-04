@@ -257,3 +257,14 @@ export function IconX({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Chevron du volet dépliable "Filtres" de la liste des tâches — voir
+// src/components/TaskFilterList.tsx. Pivote de 180° (classe `rotate-180`
+// posée par l'appelant) quand le volet est ouvert.
+export function IconChevronDown({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

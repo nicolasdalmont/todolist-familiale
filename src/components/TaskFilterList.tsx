@@ -5,7 +5,7 @@ import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { TaskCard } from "./TaskCard";
-import { IconAlertTriangle, IconSearch } from "./Icons";
+import { IconAlertTriangle, IconChevronDown, IconSearch } from "./Icons";
 
 // Ordre de la liste déroulante de catégorie : alphabétique comme
 // CATEGORY_ORDER (voir src/lib/categories.ts), sauf "autre" qui est
@@ -24,9 +24,12 @@ const DEFAULT_STATUSES: TaskStatus[] = ["todo", "in_progress"];
 
 // Petite séparation verticale entre deux groupes de filtres sur une même
 // ligne, pour plus de lisibilité (demande explicite de l'utilisateur,
-// 03/09/2026).
+// 03/09/2026). Masquée sous le point de rupture `sm` : sur mobile, chaque
+// groupe de filtres passe à la ligne (voir les conteneurs `flex-col
+// sm:flex-row` plus bas) et une barre verticale n'y aurait plus de sens —
+// demande explicite de l'utilisateur.
 function FilterSeparator() {
-  return <span aria-hidden="true" className="h-5 w-px shrink-0 self-center bg-line" />;
+  return <span aria-hidden="true" className="hidden h-5 w-px shrink-0 self-center bg-line sm:block" />;
 }
 
 // Filtrage additionnel (portée/statut/catégorie/échéance/partagé-privé/
@@ -36,9 +39,12 @@ function FilterSeparator() {
 // src/app/tasks/page.tsx) : la liste de tâches d'une famille reste petite,
 // et ça évite un aller-retour serveur à chaque frappe/clic.
 //
-// Disposition en 4 lignes, chaque ligne pouvant regrouper deux filtres
-// séparés par une barre verticale (`FilterSeparator`, demande explicite
-// de l'utilisateur, 03/09/2026) :
+// Disposition en 4 lignes à l'intérieur d'un volet dépliable "Filtres"
+// (replié par défaut — demande explicite de l'utilisateur, 03/09/2026 —
+// la barre de recherche, elle, reste toujours visible au-dessus du
+// volet), chaque ligne pouvant regrouper deux filtres séparés par une
+// barre verticale sur desktop (`FilterSeparator`, masquée sur mobile où
+// les groupes s'empilent l'un sous l'autre) :
 //   1. Portée (mes tâches / toutes) │ statut (4 boutons à cocher, à
 //      faire + en cours cochés par défaut)
 //   2. Catégorie (liste déroulante, sélection unique) │ échéance
@@ -65,6 +71,10 @@ export function TaskFilterList({
   initialOverdueOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  // Volet "Filtres" replié par défaut (demande explicite de l'utilisateur,
+  // 03/09/2026) : l'écran s'ouvre sur une liste plus courte, sans les 4
+  // lignes de filtres — dépliable au besoin via le bouton dédié.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Portée par défaut : mes tâches uniquement — un seul bouton bascule vers
   // "toutes" (tout ce qui m'est visible, y compris partagé avec moi) et
   // inversement.
@@ -160,119 +170,156 @@ export function TaskFilterList({
         />
       </div>
 
-      {/* Ligne 1 : portée (mes tâches / toutes) │ statut (4 boutons à
-          cocher, à faire + en cours par défaut). */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setScope((prev) => (prev === "mine" ? "all" : "mine"))}
-          className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-            scope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-          }`}
-        >
-          Toutes les tâches
-        </button>
-        <FilterSeparator />
-        {STATUS_ORDER.map((status) => (
-          <button
-            key={status}
-            type="button"
-            onClick={() => toggleStatus(status)}
-            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-              statuses.has(status) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-            }`}
-          >
-            {STATUS_LABELS[status]}
-          </button>
-        ))}
-      </div>
-
-      {/* Ligne 2 : catégorie (liste déroulante, sélection unique) │
-          échéance. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={category ?? ""}
-          onChange={(e) => setCategory(e.target.value || null)}
-          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] font-semibold text-ink outline-none focus:border-brand"
-        >
-          <option value="">Toutes catégories</option>
-          {CATEGORY_SELECT_ORDER.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
-            </option>
-          ))}
-        </select>
-
-        <FilterSeparator />
-
-        <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
-          Échéance au plus tard le
-        </label>
-        <input
-          id="dueAtMost"
-          type="date"
-          value={dueAtMost}
-          onChange={(e) => setDueAtMost(e.target.value)}
-          className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
+      {/* Volet dépliable "Filtres" : replié par défaut (voir l'état
+          `filtersOpen` plus haut) pour laisser un écran plus court par
+          défaut ; la barre de recherche ci-dessus reste toujours visible,
+          elle n'en fait pas partie. */}
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((prev) => !prev)}
+        aria-expanded={filtersOpen}
+        className="flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13.5px] font-bold text-ink"
+      >
+        <span className="flex items-center gap-2">
+          Filtres
+          {hasActiveFilters ? (
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand" />
+          ) : null}
+        </span>
+        <IconChevronDown
+          className={`h-4 w-4 text-ink-muted transition-transform ${filtersOpen ? "rotate-180" : ""}`}
         />
-        {dueAtMost ? (
-          <button
-            type="button"
-            onClick={() => setDueAtMost("")}
-            className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
-          >
-            Effacer
-          </button>
-        ) : null}
-      </div>
+      </button>
 
-      {/* Ligne 3 : partagé/privé │ en retard uniquement. */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {(
-          [
-            { value: null, label: "Toutes" },
-            { value: "shared" as Visibility, label: "Partagées" },
-            { value: "private" as Visibility, label: "Privées" },
-          ] as const
-        ).map((opt) => (
-          <button
-            key={opt.label}
-            type="button"
-            onClick={() => setVisibility(opt.value)}
-            className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-              visibility === opt.value ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-        <FilterSeparator />
-        <button
-          type="button"
-          onClick={() => setOverdueOnly((prev) => !prev)}
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-            overdueOnly ? "border-rose-300 bg-rose-50 text-rose-600" : "border-line bg-surface text-ink-muted"
-          }`}
-        >
-          <IconAlertTriangle className="h-3.5 w-3.5" /> En retard uniquement
-        </button>
-      </div>
-
-      {/* Ligne 4 : tags (sélection multiple). */}
-      {tagNames.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {tagNames.map((name) => (
+      {filtersOpen ? (
+        <div className="flex flex-col gap-3">
+          {/* Ligne 1 : portée (mes tâches / toutes) │ statut (4 boutons à
+              cocher, à faire + en cours par défaut). Sur mobile
+              (`flex-col`), la portée et le groupe de statuts passent
+              chacun à la ligne, sans séparateur (voir `FilterSeparator`) ;
+              à partir de `sm`, ils reviennent sur la même ligne. */}
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
             <button
-              key={name}
               type="button"
-              onClick={() => toggleTag(name)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${
-                selectedTags.has(name) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+              onClick={() => setScope((prev) => (prev === "mine" ? "all" : "mine"))}
+              className={`self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                scope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
               }`}
             >
-              #{name}
+              Toutes les tâches
             </button>
-          ))}
+            <FilterSeparator />
+            <div className="flex flex-wrap gap-1.5">
+              {STATUS_ORDER.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => toggleStatus(status)}
+                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                    statuses.has(status) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                  }`}
+                >
+                  {STATUS_LABELS[status]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ligne 2 : catégorie (liste déroulante, sélection unique) │
+              échéance. Même principe d'empilement sur mobile que la
+              ligne 1. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <select
+              value={category ?? ""}
+              onChange={(e) => setCategory(e.target.value || null)}
+              className="self-start rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] font-semibold text-ink outline-none focus:border-brand"
+            >
+              <option value="">Toutes catégories</option>
+              {CATEGORY_SELECT_ORDER.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+
+            <FilterSeparator />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
+                Échéance au plus tard le
+              </label>
+              <input
+                id="dueAtMost"
+                type="date"
+                value={dueAtMost}
+                onChange={(e) => setDueAtMost(e.target.value)}
+                className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
+              />
+              {dueAtMost ? (
+                <button
+                  type="button"
+                  onClick={() => setDueAtMost("")}
+                  className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
+                >
+                  Effacer
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Ligne 3 : partagé/privé │ en retard uniquement. Même principe
+              d'empilement sur mobile que les lignes 1 et 2. */}
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { value: null, label: "Toutes" },
+                  { value: "shared" as Visibility, label: "Partagées" },
+                  { value: "private" as Visibility, label: "Privées" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setVisibility(opt.value)}
+                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                    visibility === opt.value ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <FilterSeparator />
+            <button
+              type="button"
+              onClick={() => setOverdueOnly((prev) => !prev)}
+              className={`flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                overdueOnly ? "border-rose-300 bg-rose-50 text-rose-600" : "border-line bg-surface text-ink-muted"
+              }`}
+            >
+              <IconAlertTriangle className="h-3.5 w-3.5" /> En retard uniquement
+            </button>
+          </div>
+
+          {/* Ligne 4 : tags (sélection multiple) — un seul groupe, pas de
+              séparateur ni de traitement particulier sur mobile. */}
+          {tagNames.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {tagNames.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleTag(name)}
+                  className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${
+                    selectedTags.has(name) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                  }`}
+                >
+                  #{name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

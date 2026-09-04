@@ -58,7 +58,11 @@ export const config = {
   // aussi appelée depuis public/sw.js (handler "pushsubscriptionchange"),
   // hors du contexte d'un onglet navigateur — la vérification de session
   // s'y fait directement (401 JSON si absente), pas via une redirection.
+  //
+  // /api/cron exclu de même : /api/cron/reminders (voir vercel.json) est
+  // appelée par Vercel Cron, jamais par un navigateur — aucun cookie de
+  // session à vérifier, la route s'authentifie elle-même via CRON_SECRET.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version|api/push).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version|api/push|api/cron).*)",
   ],
 };

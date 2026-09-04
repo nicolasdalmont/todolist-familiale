@@ -138,8 +138,7 @@ Deux sources complémentaires, toutes deux dans `supabase/` :
    - `004_checklist.sql` — table `checklist_items` (voir 6.10).
    - `005_activity_log.sql` — table `activity_log` (voir 6.12).
    - `006_notifications.sql` — table `notifications` (voir 6.15).
-   - `007_push_subscriptions.sql` — table `push_subscriptions` (voir 6.15
-     et la feuille de route notifications).
+   - `007_push_subscriptions.sql` — table `push_subscriptions` (voir 6.15).
 
 Toute nouvelle évolution du schéma passe par un nouveau fichier numéroté
 dans `supabase/migrations/` (voir section 10), et `recreate_full_schema.sql`
@@ -925,11 +924,23 @@ moments :
 | `task_shared` | `createTaskAction` (partage) / `updateTaskAction` (personne nouvellement ajoutée) | les personnes ajoutées |
 | `comment_added` | `addCommentAction` sur une tâche partagée | participants sauf l'auteur |
 | `status_changed` | `setStatusAction` sur une tâche partagée | participants sauf l'auteur |
-| `due_soon` | *(à venir, Vercel Cron)* | assigné(e)s de la tâche |
+| `due_soon` | `/api/cron/reminders` (Vercel Cron, 1×/jour) — tâche `todo`/`in_progress` dont l'échéance tombe aujourd'hui (jour civil de Paris) | créateur + assigné(e)s, **y compris sur une tâche privée** |
 
 Un changement de statut fait depuis le **formulaire de modification**
 (`updateTaskAction`) n'émet pas de `status_changed` — seul le bouton de
 statut de l'écran de détail (`setStatusAction`, le chemin courant) le fait.
+
+**Rappel d'échéance** (`src/app/api/cron/reminders/route.ts`, 04/09/2026) :
+route déclenchée une fois par jour par **Vercel Cron** (`vercel.json`,
+`0 7 * * *` — 07:00 UTC, ≈ 8-9h à Paris selon la saison), protégée par
+`CRON_SECRET` (Vercel l'ajoute automatiquement en en-tête `Authorization`
+à ses appels). Contrairement aux autres types, elle notifie **même le
+créateur d'une tâche privée** : ce n'est pas l'action d'un tiers dont on
+informe des participants, mais un rappel adressé à chacun. Un garde-fou
+(pas de nouveau `due_soon` pour la même tâche dans les 20h précédentes)
+évite un doublon si Vercel retentait l'appel. Exclue du middleware
+d'authentification (voir 3), comme `/api/version` et `/api/push` : elle
+n'est jamais appelée par un navigateur.
 
 **Lecture / affichage** : `getMyNotifications()` (`src/lib/queries.ts`,
 30 dernières) → `AttentionFeed.tsx`. Chaque ligne renvoie vers
@@ -952,11 +963,12 @@ l'utilisateur).
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
 | `/api/push/subscribe` | `POST`/`DELETE` : enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) — pas une page, aucune UI |
+| `/api/cron/reminders` | Rappel quotidien d'échéance (Vercel Cron, voir 6.15) — pas une page, aucune UI |
 
-Toutes les routes sauf `/login`, `/api/version` et `/api/push/subscribe`
-exigent une session valide (appliqué par le middleware — cette dernière
-vérifie la session elle-même, voir 6.15) ; `/tasks/[id]` et
-`/tasks/[id]/edit`
+Toutes les routes sauf `/login`, `/api/version`, `/api/push/subscribe` et
+`/api/cron/reminders` exigent une session valide (appliqué par le
+middleware — ces deux dernières s'authentifient elles-mêmes, voir 6.15) ;
+`/tasks/[id]` et `/tasks/[id]/edit`
 exigent en plus les droits d'accès décrits en 6.1, et `/admin` exige le
 rôle `admin` (voir 6.9), vérifiés côté serveur indépendamment de toute
 navigation dans l'UI. La racine `/` a hébergé la
@@ -1168,6 +1180,8 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/components/AttentionFeed.tsx` | Fil « À ton attention » sous les compteurs de l'accueil (voir 6.15) |
 | `src/components/NotificationsToggle.tsx` | Activation/désactivation des notifications sur l'écran « Mon compte » (voir 6.15) |
 | `src/app/api/push/subscribe/route.ts` | Enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) |
+| `src/app/api/cron/reminders/route.ts` | Rappel quotidien d'échéance, appelé par Vercel Cron (voir 6.15) |
+| `vercel.json` | Déclare le Cron Job (`/api/cron/reminders`, 1×/jour) |
 | `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |

@@ -71,6 +71,7 @@ SESSION_SECRET=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=
+CRON_SECRET=
 ```
 
 `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` viennent de Supabase → Project
@@ -86,7 +87,11 @@ des notifications push web (protocole standard, aucun compte/service tiers
 garder ensuite, ne pas régénérer (ça invaliderait tous les abonnements déjà
 enregistrés). `VAPID_SUBJECT` est un contact `mailto:...` transmis au
 service push en cas de souci de délivrabilité, jamais affiché aux
-utilisateurs. Toutes les six en type **Secret**, sauf
+utilisateurs. `CRON_SECRET` protège la route de rappel d'échéance
+(`/api/cron/reminders`, voir `vercel.json`) — Vercel Cron l'ajoute
+automatiquement en en-tête `Authorization` à ses appels dès que cette
+variable est définie sur le projet ; à générer une fois
+(ex. `openssl rand -base64 32`). Toutes en type **Secret**, sauf
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY` qui doit rester en clair (le préfixe
 `NEXT_PUBLIC_` l'expose intentionnellement au navigateur).
 

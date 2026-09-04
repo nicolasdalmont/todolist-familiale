@@ -49,12 +49,15 @@ export async function notifyUser(
 
 // Notifie tous les participants d'une tâche (créateur + assignés + lecteurs)
 // sauf `excludeUserId` — typiquement l'auteur de l'action, qu'on n'informe
-// pas de ce qu'il vient de faire lui-même.
+// pas de ce qu'il vient de faire lui-même. `excludeUserId` est optionnel :
+// omis pour une notification système sans auteur (ex. rappel d'échéance,
+// voir /api/cron/reminders), qui doit alors atteindre tout le monde y
+// compris le créateur d'une tâche privée.
 export async function notifyTaskParticipants(
   supabase: DB,
   params: {
     taskId: string;
-    excludeUserId: string;
+    excludeUserId?: string;
     type: NotificationType;
     title: string;
     body?: string | null;
@@ -70,7 +73,7 @@ export async function notifyTaskParticipants(
     task.created_by,
     ...(assignees ?? []).map((a) => a.user_id as string),
   ]);
-  recipients.delete(params.excludeUserId);
+  if (params.excludeUserId) recipients.delete(params.excludeUserId);
 
   await Promise.all(
     [...recipients].map((userId) =>

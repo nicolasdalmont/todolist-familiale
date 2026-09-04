@@ -11,6 +11,14 @@ export function TaskCard({ task }: { task: Task }) {
   const CategoryIcon = CATEGORY_ICONS[task.category];
   const checklist = task.checklist ?? [];
   const checklistDone = checklist.filter((i) => i.done).length;
+  // Vignettes séparées en deux groupes : assigné(e)s (droit de
+  // modification) à gauche, lecture seule à droite — demande explicite de
+  // l'utilisateur (04/09/2026), pour distinguer d'un coup d'œil qui peut
+  // agir sur la tâche de qui peut seulement la consulter. Même principe
+  // que l'écran de détail (src/app/tasks/[id]/page.tsx), qui les sépare
+  // déjà en deux lignes libellées "Assigné(e)s"/"Lecture seule".
+  const editors = (task.assignees ?? []).filter((a) => a.role === "editor");
+  const viewers = (task.assignees ?? []).filter((a) => a.role === "viewer");
 
   return (
     <Link
@@ -64,11 +72,24 @@ export function TaskCard({ task }: { task: Task }) {
           </span>
         </div>
       ) : null}
-      <div className="flex -space-x-2">
-        {(task.assignees ?? []).map((a) => (
-          <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
-        ))}
-      </div>
+      {editors.length > 0 || viewers.length > 0 ? (
+        <div className="flex items-center gap-3">
+          {editors.length > 0 ? (
+            <div className="flex -space-x-2">
+              {editors.map((a) => (
+                <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
+              ))}
+            </div>
+          ) : null}
+          {viewers.length > 0 ? (
+            <div className="flex -space-x-2">
+              {viewers.map((a) => (
+                <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface opacity-60" />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Link>
   );
 }

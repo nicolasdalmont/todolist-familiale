@@ -298,6 +298,14 @@ avec"), avec un rôle par personne :
   détail, et l'URL `/tasks/[id]/edit` renvoie une page introuvable si elle
   y accède directement).
 
+**Vignettes séparées par rôle (`TaskCard.tsx`, liste `/tasks`, 04/09/2026)** :
+les avatars des personnes partageant la tâche sont affichés en deux
+groupes distincts — assigné(e)s (`editor`, y compris le créateur) à
+gauche, lecture seule (`viewer`, estompées à 60% d'opacité) à droite —
+pour distinguer d'un coup d'œil qui peut agir sur la tâche de qui peut
+seulement la consulter. L'écran de détail (`/tasks/[id]`) fait déjà cette
+séparation, avec deux lignes libellées ("Assigné(e)s" / "Lecture seule").
+
 Le créateur d'une tâche a toujours les deux droits (voir/modifier), qu'il
 figure ou non explicitement dans la liste de partage. **Le champ
 `tasks.visibility` (`shared`/`private`) n'est plus saisi manuellement** :

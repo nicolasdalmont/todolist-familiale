@@ -41,7 +41,7 @@ export function CommentForm({ taskId }: { taskId: string }) {
         disabled={isPending}
         className="rounded-xl bg-brand px-4 font-bold text-white disabled:opacity-50"
       >
-        Envoyer
+        Ajouter
       </button>
     </form>
   );

@@ -305,22 +305,38 @@ export async function updateTaskAction(formData: FormData) {
 
   if (visibility === "shared") {
     await logActivity(supabase, { taskId, actorId: userId, type: "task_updated", taskTitle: title });
-    const newlyShared = Array.from(shareRoles.keys()).filter(
+    const who = await actorName(supabase, userId);
+    const currentIds = Array.from(shareRoles.keys());
+
+    // Personnes déjà sur la tâche avant cette modification et toujours
+    // présentes après → notification "a modifié". Les personnes
+    // nouvellement ajoutées, elles, reçoivent "t'a partagé" juste en
+    // dessous — pas les deux.
+    const stillOnTask = currentIds.filter((id) => id !== userId && previouslyShared.has(id));
+    await Promise.all(
+      stillOnTask.map((id) =>
+        notifyUser(supabase, {
+          userId: id,
+          type: "task_updated",
+          taskId,
+          title: `${who} a modifié « ${title} »`,
+        })
+      )
+    );
+
+    const newlyShared = currentIds.filter(
       (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
     );
-    if (newlyShared.length > 0) {
-      const who = await actorName(supabase, userId);
-      await Promise.all(
-        newlyShared.map((id) =>
-          notifyUser(supabase, {
-            userId: id,
-            type: "task_shared",
-            taskId,
-            title: `${who} t'a partagé « ${title} »`,
-          })
-        )
-      );
-    }
+    await Promise.all(
+      newlyShared.map((id) =>
+        notifyUser(supabase, {
+          userId: id,
+          type: "task_shared",
+          taskId,
+          title: `${who} t'a partagé « ${title} »`,
+        })
+      )
+    );
   }
 
   revalidatePath("/");
@@ -343,7 +359,39 @@ export async function deleteTaskAction(formData: FormData) {
     throw new Error("Tu n'as pas le droit de supprimer cette tâche.");
   }
 
+  // Titre + destinataires récupérés AVANT la suppression : task_assignees
+  // et les notifications rattachées à la tâche disparaissent en cascade
+  // (on delete cascade), donc la notification de suppression est créée
+  // avec taskId = null (rien vers quoi renvoyer) et le titre figé dans le
+  // texte.
+  const taskTitle = access.title ?? "une tâche";
+  let recipients: string[] = [];
+  if (access.visibility === "shared") {
+    const { data: assignees } = await supabase
+      .from("task_assignees")
+      .select("user_id")
+      .eq("task_id", taskId);
+    recipients = Array.from(
+      new Set([access.createdBy!, ...(assignees ?? []).map((a) => a.user_id as string)])
+    ).filter((id) => id !== userId);
+  }
+
   await supabase.from("tasks").delete().eq("id", taskId);
+
+  if (recipients.length > 0) {
+    const who = await actorName(supabase, userId);
+    await Promise.all(
+      recipients.map((id) =>
+        notifyUser(supabase, {
+          userId: id,
+          type: "task_deleted",
+          taskId: null,
+          title: `${who} a supprimé « ${taskTitle} »`,
+        })
+      )
+    );
+  }
+
   revalidatePath("/");
   revalidatePath("/tasks");
   redirect("/tasks");

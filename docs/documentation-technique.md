@@ -989,9 +989,15 @@ filtré par `canView`) à deux moments :
 | Type | Déclencheur | Destinataires |
 |---|---|---|
 | `task_shared` | `createTaskAction` (partage) / `updateTaskAction` (personne nouvellement ajoutée) | les personnes ajoutées |
+| `task_updated` | `updateTaskAction` sur une tâche partagée | participants **déjà présents** avant la modif, sauf l'auteur (les nouveaux reçoivent `task_shared`) |
+| `task_deleted` | `deleteTaskAction` sur une tâche partagée | créateur + assigné(e)s, sauf l'auteur — notif sans lien (`task_id = null`, la tâche n'existe plus) |
 | `comment_added` | `addCommentAction` sur une tâche partagée | participants sauf l'auteur |
 | `status_changed` | `setStatusAction` sur une tâche partagée | participants sauf l'auteur |
 | `due_soon` | `/api/cron/reminders` (Vercel Cron, 1×/jour) — tâche `todo`/`in_progress` dont l'échéance tombe aujourd'hui (jour civil de Paris) | créateur + assigné(e)s, **y compris sur une tâche privée** |
+
+*Création d'une tâche* : couverte par `task_shared` (« X t'a partagé
+… »), envoyé à chaque personne avec qui la tâche est partagée dès sa
+création — pas de type `task_created` distinct.
 
 Un changement de statut fait depuis le **formulaire de modification**
 (`updateTaskAction`) n'émet pas de `status_changed` — seul le bouton de

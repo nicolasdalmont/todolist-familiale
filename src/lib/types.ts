@@ -116,7 +116,13 @@ export interface ActivityLogEntry {
 // src/components/AttentionFeed.tsx, src/lib/notifications.ts et migration
 // 006_notifications.sql). `title` est une phrase prête à afficher ; `body`
 // est un détail secondaire optionnel. `read_at` NULL = non lue.
-export type NotificationType = "task_shared" | "comment_added" | "status_changed" | "due_soon";
+export type NotificationType =
+  | "task_shared"
+  | "task_updated"
+  | "task_deleted"
+  | "comment_added"
+  | "status_changed"
+  | "due_soon";
 
 export interface NotificationItem {
   id: string;

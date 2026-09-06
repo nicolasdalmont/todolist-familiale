@@ -7,7 +7,7 @@ import type { NotificationItem, NotificationType } from "@/lib/types";
 import { relativeTime } from "@/lib/format";
 import { markNotificationReadAction, markNotificationsReadAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
-import { IconCalendar, IconChat, IconCheck, IconUsers } from "./Icons";
+import { IconCalendar, IconChat, IconCheck, IconPencil, IconUsers, IconX } from "./Icons";
 
 // Fil « À ton attention » affiché sous les compteurs de l'écran d'accueil
 // (src/components/HomeDashboard.tsx) : le miroir in-app des notifications
@@ -21,6 +21,8 @@ import { IconCalendar, IconChat, IconCheck, IconUsers } from "./Icons";
 
 const TYPE_ICON: Record<NotificationType, typeof IconChat> = {
   task_shared: IconUsers,
+  task_updated: IconPencil,
+  task_deleted: IconX,
   comment_added: IconChat,
   status_changed: IconCheck,
   due_soon: IconCalendar,

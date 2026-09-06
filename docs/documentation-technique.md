@@ -852,33 +852,37 @@ tâche Impôts en « Terminée »". Si le fil est vide pour la journée, un
 message neutre ("Aucune activité partagée aujourd'hui.") s'affiche à la
 place plutôt que de faire disparaître la section.
 
-### 6.13 Ajouter une tâche à Google Agenda (04/09/2026)
+### 6.13 Ajouter une tâche à son agenda (04/09/2026)
 
 L'écran de détail d'une tâche **datée** affiche, à côté de l'icône crayon
-« Modifier », une icône calendrier qui ouvre le formulaire de création
-d'événement de Google Agenda **pré-rempli** (titre, créneau, description) —
-l'utilisateur choisit son agenda et enregistre.
+« Modifier », une icône calendrier qui télécharge un fichier **`.ics`**
+(iCalendar, RFC 5545). L'appareil l'ouvre alors dans son **application de
+calendrier par défaut** — Apple Calendar sur iOS, l'agenda par défaut sur
+Android, Outlook/Apple Calendar sur desktop… — qui propose d'ajouter
+l'événement. Générique et indépendant de la plateforme (remplace, le
+04/09/2026, un lien spécifique à Google Agenda).
 
-- **Aucune API, aucun OAuth, aucun secret.** `googleCalendarUrl()`
-  (`src/lib/calendar.ts`) construit une simple URL
-  `https://calendar.google.com/calendar/render?action=TEMPLATE&…`. Sur
-  mobile, le lien ouvre l'application Google Agenda ; sur desktop, l'onglet
-  web.
-- **Créneau** : un bloc d'**une heure** à partir de l'échéance. L'échéance
-  est transmise en UTC (suffixe `Z`) ; Google la reconvertit dans le fuseau
-  de l'agenda de l'utilisateur. Depuis la refonte fuseau du 04/09/2026
-  (§8.1), l'instant stocké est correct, donc l'événement tombe à la bonne
-  heure de Paris.
-- **Description de l'événement** : la description de la tâche, suivie de
-  l'URL absolue de la tâche (reconstruite depuis les en-têtes `host` /
-  `x-forwarded-proto` de la requête) pour pouvoir y revenir.
-- **Tâche sans échéance** : l'icône n'est pas affichée (rien à planifier).
+- **Route** : `GET /api/tasks/[id]/calendar`
+  (`src/app/api/tasks/[id]/calendar/route.ts`) — sous le middleware
+  d'authentification, plus un contrôle d'accès à la tâche
+  (`getTask(supabase, id, userId)` renvoie `null` sans droit → 404, comme
+  si elle n'existait pas). Réponse : `Content-Type: text/calendar` +
+  `Content-Disposition: attachment; filename="tache.ics"`.
+- **Contenu** (`buildTaskICS()`, `src/lib/calendar.ts`, aucune dépendance —
+  chaîne construite à la main) : un `VEVENT` avec `SUMMARY` = titre,
+  `DESCRIPTION` = description + URL absolue de la tâche (reconstruite
+  depuis les en-têtes `host` / `x-forwarded-proto`), `DTSTART` = échéance
+  en UTC (suffixe `Z` — l'appli de calendrier reconvertit dans le fuseau
+  de l'appareil), `DTEND` = +1 h.
+- **Tâche sans échéance** : l'icône n'est pas affichée (rien à planifier) ;
+  la route répond 404.
 - **Accessible à tous ceux qui voient la tâche** (y compris en lecture
   seule) : c'est leur propre agenda, aucune écriture côté appli.
-- **Copie ponctuelle** : une modification ultérieure de la tâche (titre,
-  échéance) ne met pas l'événement à jour. La récurrence de la tâche n'est
-  pas transmise pour l'instant (évolution possible via le paramètre
-  `recur=RRULE:…`).
+- **Copie ponctuelle** : une modification ultérieure de la tâche ne met
+  pas l'événement à jour. La récurrence n'est pas transmise (évolution
+  possible via une `RRULE` dans le `VEVENT`). Les lignes longues ne sont
+  pas repliées (RFC §3.1) — toléré en pratique par les applis de
+  calendrier courantes, à ajouter si l'une refuse.
 
 ### 6.14 Mon compte (`/compte`, 04/09/2026)
 
@@ -1040,11 +1044,12 @@ notifications. Chaque action fait `revalidatePath("/")`.
 | `/` | Écran d'accueil (message de bienvenue, compteurs, activité du jour) |
 | `/tasks` | Liste des tâches (onglets, recherche, filtres) |
 | `/tasks/new` | Formulaire de création |
-| `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à Google Agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
+| `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
 | `/compte` | Mon compte : identité + « Modifier mon mot de passe » (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
+| `/api/tasks/[id]/calendar` | Fichier `.ics` de la tâche pour l'agenda de l'appareil (voir 6.13) — 404 si l'utilisateur n'a pas `canView` ou si la tâche n'a pas d'échéance |
 | `/api/push/subscribe` | `POST`/`DELETE` : enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) — pas une page, aucune UI |
 | `/api/cron/reminders` | Rappel quotidien d'échéance (Vercel Cron, voir 6.15) — pas une page, aucune UI |
 
@@ -1089,7 +1094,7 @@ Postgres — aucun décalage codé en dur.
 
 **Avant cette refonte**, saisie et affichage étaient tous deux naïfs :
 "18:00" saisi était stocké `18:00Z` et réaffiché "18:00", les deux erreurs
-se compensant dans l'appli mais pas ailleurs (lien Google Agenda, §6.13).
+se compensant dans l'appli mais pas ailleurs (événement d'agenda, §6.13).
 Les 12 échéances déjà en base ont été réalignées le 04/09/2026 par
 `supabase/fix_due_at_timezone_2026-09-04.sql` (script ponctuel, à ne pas
 rejouer).
@@ -1248,7 +1253,8 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`/`ActivityLogEntry`) |
 | `src/lib/format.ts` | Formatage de dates (heure de Paris), statuts, récurrence, clés de jour civil |
 | `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
-| `src/lib/calendar.ts` | `googleCalendarUrl()` — lien de création d'événement Google Agenda depuis une tâche (voir 6.13) |
+| `src/lib/calendar.ts` | `buildTaskICS()` — génère le fichier `.ics` d'une tâche pour l'agenda de l'appareil (voir 6.13) |
+| `src/app/api/tasks/[id]/calendar/route.ts` | Sert ce `.ics` (`Content-Disposition: attachment`) — accès vérifié par `getTask` (voir 6.13) |
 | `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage par personne |

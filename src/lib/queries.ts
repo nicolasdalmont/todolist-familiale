@@ -210,9 +210,12 @@ export async function getRecentActivity(
 }
 
 // Fil « À ton attention » de l'écran d'accueil (src/components/
-// AttentionFeed.tsx) : les N dernières notifications de l'utilisateur, plus
-// récentes d'abord. Tolère l'absence de la table (migration 006 pas encore
-// appliquée) en dégradant en liste vide, comme getRecentActivity().
+// AttentionFeed.tsx) : les N dernières notifications **non lues** de
+// l'utilisateur, plus récentes d'abord. Une notification marquée lue
+// disparaît donc du fil (voir markNotificationReadAction /
+// markNotificationsReadAction dans src/lib/actions.ts). Tolère l'absence
+// de la table (migration 006 pas encore appliquée) en dégradant en liste
+// vide, comme getRecentActivity().
 export async function getMyNotifications(
   supabase: DB,
   userId: string,
@@ -222,6 +225,7 @@ export async function getMyNotifications(
     .from("notifications")
     .select("id, type, task_id, title, body, read_at, created_at")
     .eq("user_id", userId)
+    .is("read_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 

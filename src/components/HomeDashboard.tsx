@@ -81,8 +81,9 @@ export function HomeDashboard({
   // remise à jour dès qu'on a lu les notifications ou traité les tâches en
   // retard. Best-effort, ignoré si l'API n'est pas supportée.
   useEffect(() => {
-    const unreadCount = notifications.filter((n) => !n.read_at).length;
-    const total = overdueCount + unreadCount;
+    // `notifications` ne contient que les non lues (getMyNotifications les
+    // filtre déjà), donc sa longueur = le nombre de notifs non lues.
+    const total = overdueCount + notifications.length;
     const nav = navigator as Navigator & {
       setAppBadge?: (count?: number) => Promise<void>;
       clearAppBadge?: () => Promise<void>;

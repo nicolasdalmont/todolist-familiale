@@ -901,8 +901,8 @@ Héberge aussi, depuis le 04/09/2026, la section **Notifications**
 
 Fil affiché **sous les compteurs de l'écran d'accueil**, au-dessus de
 « Activité du jour » (6.12). C'est le **miroir in-app des notifications** :
-il existe indépendamment des push web et reste visible dès qu'il y a au
-moins une notification, que les push soient activés ou non.
+il existe indépendamment des push web et reste visible tant qu'il reste au
+moins une notification **non lue**, que les push soient activés ou non.
 
 **Modèle** : table `notifications` (migration `006_notifications.sql`) —
 `user_id`, `type`, `task_id` (nullable, `on delete cascade`), `title`
@@ -1009,12 +1009,22 @@ informe des participants, mais un rappel adressé à chacun. Un garde-fou
 d'authentification (voir 3), comme `/api/version` et `/api/push` : elle
 n'est jamais appelée par un navigateur.
 
-**Lecture / affichage** : `getMyNotifications()` (`src/lib/queries.ts`,
-30 dernières) → `AttentionFeed.tsx`. Chaque ligne renvoie vers
-`/tasks/[id]` ; les non lues sont mises en avant (bordure `brand`, pastille
-de compteur) ; **« Tout marquer comme lu »** appelle
-`markNotificationsReadAction` (`read_at = now()` sur les non lues de
-l'utilisateur).
+**Lecture / affichage** (`AttentionFeed.tsx`) : `getMyNotifications()`
+(`src/lib/queries.ts`) ne renvoie **que les notifications non lues** (30
+au plus, plus récentes d'abord) — une notif marquée lue **disparaît du
+fil**, et la section entière disparaît quand il n'y a plus rien à lire.
+Trois façons de marquer lu :
+
+- le **bouton ✓** sur chaque ligne (`markNotificationReadAction(id)`,
+  `useTransition` local, pas de gel d'écran) ;
+- le **clic sur la notification** — va à `/tasks/[id]` **et** marque lu
+  (appel non bloquant de `markNotificationReadAction` sur le `onClick` du
+  lien) ;
+- **« Tout marquer comme lu »** (`markNotificationsReadAction`, `read_at =
+  now()` sur toutes les non lues de l'utilisateur).
+
+Toutes filtrent par `user_id` : on ne peut marquer que ses propres
+notifications. Chaque action fait `revalidatePath("/")`.
 
 ## 7. Routes de l'application
 

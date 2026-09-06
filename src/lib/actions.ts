@@ -620,6 +620,28 @@ export async function deleteChecklistItemAction(taskId: string, itemId: string) 
 
 // --- Notifications --------------------------------------------------------
 
+// Marque UNE notification comme lue — bouton dédié sur chaque ligne du fil
+// « À ton attention », et aussi appelé au clic sur la notification pour
+// aller à la tâche concernée (src/components/AttentionFeed.tsx). Une fois
+// lue, elle ne réapparaît plus dans le fil (getMyNotifications ne renvoie
+// que les non lues). Filtrée par `user_id` : on ne peut marquer que ses
+// propres notifications, même en connaissant l'id d'une autre.
+export async function markNotificationReadAction(notificationId: string) {
+  const userId = await getSessionUserId();
+  if (!userId || !notificationId) return;
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (error) console.error("markNotificationReadAction:", error.message);
+
+  revalidatePath("/");
+}
+
 // Marque toutes les notifications non lues de l'utilisateur courant comme
 // lues (bouton « Tout marquer comme lu » du fil « À ton attention » —
 // src/components/AttentionFeed.tsx).

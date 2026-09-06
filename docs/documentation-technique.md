@@ -527,6 +527,17 @@ au moins un filtre s'écarte de sa valeur par défaut (même condition que
 `hasActiveFilters`, voir plus bas) — repère visible même volet replié,
 pour ne pas oublier qu'un filtre est actif.
 
+**Volet replié : résumé texte des critères** (`filterSummary`,
+04/09/2026) — une seconde ligne sous "Filtres", en petit et estompée,
+tronquée si trop longue, qui liste les critères en cours sans avoir à
+déplier : les **statuts cochés** toujours (« À faire, En cours » par
+défaut, ou « Tous les statuts » si les 4 sont cochés, « Aucun statut »
+si aucun) ; puis, seulement s'ils s'écartent du défaut, « Toutes les
+tâches » (portée), « Partagées »/« Privées », la catégorie, « Échéance ≤
+JJ/MM/AAAA », « En retard uniquement », les `#tags`, et « « recherche » »
+si le champ de recherche est rempli. Masqué quand le volet est déplié
+(les contrôles sont alors tous visibles).
+
 Une fois déplié, chaque ligne peut regrouper deux filtres séparés par une
 **barre verticale** sur desktop (`FilterSeparator`, ajoutée le 03/09/2026 ;
 **masquée en dessous du point de rupture Tailwind `sm`**, ajout du

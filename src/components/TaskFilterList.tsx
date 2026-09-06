@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Tag, Task, TaskStatus, Visibility } from "@/lib/types";
+import type { Category, Tag, Task, TaskStatus, Visibility } from "@/lib/types";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
@@ -262,6 +262,25 @@ export function TaskFilterList({
     overdueOnly ||
     query.trim().length > 0;
 
+  // Résumé texte des critères actifs, affiché sous « Filtres » quand le
+  // volet est replié (demande explicite de l'utilisateur) — évite d'avoir
+  // à le déplier pour se rappeler ce qui est filtré. Les statuts cochés
+  // sont toujours listés ; le reste n'apparaît que s'il s'écarte du défaut.
+  const checkedStatuses = STATUS_ORDER.filter((s) => statuses.has(s));
+  const filterSummaryParts: string[] = [];
+  if (checkedStatuses.length === 0) filterSummaryParts.push("Aucun statut");
+  else if (checkedStatuses.length === STATUS_ORDER.length) filterSummaryParts.push("Tous les statuts");
+  else filterSummaryParts.push(...checkedStatuses.map((s) => STATUS_LABELS[s]));
+  if (scope === "all") filterSummaryParts.push("Toutes les tâches");
+  if (visibility === "shared") filterSummaryParts.push("Partagées");
+  if (visibility === "private") filterSummaryParts.push("Privées");
+  if (category) filterSummaryParts.push(CATEGORY_LABELS[category as Category]);
+  if (dueAtMost) filterSummaryParts.push(`Échéance ≤ ${dueAtMost.split("-").reverse().join("/")}`);
+  if (overdueOnly) filterSummaryParts.push("En retard uniquement");
+  for (const tag of selectedTags) filterSummaryParts.push(`#${tag}`);
+  if (query.trim()) filterSummaryParts.push(`« ${query.trim()} »`);
+  const filterSummary = filterSummaryParts.join(", ");
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative">
@@ -283,16 +302,21 @@ export function TaskFilterList({
         type="button"
         onClick={() => setFiltersOpen((prev) => !prev)}
         aria-expanded={filtersOpen}
-        className="flex items-center justify-between rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13.5px] font-bold text-ink"
+        className="flex items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left"
       >
-        <span className="flex items-center gap-2">
-          Filtres
-          {hasActiveFilters ? (
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand" />
+        <span className="flex min-w-0 flex-col">
+          <span className="flex items-center gap-2 text-[13.5px] font-bold text-ink">
+            Filtres
+            {hasActiveFilters ? (
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand" />
+            ) : null}
+          </span>
+          {!filtersOpen ? (
+            <span className="truncate text-[12px] font-medium text-ink-muted">{filterSummary}</span>
           ) : null}
         </span>
         <IconChevronDown
-          className={`h-4 w-4 text-ink-muted transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${filtersOpen ? "rotate-180" : ""}`}
         />
       </button>
 

@@ -1,12 +1,17 @@
 # To-Do List Familiale — Documentation technique
 
-Dernière mise à jour : 04/09/2026 (compteur "En retard" et journal
-d'activité / fil "Activité du jour" sur l'écran d'accueil, disposition
-compacte des tuiles "Aujourd'hui"/"Cette semaine", rationalisation des
-filtres de la liste des tâches, ajustement du filtre de statut (4 boutons
-à cocher plutôt qu'un bouton à bascule), volet dépliable "Filtres" replié
-par défaut et adaptation mobile des filtres, puis script de reconstruction
-intégrale de la base — voir 5.3, 6.6 et 6.7).
+Dernière mise à jour : 04/09/2026. Grand lot de ce jour : passage de
+l'appli en fuseau Europe/Paris de bout en bout (8.1), écran « Mon compte »
++ changement de mot de passe connecté (6.14), système de notifications
+complet — fil in-app « À ton attention » + push web opt-in + rappel
+d'échéance quotidien via Vercel Cron (6.15), export d'une tâche vers le
+calendrier de l'appareil en `.ics` générique (6.13, remplace un lien
+spécifique à Google Agenda), portée « Uniquement mes tâches » alignée sur
+`canEdit` + résumé texte des filtres quand le volet est replié (6.7),
+séparation des vignettes assigné(e)s / lecture seule (6.1). Avant ça,
+même jour : script de reconstruction intégrale de la base (5.3),
+compteurs et fil d'activité de l'écran d'accueil (6.6), rationalisation
+des filtres (6.7).
 Ce document décrit l'application telle qu'elle existe à ce jour (dépôt
 `nicolasdalmont/todolist-familiale`) : pile technique, architecture,
 modèle de données, fonctionnalités, écrans, et points d'attention connus.
@@ -23,7 +28,11 @@ partagées en famille. Chaque membre de la famille dispose d'un profil
 personnes choisies individuellement, avec deux niveaux d'accès (voir
 section 6.1). Les tâches sont classées par catégorie, taguées librement,
 planifiées avec une échéance et une récurrence, et commentées. Un écran
-d'accueil résume les tâches à traiter en priorité.
+d'accueil résume les tâches à traiter en priorité et affiche un fil de
+notifications « À ton attention » (voir 6.15), doublé de **notifications
+push** opt-in par appareil. Chaque tâche datée peut être exportée vers le
+calendrier de l'appareil (fichier `.ics`, voir 6.13). Toutes les heures
+sont gérées en fuseau Europe/Paris (voir 8.1).
 
 ## 2. Pile technique
 
@@ -33,11 +42,14 @@ d'accueil résume les tâches à traiter en priorité.
 | UI | React 18.3.1, Tailwind CSS 3.4 | Composants, style |
 | Base de données | Supabase (Postgres géré) | Stockage — **pas** Supabase Auth |
 | Authentification | Maison (`src/lib/auth.ts`) | Table `users`, hash scrypt, cookie JWT (`jose`) |
-| Hébergement | Vercel | Build + déploiement continu |
-| PWA | `manifest.json` + `public/sw.js` | Installabilité, cache de l'app shell |
+| Hébergement | Vercel | Build + déploiement continu ; **Vercel Cron** (`vercel.json`) pour le rappel d'échéance (6.15) |
+| PWA | `manifest.json` + `public/sw.js` | Installabilité, cache de l'app shell, réception des notifications push (6.15) |
+| Push | `web-push` (`jose` déjà présent pour le JWT de session) | Envoi Web Push standard (VAPID), aucun service tiers (6.15) |
 
 Aucune dépendance d'UI framework (pas de librairie de composants) ni d'ORM :
 les requêtes passent directement par le client `@supabase/supabase-js`.
+Dépendances runtime : `next`, `react`, `react-dom`, `@supabase/supabase-js`,
+`jose`, `web-push`.
 
 ## 3. Architecture générale
 
@@ -67,11 +79,16 @@ Points clés :
   quoi) est donc entièrement gérée dans le code Next.js, centralisée dans
   `src/lib/access.ts` (voir section 6.1) — RLS ne joue aucun rôle dans le
   contrôle d'accès aux tâches privées ou partagées.
-- **Aucune API REST/GraphQL exposée** : tout passe par des Server
-  Components (lecture, au chargement de page) et des Server Actions
-  (écriture, déclenchées par des formulaires ou des boutons). Il n'y a pas
-  de route `/api/*` applicative — seule exception, `/api/version` (voir
-  6.8), qui n'expose aucune donnée métier.
+- **Pas d'API REST/GraphQL générale sur les données** : la lecture passe
+  par des Server Components (au chargement de page), l'écriture par des
+  Server Actions (`"use server"`, déclenchées par des formulaires ou des
+  boutons). Les rares Route Handlers `/api/*` couvrent des besoins précis
+  qui ne rentrent pas dans ce modèle : `/api/version` (repère de version,
+  6.8), `/api/push/subscribe` (abonnement push, appelé aussi par le
+  service worker, 6.15), `/api/cron/reminders` (Vercel Cron, 6.15),
+  `/api/tasks/[id]/calendar` (fichier `.ics`, 6.13). Chacun applique son
+  propre contrôle d'accès (session et/ou `CRON_SECRET`, plus `canView`
+  pour le `.ics`) — voir le tableau des routes en section 7.
 
 ## 4. Authentification
 
@@ -1054,12 +1071,12 @@ notifications. Chaque action fait `revalidatePath("/")`.
 | Route | Contenu |
 |---|---|
 | `/login` | Grille des profils + connexion / première connexion / changement de mot de passe |
-| `/` | Écran d'accueil (message de bienvenue, compteurs, activité du jour) |
-| `/tasks` | Liste des tâches (onglets, recherche, filtres) |
+| `/` | Écran d'accueil (bienvenue, compteurs, fil « À ton attention » — 6.15, activité du jour — 6.12) |
+| `/tasks` | Liste des tâches (recherche + volet de filtres, voir 6.7) |
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
-| `/compte` | Mon compte : identité + « Modifier mon mot de passe » (voir 6.14) |
+| `/compte` | Mon compte : identité, « Modifier mon mot de passe » et activation des notifications (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
 | `/api/tasks/[id]/calendar` | Fichier `.ics` de la tâche pour l'agenda de l'appareil (voir 6.13) — 404 si l'utilisateur n'a pas `canView` ou si la tâche n'a pas d'échéance |
@@ -1181,12 +1198,14 @@ correctif ponctuel.
 Conformément au phasage du cahier des charges :
 
 - Offline-first réel (file d'attente IndexedDB + réconciliation à la
-  reconnexion) — le service worker actuel (`public/sw.js`) ne fait que
-  mettre en cache l'app shell pour l'installabilité PWA.
-- Notifications Web Push et App Badge (nécessitent des clés VAPID et une
-  fonction serveur d'envoi).
+  reconnexion) — le service worker (`public/sw.js`) ne gère que le cache
+  de l'app shell (installabilité PWA) et les notifications push (voir
+  6.15), pas les mutations créées hors-ligne.
 - Interface d'administration pour la création de comptes (actuellement
   faite directement en SQL dans Supabase).
+
+Les **notifications Web Push + pastille d'icône** (initialement listées
+ici) sont désormais implémentées — voir 6.15.
 
 ## 9. Charte graphique
 
@@ -1261,9 +1280,9 @@ sur toutes les plateformes. Icône PWA regénérable via
 | `src/lib/auth.ts` | Hash de mot de passe, session JWT |
 | `src/lib/access.ts` | Contrôle d'accès aux tâches (`canView`/`canEdit`/`computeVisibility`/`getTaskAccess`) |
 | `src/lib/supabase/admin.ts` | Client Supabase service_role (+ `cache: "no-store"`) |
-| `src/lib/queries.ts` | Lectures (profils, tâches, tags, commentaires, stats admin, activité — `getRecentActivity`) — filtrées par `access.ts` |
-| `src/lib/actions.ts` | Server Actions (écritures : auth, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`) — vérifiées par `access.ts` |
-| `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`/`ActivityLogEntry`) |
+| `src/lib/queries.ts` | Lectures (profils, tâches, tags, commentaires, stats admin, activité, notifications — `getMyNotifications`, pastille — `getBadgeCount`) — filtrées par `access.ts` |
+| `src/lib/actions.ts` | Server Actions (écritures : auth + mot de passe, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`, notifications lues) — vérifiées par `access.ts` |
+| `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`, `NotificationType`, `NotificationItem`) |
 | `src/lib/format.ts` | Formatage de dates (heure de Paris), statuts, récurrence, clés de jour civil |
 | `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
 | `src/lib/calendar.ts` | `buildTaskICS()` — génère le fichier `.ics` d'une tâche pour l'agenda de l'appareil (voir 6.13) |

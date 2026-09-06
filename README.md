@@ -100,9 +100,10 @@ variable est définie sur le projet ; à générer une fois
 Structure complète et à jour : `supabase/recreate_full_schema.sql`
 (exécutable, réservé à la reconstruction d'un environnement — voir la
 documentation technique §5.3). Évolutions successives appliquées sur la
-base réelle : `supabase/migrations/` (scripts additifs numérotés). Tables
-principales : `users`, `tasks`, `task_assignees` (partage multiple, avec
-rôle), `comments`, `tags`/`task_tags`, `checklist_items`, `activity_log`.
+base réelle : `supabase/migrations/` (scripts additifs numérotés, 001 à
+007). Tables : `users`, `tasks`, `task_assignees` (partage multiple, avec
+rôle), `comments`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
+`notifications`, `push_subscriptions`.
 RLS est activé sur toutes les tables mais sans policy : tout accès légitime
 passe par le serveur Next.js via la clé service_role ; la visibilité
 partagée/privée est appliquée au niveau applicatif (`src/lib/access.ts`),
@@ -113,18 +114,20 @@ pas par RLS.
 - Toute nouvelle tâche est assignée automatiquement à son créateur.
 - Une tâche récurrente clôturée ("Terminée") régénère automatiquement la
   prochaine occurrence avec les mêmes assignations.
-- Visibilité partagée (visible par tous) ou privée (visible uniquement par
-  le créateur), filtrée côté application.
+- Visibilité privée par défaut, partage explicite par personne avec un
+  rôle (assigné / lecture seule) — filtré côté application.
+- Notifications « À ton attention » sur l'écran d'accueil + notifications
+  push web (opt-in par appareil, écran « Mon compte ») + rappel d'échéance
+  quotidien (Vercel Cron). Voir la doc technique §6.15.
+- Export d'une tâche datée vers le calendrier de l'appareil (fichier
+  `.ics`). Voir §6.13.
+- Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 
 ## Ce qui n'est pas encore implémenté
 
-Conformément au phasage du cahier des charges, restent à construire :
-
 - Offline-first réel (file d'attente IndexedDB + réconciliation à la
-  reconnexion) — le service worker actuel ne fait que mettre en cache
-  l'app shell.
-- Notifications Web Push et App Badge (nécessitent des clés VAPID et une
-  fonction serveur d'envoi).
+  reconnexion) — le service worker gère le cache de l'app shell et les
+  notifications push, pas les mutations créées hors-ligne.
 - Interface d'administration pour la création de comptes (actuellement
   faite directement en SQL dans Supabase).
 

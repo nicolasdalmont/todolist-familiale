@@ -532,11 +532,11 @@ pour ne pas oublier qu'un filtre est actif.
 tronquée si trop longue, qui liste les critères en cours sans avoir à
 déplier : les **statuts cochés** toujours (« À faire, En cours » par
 défaut, ou « Tous les statuts » si les 4 sont cochés, « Aucun statut »
-si aucun) ; puis, seulement s'ils s'écartent du défaut, « Toutes les
-tâches » (portée), « Partagées »/« Privées », la catégorie, « Échéance ≤
-JJ/MM/AAAA », « En retard uniquement », les `#tags`, et « « recherche » »
-si le champ de recherche est rempli. Masqué quand le volet est déplié
-(les contrôles sont alors tous visibles).
+si aucun) ; puis, seulement s'ils s'écartent du défaut, « Y compris
+lecture seule » (bouton de portée décoché), « Partagées »/« Privées », la
+catégorie, « Échéance ≤ JJ/MM/AAAA », « En retard uniquement », les
+`#tags`, et « « recherche » » si le champ de recherche est rempli. Masqué
+quand le volet est déplié (les contrôles sont alors tous visibles).
 
 Une fois déplié, chaque ligne peut regrouper deux filtres séparés par une
 **barre verticale** sur desktop (`FilterSeparator`, ajoutée le 03/09/2026 ;
@@ -547,21 +547,23 @@ l'autre, plutôt que de rester côte à côte séparé par une barre qui
 n'aurait plus de sens dans cette disposition empilée) :
 
 1. **Portée │ statut** :
-   - **Portée** : par défaut **mes tâches** uniquement — `canEdit(task,
-     currentUserId)` (`src/lib/access.ts`), prop `currentUserId` transmis
-     par `tasks/page.tsx` : créateur, ou assigné(e) avec droit de
-     modification, jamais une tâche où l'utilisateur n'est qu'en lecture
-     seule. Le bouton "Toutes les tâches" bascule vers tout ce qui est
-     visible par l'utilisateur (`canView`, y compris en lecture seule),
-     et inversement. **Même définition que les compteurs de l'accueil**
-     (`canEdit()`, voir 6.6) — corrigé le 04/09/2026, en remplacement de
-     l'ancienne portée (`task.created_by === currentUserId` seul, qui
-     excluait à tort les tâches assignées créées par quelqu'un d'autre) :
-     un compteur de l'accueil et la liste qu'on obtient en cliquant dessus
-     affichent désormais toujours le même total, sans avoir besoin de
-     forcer explicitement une portée particulière en arrivant depuis une
-     tuile (`cameFromTile` dans `TaskFilterList.tsx` continue seulement à
-     ignorer tout filtre mémorisé dans ce cas — voir plus bas).
+   - **Portée** : un seul bouton, **« Uniquement mes tâches », coché par
+     défaut** (`scope = "mine"`) — ne garde que `canEdit(task,
+     currentUserId)` (`src/lib/access.ts`, prop `currentUserId` transmise
+     par `tasks/page.tsx`) : créateur, ou assigné(e) avec droit de
+     modification. **Le décocher** (`scope = "all"`) ajoute les tâches où
+     l'utilisateur est seulement en **lecture seule** (`canView`). Le
+     libellé « Toutes les tâches » (bouton décoché par défaut, à activer)
+     s'était révélé trouble à l'usage — inversé le 04/09/2026 en un bouton
+     positif coché par défaut. **Même définition que les compteurs de
+     l'accueil** (`canEdit()`, voir 6.6) — remplace l'ancienne portée
+     (`task.created_by === currentUserId` seul, qui excluait à tort les
+     tâches assignées créées par quelqu'un d'autre) : un compteur de
+     l'accueil et la liste qu'on obtient en cliquant dessus affichent
+     toujours le même total, sans forcer de portée particulière en
+     arrivant depuis une tuile (`cameFromTile` dans `TaskFilterList.tsx`
+     continue seulement à ignorer tout filtre mémorisé dans ce cas — voir
+     plus bas).
    - **Statut** : quatre boutons à cocher indépendamment (À faire, En
      cours, Terminée, Archivée — `STATUS_ORDER`/`STATUS_LABELS` dans
      `src/lib/format.ts`), sélection multiple comme les tags. **À faire**

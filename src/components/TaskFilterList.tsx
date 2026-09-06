@@ -102,13 +102,13 @@ export function TaskFilterList({
 }: {
   tasks: Task[];
   allTags: Tag[];
-  // Sert le filtre de portée (ligne 1) : "mes tâches" par défaut ne garde
-  // que les tâches dont l'utilisateur est responsable — canEdit(task,
-  // currentUserId), voir src/lib/access.ts : créateur, ou assigné(e) avec
-  // droit de modification. Même définition que les compteurs de l'accueil
-  // (HomeDashboard.tsx) — corrigé le 04/09/2026 pour que cliquer sur un
-  // compteur (qui atterrit sur cette portée par défaut) affiche toujours
-  // exactement ce qu'il comptait, ni plus ni moins. Exclut les tâches où
+  // Sert le filtre de portée (ligne 1). Bouton "Uniquement mes tâches",
+  // **coché par défaut** : ne garde que les tâches dont l'utilisateur est
+  // responsable — canEdit(task, currentUserId), voir src/lib/access.ts :
+  // créateur, ou assigné(e) avec droit de modification. Même définition que
+  // les compteurs de l'accueil (HomeDashboard.tsx) — cliquer sur un
+  // compteur atterrit sur cette portée par défaut et affiche donc
+  // exactement ce qu'il comptait. Décocher le bouton ajoute les tâches où
   // l'utilisateur est seulement en lecture seule.
   currentUserId: string;
   // Pré-remplit le filtre d'échéance, passé en "?dueAtMost=YYYY-MM-DD" par
@@ -140,11 +140,11 @@ export function TaskFilterList({
   // 03/09/2026) : l'écran s'ouvre sur une liste plus courte, sans les 4
   // lignes de filtres — dépliable au besoin via le bouton dédié.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // Portée par défaut : mes tâches uniquement — un seul bouton bascule vers
-  // "toutes" (tout ce qui m'est visible, y compris en lecture seule) et
-  // inversement. "mine" est toujours la valeur initiale, y compris depuis
-  // une tuile de l'accueil (cameFromTile) : elle correspond déjà à ce que
-  // la tuile a compté, pas besoin de la forcer.
+  // Portée : "mine" par défaut (bouton "Uniquement mes tâches" coché) ;
+  // décocher passe à "all" (ajoute les tâches où on est seulement en
+  // lecture seule). "mine" est toujours la valeur initiale, y compris
+  // depuis une tuile de l'accueil (cameFromTile) : elle correspond déjà à
+  // ce que la tuile a compté.
   const [scope, setScope] = useState<"mine" | "all">("mine");
   // Statut par défaut : à faire + en cours cochés (sélection multiple, un
   // bouton par statut) — reproduit le comportement d'avant la première
@@ -271,7 +271,7 @@ export function TaskFilterList({
   if (checkedStatuses.length === 0) filterSummaryParts.push("Aucun statut");
   else if (checkedStatuses.length === STATUS_ORDER.length) filterSummaryParts.push("Tous les statuts");
   else filterSummaryParts.push(...checkedStatuses.map((s) => STATUS_LABELS[s]));
-  if (scope === "all") filterSummaryParts.push("Toutes les tâches");
+  if (scope === "all") filterSummaryParts.push("Y compris lecture seule");
   if (visibility === "shared") filterSummaryParts.push("Partagées");
   if (visibility === "private") filterSummaryParts.push("Privées");
   if (category) filterSummaryParts.push(CATEGORY_LABELS[category as Category]);
@@ -322,20 +322,22 @@ export function TaskFilterList({
 
       {filtersOpen ? (
         <div className="flex flex-col gap-3">
-          {/* Ligne 1 : portée (mes tâches / toutes) │ statut (4 boutons à
-              cocher, à faire + en cours par défaut). Sur mobile
-              (`flex-col`), la portée et le groupe de statuts passent
-              chacun à la ligne, sans séparateur (voir `FilterSeparator`) ;
-              à partir de `sm`, ils reviennent sur la même ligne. */}
+          {/* Ligne 1 : portée ("Uniquement mes tâches", coché par défaut) │
+              statut (4 boutons à cocher, à faire + en cours par défaut).
+              Sur mobile (`flex-col`), la portée et le groupe de statuts
+              passent chacun à la ligne, sans séparateur (voir
+              `FilterSeparator`) ; à partir de `sm`, ils reviennent sur la
+              même ligne. */}
           <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={() => setScope((prev) => (prev === "mine" ? "all" : "mine"))}
+              aria-pressed={scope === "mine"}
               className={`self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                scope === "all" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                scope === "mine" ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
               }`}
             >
-              Toutes les tâches
+              Uniquement mes tâches
             </button>
             <FilterSeparator />
             <div className="flex flex-wrap gap-1.5">

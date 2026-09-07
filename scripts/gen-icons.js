@@ -26,13 +26,22 @@ function svgIcon(size) {
     .map(([cx, cy, rr]) => `<circle cx="${p(cx)}" cy="${p(cy)}" r="${p(rr)}"/>`)
     .join("");
   const leaf = `<path d="M ${p(50)} ${p(33)} C ${p(43)} ${p(24)}, ${p(35)} ${p(25)}, ${p(34)} ${p(30)} C ${p(40)} ${p(31)}, ${p(45)} ${p(34)}, ${p(50)} ${p(38)} C ${p(55)} ${p(34)}, ${p(60)} ${p(31)}, ${p(66)} ${p(30)} C ${p(65)} ${p(25)}, ${p(57)} ${p(24)}, ${p(50)} ${p(33)} Z"/>`;
+  // Le fruit (grappe + feuille) est pivoté de 30° dans le sens horaire et
+  // agrandi de 50 %, autour de son centre visuel (~50, 54) ; il est écrêté
+  // au carré arrondi pour ne pas déborder dans les coins. La coche, elle,
+  // reste droite et à sa place, par-dessus le fruit agrandi.
+  const cx = p(50);
+  const cy = p(54);
   return `
   <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+    <defs><clipPath id="iconclip"><rect width="${size}" height="${size}" rx="${r}"/></clipPath></defs>
     <rect width="${size}" height="${size}" rx="${r}" fill="#D6336C"/>
-    <g fill="#FFFFFF">${leaf}${drupes}</g>
-    <path d="M ${p(40)} ${p(57)} L ${p(48)} ${p(65)} L ${p(63)} ${p(48)}"
-      stroke="#D6336C" stroke-width="${p(7.5)}" fill="none"
-      stroke-linecap="round" stroke-linejoin="round"/>
+    <g clip-path="url(#iconclip)">
+      <g fill="#FFFFFF" transform="translate(${cx} ${cy}) rotate(30) scale(1.5) translate(-${cx} -${cy})">${leaf}${drupes}</g>
+      <path d="M ${p(38)} ${p(56)} L ${p(48)} ${p(66)} L ${p(66)} ${p(46)}"
+        stroke="#D6336C" stroke-width="${p(9)}" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
   </svg>`;
 }
 

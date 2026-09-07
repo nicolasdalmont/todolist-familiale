@@ -276,31 +276,39 @@ export function IconChevronDown({ className = "" }: IconProps) {
 export function IconBerry({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 100 100" className={`${base} ${className}`} aria-hidden="true">
+      <defs>
+        <clipPath id="berryClip">
+          <rect width="100" height="100" rx="22" />
+        </clipPath>
+      </defs>
       <rect width="100" height="100" rx="22" fill="#D6336C" />
-      <g fill="#FFFFFF">
-        <path d="M50 33C43 24 35 25 34 30C40 31 45 34 50 38C55 34 60 31 66 30C65 25 57 24 50 33Z" />
-        <circle cx="39" cy="42" r="9" />
-        <circle cx="51" cy="40" r="9" />
-        <circle cx="62" cy="43" r="8.6" />
-        <circle cx="34" cy="52" r="8.6" />
-        <circle cx="46" cy="51" r="8.8" />
-        <circle cx="57" cy="52" r="8.6" />
-        <circle cx="67" cy="53" r="7.8" />
-        <circle cx="40" cy="61" r="8.2" />
-        <circle cx="51" cy="61" r="8.4" />
-        <circle cx="61" cy="61" r="7.6" />
-        <circle cx="45" cy="70" r="7.6" />
-        <circle cx="55" cy="70" r="7.2" />
-        <circle cx="50" cy="78" r="6.6" />
+      <g clipPath="url(#berryClip)">
+        {/* Fruit pivoté 30° horaire + agrandi 50 % ; la coche reste droite. */}
+        <g fill="#FFFFFF" transform="translate(50 54) rotate(30) scale(1.5) translate(-50 -54)">
+          <path d="M50 33C43 24 35 25 34 30C40 31 45 34 50 38C55 34 60 31 66 30C65 25 57 24 50 33Z" />
+          <circle cx="39" cy="42" r="9" />
+          <circle cx="51" cy="40" r="9" />
+          <circle cx="62" cy="43" r="8.6" />
+          <circle cx="34" cy="52" r="8.6" />
+          <circle cx="46" cy="51" r="8.8" />
+          <circle cx="57" cy="52" r="8.6" />
+          <circle cx="67" cy="53" r="7.8" />
+          <circle cx="40" cy="61" r="8.2" />
+          <circle cx="51" cy="61" r="8.4" />
+          <circle cx="61" cy="61" r="7.6" />
+          <circle cx="45" cy="70" r="7.6" />
+          <circle cx="55" cy="70" r="7.2" />
+          <circle cx="50" cy="78" r="6.6" />
+        </g>
+        <path
+          d="M38 56L48 66L66 46"
+          stroke="#D6336C"
+          strokeWidth="9"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </g>
-      <path
-        d="M40 57L48 65L63 48"
-        stroke="#D6336C"
-        strokeWidth="7.5"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }

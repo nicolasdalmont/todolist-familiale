@@ -17,7 +17,11 @@
 // autre requête (page ou donnée) passe toujours par le réseau, jamais par le
 // cache. Le nom de cache change (v1 → v2) pour purger l'ancien cache
 // fautif chez les utilisateurs déjà installés (voir l'écoute "activate").
-const CACHE_NAME = "todo-familiale-shell-v2";
+// v3 (04/09/2026) : renommage en « Checkberry » + nouveau thème rose —
+// manifest.json et les icônes de l'app shell ont changé, le nom de cache
+// change donc pour purger l'ancien chez les PWA déjà installées (voir
+// l'écoute "activate").
+const CACHE_NAME = "checkberry-shell-v3";
 const APP_SHELL = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -77,7 +81,7 @@ self.addEventListener("fetch", (event) => {
 // fichier tourne hors du runtime React, il ne peut en invoquer aucune).
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "To-Do List Familiale", body: "", url: "/", badgeCount: undefined };
+  let payload = { title: "Checkberry", body: "", url: "/", badgeCount: undefined };
   if (event.data) {
     try {
       payload = { ...payload, ...event.data.json() };

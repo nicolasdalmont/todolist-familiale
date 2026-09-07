@@ -4,7 +4,7 @@ import { useState } from "react";
 import { loginAction, setPasswordAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
 import { Avatar } from "./Avatar";
-import { IconArrowLeft, IconCheck } from "./Icons";
+import { IconArrowLeft, IconBerry } from "./Icons";
 import type { Profile } from "@/lib/types";
 
 type Step =
@@ -63,10 +63,8 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-7 bg-paper p-6">
         <div className="flex flex-col items-center gap-2.5 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-gradient-to-br from-brand to-brand-light text-white">
-            <IconCheck className="h-8 w-8" />
-          </div>
-          <h1 className="text-xl font-extrabold">To-Do List Familiale</h1>
+          <IconBerry className="h-16 w-16" />
+          <h1 className="text-xl font-extrabold">checkberry</h1>
           <p className="max-w-xs text-[13.5px] text-ink-muted">Choisis ton profil pour continuer.</p>
         </div>
 
@@ -164,7 +162,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
             />
           </div>
 
-          {error ? <p className="text-[13px] font-semibold text-rose-600">{error}</p> : null}
+          {error ? <p className="text-[13px] font-semibold text-red-600">{error}</p> : null}
 
           <button
             type="submit"
@@ -200,7 +198,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
             />
           </div>
 
-          {error ? <p className="text-[13px] font-semibold text-rose-600">{error}</p> : null}
+          {error ? <p className="text-[13px] font-semibold text-red-600">{error}</p> : null}
 
           <button
             type="submit"

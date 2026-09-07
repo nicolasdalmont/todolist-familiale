@@ -322,7 +322,7 @@ export function TaskForm({
                 router.push("/tasks");
               });
             }}
-            className="w-full rounded-xl bg-rose-50 py-3 text-[14.5px] font-bold text-rose-600"
+            className="w-full rounded-xl bg-red-50 py-3 text-[14.5px] font-bold text-red-600"
           >
             Supprimer la tâche
           </button>

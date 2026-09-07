@@ -1,53 +1,38 @@
 // Génère les icônes PWA (public/icons/icon-192.png, icon-512.png) à partir
-// d'un SVG dessiné en code, via sharp. À relancer manuellement si la charte
-// graphique change (aucune dépendance ajoutée au projet lui-même : ce
-// script n'est pas importé par l'application, seulement utilisé en local
-// pour régénérer les PNG).
+// d'un SVG dessiné en code, via sharp (devDependency — utilisé seulement
+// par ce script, pas importé par l'application).
 //
 // Usage : node scripts/gen-icons.js
+//
+// Icône « Checkberry » : fond rose framboise, framboise (le fruit) en
+// blanc — grappe de drupéoles + petite feuille —, coche rose par-dessus.
+// Le même dessin est repris en composant React pour le logo dans
+// l'interface (IconBerry, src/components/Icons.tsx).
 
 const sharp = require("sharp");
 const path = require("path");
 
-// Icône "presse-papiers à cocher" : plus évocatrice d'une to-do list que le
-// simple check générique de la précédente version, dans la nouvelle charte
-// orange/écru.
 function svgIcon(size) {
   const r = size * 0.22;
+  const s = size / 100;
+  const p = (n) => (n * s).toFixed(2);
+  const drupes = [
+    [39, 42, 9], [51, 40, 9], [62, 43, 8.6],
+    [34, 52, 8.6], [46, 51, 8.8], [57, 52, 8.6], [67, 53, 7.8],
+    [40, 61, 8.2], [51, 61, 8.4], [61, 61, 7.6],
+    [45, 70, 7.6], [55, 70, 7.2],
+    [50, 78, 6.6],
+  ]
+    .map(([cx, cy, rr]) => `<circle cx="${p(cx)}" cy="${p(cy)}" r="${p(rr)}"/>`)
+    .join("");
+  const leaf = `<path d="M ${p(50)} ${p(33)} C ${p(43)} ${p(24)}, ${p(35)} ${p(25)}, ${p(34)} ${p(30)} C ${p(40)} ${p(31)}, ${p(45)} ${p(34)}, ${p(50)} ${p(38)} C ${p(55)} ${p(34)}, ${p(60)} ${p(31)}, ${p(66)} ${p(30)} C ${p(65)} ${p(25)}, ${p(57)} ${p(24)}, ${p(50)} ${p(33)} Z"/>`;
   return `
   <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#E2621F"/>
-        <stop offset="100%" stop-color="#F3A467"/>
-      </linearGradient>
-    </defs>
-    <rect width="${size}" height="${size}" rx="${r}" fill="url(#bg)"/>
-
-    <!-- Corps du presse-papiers -->
-    <rect x="${size * 0.27}" y="${size * 0.20}" width="${size * 0.46}" height="${size * 0.60}"
-      rx="${size * 0.06}" fill="#FBF3E4"/>
-    <!-- Pince du haut -->
-    <rect x="${size * 0.41}" y="${size * 0.14}" width="${size * 0.18}" height="${size * 0.09}"
-      rx="${size * 0.025}" fill="#FBF3E4"/>
-
-    <!-- Ligne 1 : tâche cochée -->
-    <path d="M ${size * 0.335} ${size * 0.405} L ${size * 0.385} ${size * 0.455} L ${size * 0.475} ${size * 0.345}"
-      stroke="#C14E15" stroke-width="${size * 0.032}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="${size * 0.50}" y="${size * 0.385}" width="${size * 0.15}" height="${size * 0.045}"
-      rx="${size * 0.02}" fill="#C14E15"/>
-
-    <!-- Ligne 2 : tâche cochée -->
-    <path d="M ${size * 0.335} ${size * 0.565} L ${size * 0.385} ${size * 0.615} L ${size * 0.475} ${size * 0.505}"
-      stroke="#C14E15" stroke-width="${size * 0.032}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="${size * 0.50}" y="${size * 0.545}" width="${size * 0.15}" height="${size * 0.045}"
-      rx="${size * 0.02}" fill="#C14E15"/>
-
-    <!-- Ligne 3 : tâche en attente (case vide) -->
-    <rect x="${size * 0.335} " y="${size * 0.685}" width="${size * 0.09}" height="${size * 0.09}"
-      rx="${size * 0.02}" fill="none" stroke="#D9A87A" stroke-width="${size * 0.026}"/>
-    <rect x="${size * 0.50}" y="${size * 0.705}" width="${size * 0.15}" height="${size * 0.045}"
-      rx="${size * 0.02}" fill="#E9CBA6"/>
+    <rect width="${size}" height="${size}" rx="${r}" fill="#D6336C"/>
+    <g fill="#FFFFFF">${leaf}${drupes}</g>
+    <path d="M ${p(40)} ${p(57)} L ${p(48)} ${p(65)} L ${p(63)} ${p(48)}"
+      stroke="#D6336C" stroke-width="${p(7.5)}" fill="none"
+      stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 }
 

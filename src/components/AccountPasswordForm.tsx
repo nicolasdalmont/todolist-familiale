@@ -86,7 +86,7 @@ export function AccountPasswordForm() {
         />
       </div>
 
-      {error ? <p className="text-[13px] font-semibold text-rose-600">{error}</p> : null}
+      {error ? <p className="text-[13px] font-semibold text-red-600">{error}</p> : null}
       {done ? <p className="text-[13px] font-semibold text-emerald-600">Mot de passe mis à jour.</p> : null}
 
       <button

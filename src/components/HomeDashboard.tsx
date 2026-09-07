@@ -110,24 +110,24 @@ export function HomeDashboard({
           href="/tasks?overdue=1"
           className={`col-span-2 flex items-center gap-3 rounded-2xl border p-4 shadow-sm transition ${
             overdueCount > 0
-              ? "border-rose-200 bg-rose-50 hover:border-rose-300"
+              ? "border-red-200 bg-red-50 hover:border-red-300"
               : "border-line bg-surface hover:border-brand/50"
           }`}
         >
           <span
             className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${
-              overdueCount > 0 ? "bg-rose-100 text-rose-600" : "bg-brand-soft text-brand-dark"
+              overdueCount > 0 ? "bg-red-100 text-red-600" : "bg-brand-soft text-brand-dark"
             }`}
           >
             <IconAlertTriangle className="h-4 w-4" />
           </span>
           <span
-            className={`text-[28px] font-extrabold leading-none ${overdueCount > 0 ? "text-rose-600" : "text-ink"}`}
+            className={`text-[28px] font-extrabold leading-none ${overdueCount > 0 ? "text-red-600" : "text-ink"}`}
           >
             {overdueCount}
           </span>
           <span
-            className={`text-[13px] font-semibold ${overdueCount > 0 ? "text-rose-600" : "text-ink-muted"}`}
+            className={`text-[13px] font-semibold ${overdueCount > 0 ? "text-red-600" : "text-ink-muted"}`}
           >
             {overdueCount > 1 ? "Tâches en retard" : "Tâche en retard"}
           </span>

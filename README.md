@@ -1,8 +1,9 @@
-# To-Do List Familiale
+# Checkberry
 
-Application web responsive de gestion de tâches partagées en famille —
-Next.js (App Router) + Supabase (base de données Postgres uniquement) +
-Vercel (hébergement).
+Application web responsive de gestion de tâches partagées en famille
+(anciennement « To-Do List Familiale » ; dépôt toujours
+`todolist-familiale`) — Next.js (App Router) + Supabase (base de données
+Postgres uniquement) + Vercel (hébergement).
 
 Ce dépôt a été écrit par Claude depuis une session cloud (pas de clone local
 dans le flux de travail retenu pour ce projet) et poussé sur GitHub via

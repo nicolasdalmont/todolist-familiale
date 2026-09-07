@@ -27,7 +27,7 @@ export function StatusBadge({ status }: { status: TaskStatus }) {
 
 const VISIBILITY_STYLES: Record<Visibility, string> = {
   shared: "bg-emerald-50 text-emerald-700",
-  private: "bg-rose-50 text-rose-600",
+  private: "bg-red-50 text-red-600",
 };
 
 export function VisibilityBadge({ visibility }: { visibility: Visibility }) {
@@ -52,7 +52,7 @@ export function VisibilityBadge({ visibility }: { visibility: Visibility }) {
 export function OverdueBadge() {
   return (
     // shrink-0 + whitespace-nowrap : voir la note dans StatusBadge ci-dessus.
-    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-rose-50 px-2.5 py-1 text-[11.5px] font-bold text-rose-600">
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-red-50 px-2.5 py-1 text-[11.5px] font-bold text-red-600">
       <IconAlertTriangle className="h-3 w-3" /> En retard
     </span>
   );

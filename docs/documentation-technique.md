@@ -1,7 +1,12 @@
-# To-Do List Familiale — Documentation technique
+# Checkberry — Documentation technique
 
-Dernière mise à jour : 04/09/2026. Grand lot de ce jour : passage de
-l'appli en fuseau Europe/Paris de bout en bout (8.1), écran « Mon compte »
+*(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
+`nicolasdalmont/todolist-familiale`.)*
+
+Dernière mise à jour : 04/09/2026. Grand lot de ce jour : **renommage en
+« Checkberry » + nouveau thème rose framboise sur fond blanc** (9),
+passage de l'appli en fuseau Europe/Paris de bout en bout (8.1), écran
+« Mon compte »
 + changement de mot de passe connecté (6.14), système de notifications
 complet — fil in-app « À ton attention » + push web opt-in + rappel
 d'échéance quotidien via Vercel Cron (6.15), export d'une tâche vers le
@@ -1163,9 +1168,11 @@ modification ou suppression d'une tâche :
    ci-dessus déjà en place. Corrigé en restreignant le service worker aux
    seuls fichiers réellement statiques de l'app shell (`manifest.json`,
    icônes) ; toute page ou donnée passe désormais toujours par le réseau.
-   Nom de cache passé en `v2` pour purger l'ancien cache chez les
-   utilisateurs déjà installés, et `Cache-Control: no-cache` ajouté sur
-   `/sw.js` (`next.config.mjs`) pour que les futures mises à jour du
+   Nom de cache incrémenté (`v2`, puis `checkberry-shell-v3` lors du
+   renommage/rethème du 04/09/2026 — voir 9 — car `manifest.json` et les
+   icônes de l'app shell avaient changé) pour purger l'ancien cache chez
+   les utilisateurs déjà installés, et `Cache-Control: no-cache` ajouté
+   sur `/sw.js` (`next.config.mjs`) pour que les futures mises à jour du
    service worker soient détectées sans délai.
 
 Les trois premiers sont spécifiques à Next.js (rendu serveur/CDN et
@@ -1207,15 +1214,30 @@ Conformément au phasage du cahier des charges :
 Les **notifications Web Push + pastille d'icône** (initialement listées
 ici) sont désormais implémentées — voir 6.15.
 
-## 9. Charte graphique
+## 9. Charte graphique — thème « Checkberry » (04/09/2026)
 
-Palette définie dans `tailwind.config.ts` : accent orange (`brand`
-`#E2621F`, dégradé vers `#F3A467`), fond écru (`paper` `#F5EBD8`, cartes
-`surface` `#FFFCF5`, `sand` pour les fonds neutres/hover), bordures
-(`line`/`line-soft`). Icônes : jeu SVG inline maison
-(`src/components/Icons.tsx`, trait fin, couleur pilotée par
-`currentColor`), remplaçant les emoji d'origine pour un rendu cohérent
-sur toutes les plateformes. Icône PWA regénérable via
+L'appli s'appelle **Checkberry**. Le thème est passé d'un accent orange
+sur fond écru à un **accent rose framboise sur fond blanc**.
+
+Palette définie dans `tailwind.config.ts` :
+
+- **Accent** `brand` : `#D6336C` (DEFAULT), `#A12552` (`dark`, texte sur
+  fond pâle), `#F06595` (`light`), `#FBE0EA` (`soft`, fonds pâles).
+- **Fond** : `paper` / `surface` = blanc (`#FFFFFF`) ; `sand` `#F5ECF0`
+  (fonds neutres/hover, chips), `line` `#E9DEE4` / `line-soft` `#F3ECEF`
+  (bordures) — neutres très légèrement teintés rose, pas de gris froid.
+- **Texte** `ink` : `#241A20` (DEFAULT), `#867A80` (`muted`).
+- **Alerte / danger** : `red-*` de Tailwind (`red-600` `#DC2626` pour
+  « En retard », « Privée », erreurs de formulaire, bouton Supprimer) —
+  volontairement **distinct** du rose de la marque, pour que l'alerte se
+  lise comme telle. **Succès** : `emerald-*` (visibilité « Partagée »,
+  confirmation de mot de passe).
+
+Icônes : jeu SVG inline maison (`src/components/Icons.tsx`, trait fin,
+couleur pilotée par `currentColor`). Exception : `IconBerry`, le logo
+Checkberry (framboise blanche + coche rose sur carré framboise), autonome
+en couleurs — même dessin que l'icône PWA (`scripts/gen-icons.js`, via
+`sharp` en devDependency). Icône PWA regénérable :
 `node scripts/gen-icons.js`.
 
 ## 10. Workflow de développement et de déploiement

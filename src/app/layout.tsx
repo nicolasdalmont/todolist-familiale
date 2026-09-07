@@ -5,8 +5,8 @@ import { PendingOverlayProvider } from "@/components/PendingOverlay";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "To-Do List Familiale",
-  description: "Application de gestion de tâches partagées en famille.",
+  title: "Checkberry",
+  description: "Gestion de tâches partagées en famille.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.png",
@@ -18,7 +18,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#E2621F",
+  themeColor: "#D6336C",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

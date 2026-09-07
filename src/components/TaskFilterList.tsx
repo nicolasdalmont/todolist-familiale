@@ -426,7 +426,7 @@ export function TaskFilterList({
               type="button"
               onClick={() => setOverdueOnly((prev) => !prev)}
               className={`flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                overdueOnly ? "border-rose-300 bg-rose-50 text-rose-600" : "border-line bg-surface text-ink-muted"
+                overdueOnly ? "border-red-300 bg-red-50 text-red-600" : "border-line bg-surface text-ink-muted"
               }`}
             >
               <IconAlertTriangle className="h-3.5 w-3.5" /> En retard uniquement

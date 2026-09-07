@@ -51,11 +51,11 @@ export function buildTaskICS(
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//To-Do List Familiale//FR",
+    "PRODID:-//Checkberry//FR",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:${task.id}@todolist-familiale`,
+    `UID:${task.id}@checkberry`,
     `DTSTAMP:${toICSDate(new Date())}`,
     `DTSTART:${toICSDate(start)}`,
     `DTEND:${toICSDate(end)}`,

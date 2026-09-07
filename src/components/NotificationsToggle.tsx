@@ -127,7 +127,7 @@ export function NotificationsToggle() {
           {busy ? "..." : status === "on" ? "Désactiver" : "Activer"}
         </button>
       </div>
-      {error ? <p className="text-[12.5px] font-semibold text-rose-600">{error}</p> : null}
+      {error ? <p className="text-[12.5px] font-semibold text-red-600">{error}</p> : null}
     </div>
   );
 }

@@ -5,23 +5,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Thème « Checkberry » (04/09/2026) : accent rose framboise sur fond
+        // blanc. Remplace l'ancien accent orange sur fond écru.
         brand: {
-          DEFAULT: "#E2621F",
-          dark: "#B84B15",
-          light: "#F3A467",
-          soft: "#FBE7D0",
+          DEFAULT: "#D6336C",
+          dark: "#A12552",
+          light: "#F06595",
+          soft: "#FBE0EA",
         },
         ink: {
-          DEFAULT: "#2A2118",
-          muted: "#8A7A5C",
+          DEFAULT: "#241A20",
+          muted: "#867A80",
         },
-        // Palette "écru" : remplace les gris froids (slate) et le blanc pur
-        // par des tons chauds et un fond parcheminé.
-        paper: "#F5EBD8",
-        surface: "#FFFCF5",
-        sand: "#F0E4C8",
-        line: "#E4D3AC",
-        "line-soft": "#EFE4CB",
+        // Fond blanc + neutres très légèrement teintés rose/gris (pas de
+        // gris froid) pour rester cohérents avec l'accent framboise.
+        paper: "#FFFFFF",
+        surface: "#FFFFFF",
+        sand: "#F5ECF0",
+        line: "#E9DEE4",
+        "line-soft": "#F3ECEF",
       },
       borderRadius: {
         xl2: "18px",

@@ -52,6 +52,13 @@ async function main() {
     await sharp(svg).png().toFile(path.join(outDir, `icon-${size}.png`));
     console.log("generated icon-" + size + ".png");
   }
+
+  // Favicon PNG de repli (navigateurs qui n'affichent pas src/app/icon.svg) :
+  // App Router détecte src/app/icon.png et l'émet en <link rel="icon"> aux
+  // côtés du SVG. Même dessin, rastérisé petit.
+  const appDir = path.join(__dirname, "..", "src", "app");
+  await sharp(Buffer.from(svgIcon(48))).png().toFile(path.join(appDir, "icon.png"));
+  console.log("generated src/app/icon.png (48)");
 }
 
 main().catch((err) => {

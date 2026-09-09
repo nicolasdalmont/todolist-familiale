@@ -8,8 +8,10 @@ export const metadata: Metadata = {
   title: "Checkberry",
   description: "Gestion de tâches partagées en famille.",
   manifest: "/manifest.json",
+  // Favicon : fichiers src/app/icon.svg (+ icon.png de repli), détectés
+  // automatiquement par l'App Router. Ici on ne déclare que l'icône
+  // apple-touch (écran d'accueil iOS), pour laquelle on veut la version 192.
   icons: {
-    icon: "/icons/icon-192.png",
     apple: "/icons/icon-192.png",
   },
 };

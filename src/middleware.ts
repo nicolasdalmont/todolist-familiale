@@ -63,6 +63,6 @@ export const config = {
   // appelée par Vercel Cron, jamais par un navigateur — aucun cookie de
   // session à vérifier, la route s'authentifie elle-même via CRON_SECRET.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js|api/version|api/push|api/cron).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.json|sw.js|api/version|api/push|api/cron).*)",
   ],
 };

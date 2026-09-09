@@ -1237,8 +1237,15 @@ Icônes : jeu SVG inline maison (`src/components/Icons.tsx`, trait fin,
 couleur pilotée par `currentColor`). Exception : `IconBerry`, le logo
 Checkberry (framboise blanche + coche rose sur carré framboise), autonome
 en couleurs — même dessin que l'icône PWA (`scripts/gen-icons.js`, via
-`sharp` en devDependency). Icône PWA regénérable :
-`node scripts/gen-icons.js`.
+`sharp` en devDependency). Icônes PWA regénérables :
+`node scripts/gen-icons.js` — produit `public/icons/icon-192.png` et
+`icon-512.png` (manifest / écran d'accueil) **et** `src/app/icon.png`
+(favicon de repli 48 px). Le favicon principal est `src/app/icon.svg`
+(même dessin, vectoriel, écrit à la main) : l'App Router détecte
+`src/app/icon.svg` et `src/app/icon.png` et génère automatiquement les
+`<link rel="icon">` ; `src/middleware.ts` les exclut de la vérification
+de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
+(192 px) dans `metadata.icons`.
 
 ## 10. Workflow de développement et de déploiement
 

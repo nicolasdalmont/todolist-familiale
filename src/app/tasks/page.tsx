@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getTags, getTasks } from "@/lib/queries";
+import { getCategories, getTags, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskFilterList } from "@/components/TaskFilterList";
 import { IconPlus } from "@/components/Icons";
@@ -30,7 +30,11 @@ export default async function TasksPage({
   if (!profile) redirect("/login");
 
   const supabase = createAdminClient();
-  const [tasks, allTags] = await Promise.all([getTasks(supabase, profile.id), getTags(supabase)]);
+  const [tasks, allTags, categories] = await Promise.all([
+    getTasks(supabase, profile.id),
+    getTags(supabase),
+    getCategories(supabase),
+  ]);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -39,6 +43,7 @@ export default async function TasksPage({
         <TaskFilterList
           tasks={tasks}
           allTags={allTags}
+          categories={categories}
           currentUserId={profile.id}
           initialDueFrom={searchParams.dueFrom}
           initialDueAtMost={searchParams.dueAtMost}

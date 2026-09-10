@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Category, Tag, Task, TaskStatus, Visibility } from "@/lib/types";
-import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
@@ -53,13 +52,6 @@ function writePersistedFilters(filters: PersistedFilters): void {
   }
 }
 
-// Ordre de la liste déroulante de catégorie : alphabétique comme
-// CATEGORY_ORDER (voir src/lib/categories.ts), sauf "autre" qui est
-// volontairement déplacé en bas de liste plutôt qu'à sa place
-// alphabétique — demandé explicitement, "autre" étant la catégorie
-// fourre-tout, pas une catégorie au même titre que les autres.
-const CATEGORY_SELECT_ORDER = [...CATEGORY_ORDER.filter((c) => c !== "autre"), "autre" as const];
-
 // Ordre d'affichage des quatre boutons de statut (ligne 1) — l'ordre
 // naturel du cycle de vie d'une tâche, pas l'ordre alphabétique.
 const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
@@ -99,6 +91,7 @@ function FilterSeparator() {
 export function TaskFilterList({
   tasks,
   allTags,
+  categories,
   currentUserId,
   initialDueFrom,
   initialDueAtMost,
@@ -107,6 +100,7 @@ export function TaskFilterList({
 }: {
   tasks: Task[];
   allTags: Tag[];
+  categories: Category[];
   // Sert le filtre de portée (ligne 1). Bouton "Uniquement mes tâches",
   // **coché par défaut** : ne garde que les tâches dont l'utilisateur est
   // responsable — canEdit(task, currentUserId), voir src/lib/access.ts :
@@ -312,7 +306,8 @@ export function TaskFilterList({
   else if (scope === "all") filterSummaryParts.push("Y compris lecture seule");
   if (visibility === "shared") filterSummaryParts.push("Partagées");
   if (visibility === "private") filterSummaryParts.push("Privées");
-  if (category) filterSummaryParts.push(CATEGORY_LABELS[category as Category]);
+  if (category)
+    filterSummaryParts.push(categories.find((c) => c.slug === category)?.label ?? category);
   if (dueFrom && dueAtMost)
     filterSummaryParts.push(
       dueFrom === dueAtMost
@@ -452,9 +447,9 @@ export function TaskFilterList({
               className="self-start rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] font-semibold text-ink outline-none focus:border-brand"
             >
               <option value="">Toutes catégories</option>
-              {CATEGORY_SELECT_ORDER.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS[c]}
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.label}
                 </option>
               ))}
             </select>
@@ -599,7 +594,7 @@ export function TaskFilterList({
             )}
           </EmptyState>
         ) : (
-          filtered.map((task) => <TaskCard key={task.id} task={task} />)
+          filtered.map((task) => <TaskCard key={task.id} task={task} categories={categories} />)
         )}
       </div>
     </div>

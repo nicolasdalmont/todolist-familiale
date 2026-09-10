@@ -17,7 +17,7 @@ import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
 import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
-import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
+import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
 
 async function syncTaskTags(supabase: ReturnType<typeof createAdminClient>, taskId: string, tagNames: string[]) {
@@ -77,6 +77,27 @@ async function logActivity(
   } catch (e) {
     console.error("logActivity:", e);
   }
+}
+
+// Valide le slug de catégorie soumis contre la table `categories`
+// (migration 009) — repli sur « autre » si absent (formulaire d'une autre
+// session, valeur trafiquée…). La FK ON DELETE RESTRICT ferait de toute
+// façon échouer un slug inconnu, mais on préfère un repli silencieux.
+async function resolveCategorySlug(
+  supabase: ReturnType<typeof createAdminClient>,
+  raw: string
+): Promise<string> {
+  const slug = raw.trim();
+  if (!slug) return FALLBACK_CATEGORY_SLUG;
+  const { data, error } = await supabase
+    .from("categories")
+    .select("slug")
+    .eq("slug", slug)
+    .maybeSingle();
+  // Table absente (migration 009 pas encore jouée) : on fait confiance à
+  // la valeur soumise, déjà validée côté client contre DEFAULT_CATEGORIES.
+  if (error) return slug;
+  return data ? slug : FALLBACK_CATEGORY_SLUG;
 }
 
 function parseRecurrence(formData: FormData): Recurrence {
@@ -200,7 +221,7 @@ export async function createTaskAction(formData: FormData) {
   const dueAt = dueAtRaw ? parisWallTimeToUtcIso(dueAtRaw) : null;
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");
-  const category = isCategory(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
+  const category = await resolveCategorySlug(supabase, categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
 
   const shareRoles = parseShareRoles(formData, userId);
@@ -277,7 +298,7 @@ export async function updateTaskAction(formData: FormData) {
   const status = String(formData.get("status") || "todo");
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");
-  const category = isCategory(categoryRaw) ? categoryRaw : DEFAULT_CATEGORY;
+  const category = await resolveCategorySlug(supabase, categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
 
   // Le créateur original garde toujours l'accès complet, même si la

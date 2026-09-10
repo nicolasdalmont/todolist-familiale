@@ -1,15 +1,16 @@
 import Link from "next/link";
-import type { Task } from "@/lib/types";
+import type { Category, Task } from "@/lib/types";
 import { isOverdue } from "@/lib/format";
-import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
+import { categoryIcon, resolveCategory } from "@/lib/categories";
 import { Avatar } from "./Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "./Badge";
 import { Time } from "./Time";
 import { IconCalendar, IconChat, IconRepeat } from "./Icons";
 
-export function TaskCard({ task }: { task: Task }) {
+export function TaskCard({ task, categories }: { task: Task; categories: Category[] }) {
   const overdue = isOverdue(task.due_at, task.status);
-  const CategoryIcon = CATEGORY_ICONS[task.category];
+  const category = resolveCategory(task.category, categories);
+  const CategoryIcon = categoryIcon(category.icon);
   const checklist = task.checklist ?? [];
   const checklistDone = checklist.filter((i) => i.done).length;
   // Vignettes séparées en deux groupes : assigné(e)s (droit de
@@ -47,7 +48,7 @@ export function TaskCard({ task }: { task: Task }) {
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-muted">
         <span className="flex items-center gap-1 rounded-full bg-sand px-2 py-0.5 font-semibold text-ink">
-          <CategoryIcon className="h-3.5 w-3.5" /> {CATEGORY_LABELS[task.category]}
+          <CategoryIcon className="h-3.5 w-3.5" /> {category.label}
         </span>
         {overdue ? (
           <OverdueBadge />

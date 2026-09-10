@@ -6,9 +6,16 @@ export type Visibility = "shared" | "private";
 // src/lib/access.ts pour les règles de contrôle d'accès associées.
 export type ShareRole = "editor" | "viewer";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom";
-// Ordre volontairement alphabétique (reflète l'ordre d'affichage demandé) ;
-// voir src/lib/categories.ts pour les libellés et icônes associés.
-export type Category = "achats" | "autre" | "cadeaux" | "enfants" | "famille" | "maison" | "vacances";
+// Une catégorie de tâche — depuis la migration 009, elles vivent en base
+// (table `categories`) et sont gérables depuis l'écran admin. `slug` est
+// la clé stable stockée dans `tasks.category` ; `icon` est un nom choisi
+// parmi CATEGORY_ICON_CHOICES (src/lib/categories.ts).
+export interface Category {
+  slug: string;
+  label: string;
+  icon: string;
+  position: number;
+}
 
 export interface Recurrence {
   type: RecurrenceType;
@@ -62,7 +69,8 @@ export interface Task {
   recurrence: Recurrence;
   status: TaskStatus;
   visibility: Visibility;
-  category: Category;
+  // Slug de catégorie (voir Category / table `categories`).
+  category: string;
   created_by: string;
   created_at: string;
   // Personnes avec qui la tâche est partagée (le créateur n'y figure pas

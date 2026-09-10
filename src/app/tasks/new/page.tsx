@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProfiles, getTags } from "@/lib/queries";
+import { getCategories, getProfiles, getTags } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 import { IconArrowLeft } from "@/components/Icons";
@@ -14,7 +14,11 @@ export default async function NewTaskPage() {
   if (!profile) redirect("/login");
 
   const supabase = createAdminClient();
-  const [profiles, allTags] = await Promise.all([getProfiles(supabase), getTags(supabase)]);
+  const [profiles, allTags, categories] = await Promise.all([
+    getProfiles(supabase),
+    getTags(supabase),
+    getCategories(supabase),
+  ]);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -30,7 +34,13 @@ export default async function NewTaskPage() {
           </Link>
           <h2 className="text-lg font-extrabold">Nouvelle tâche</h2>
         </div>
-        <TaskForm mode="create" profiles={profiles} allTags={allTags} currentUserId={profile.id} />
+        <TaskForm
+          mode="create"
+          profiles={profiles}
+          allTags={allTags}
+          categories={categories}
+          currentUserId={profile.id}
+        />
       </main>
     </div>
   );

@@ -7,8 +7,8 @@ import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOver
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { setFlash } from "@/components/Toast";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
-import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
-import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
+import { categoryIcon, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
+import type { Category, Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
 
 // Les trois niveaux d'accès proposés pour chaque membre de la famille
 // (hors créateur, qui a toujours accès complet — voir src/lib/access.ts).
@@ -22,12 +22,14 @@ export function TaskForm({
   mode,
   profiles,
   allTags,
+  categories,
   currentUserId,
   task,
 }: {
   mode: "create" | "edit";
   profiles: Profile[];
   allTags: Tag[];
+  categories: Category[];
   currentUserId: string;
   task?: Task;
 }) {
@@ -35,7 +37,9 @@ export function TaskForm({
   const [, startTransition] = useGlobalTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState(task?.recurrence?.type ?? "none");
-  const [category, setCategory] = useState(task?.category ?? DEFAULT_CATEGORY);
+  const defaultCategory =
+    categories.find((c) => c.slug === FALLBACK_CATEGORY_SLUG)?.slug ?? categories[0]?.slug ?? FALLBACK_CATEGORY_SLUG;
+  const [category, setCategory] = useState(task?.category ?? defaultCategory);
   // Champ contrôlé pour pouvoir le vider via le bouton "Retirer" : l'effacer
   // renvoie une échéance vide, que les Server Actions traduisent en
   // due_at = null (voir createTaskAction / updateTaskAction, actions.ts).
@@ -166,19 +170,19 @@ export function TaskForm({
       <div className="mb-4">
         <label className="mb-1.5 block text-[13px] font-bold">Catégorie</label>
         <div role="group" aria-label="Catégorie" className="flex flex-wrap gap-1.5">
-          {CATEGORY_ORDER.map((c) => {
-            const Icon = CATEGORY_ICONS[c];
+          {categories.map((c) => {
+            const Icon = categoryIcon(c.icon);
             return (
               <button
-                key={c}
+                key={c.slug}
                 type="button"
-                aria-pressed={category === c}
-                onClick={() => setCategory(c)}
+                aria-pressed={category === c.slug}
+                onClick={() => setCategory(c.slug)}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                  category === c ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                  category === c.slug ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABELS[c]}
+                <Icon className="h-3.5 w-3.5" /> {c.label}
               </button>
             );
           })}

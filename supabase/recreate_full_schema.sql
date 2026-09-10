@@ -82,6 +82,7 @@ drop table if exists public.activity_log cascade;
 drop table if exists public.checklist_items cascade;
 drop table if exists public.task_tags cascade;
 drop table if exists public.tags cascade;
+drop table if exists public.categories cascade;
 drop table if exists public.comments cascade;
 drop table if exists public.task_assignees cascade;
 drop table if exists public.tasks cascade;
@@ -125,10 +126,12 @@ create table public.tasks (
     check (visibility in ('shared', 'private')),
   created_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz default now(),
-  -- Catégorie principale de la tâche — voir src/lib/categories.ts pour les
-  -- libellés/icônes affichés. Migration 001_categories_and_tags.sql.
+  -- Slug de catégorie — depuis la migration 009 les catégories vivent dans
+  -- la table public.categories (gérables depuis l'écran admin) ; la FK est
+  -- ajoutée plus bas, une fois cette table créée. « on delete restrict » :
+  -- deleteCategoryAction réaffecte les tâches à « autre » avant de
+  -- supprimer une catégorie (voir src/lib/category-actions.ts).
   category text not null default 'autre'
-    check (category in ('achats', 'autre', 'cadeaux', 'enfants', 'famille', 'maison', 'vacances'))
 );
 
 create table public.task_assignees (
@@ -149,6 +152,23 @@ create table public.comments (
   body text not null,
   created_at timestamptz default now()
 );
+
+-- Catégories de tâches, gérables depuis l'écran admin (renommer, ajouter,
+-- supprimer, réordonner). Migration 009_categories.sql. `slug` est la clé
+-- stockée dans tasks.category ; `icon` est un nom choisi parmi
+-- CATEGORY_ICON_CHOICES (src/lib/categories.ts). La FK depuis
+-- tasks.category est ajoutée juste après.
+create table public.categories (
+  slug text primary key,
+  label text not null,
+  icon text not null default 'dots',
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.tasks
+  add constraint tasks_category_fkey
+  foreign key (category) references public.categories(slug) on delete restrict;
 
 -- Tags libres (créés à la volée depuis le formulaire de tâche). Migration
 -- 001_categories_and_tags.sql.
@@ -240,6 +260,7 @@ alter table public.users enable row level security;
 alter table public.tasks enable row level security;
 alter table public.task_assignees enable row level security;
 alter table public.comments enable row level security;
+alter table public.categories enable row level security;
 alter table public.tags enable row level security;
 alter table public.task_tags enable row level security;
 alter table public.checklist_items enable row level security;
@@ -270,6 +291,18 @@ values (
   'admin',
   false
 );
+
+-- Catégories de départ (modifiables ensuite depuis l'écran admin). « autre »
+-- est la catégorie de repli, non supprimable côté application.
+insert into public.categories (slug, label, icon, position) values
+  ('achats',   'Achats',   'shopping', 0),
+  ('autre',    'Autre',    'dots',     1),
+  ('cadeaux',  'Cadeaux',  'gift',     2),
+  ('enfants',  'Enfants',  'baby',     3),
+  ('famille',  'Famille',  'users',    4),
+  ('maison',   'Maison',   'home',     5),
+  ('vacances', 'Vacances', 'sun',      6)
+on conflict (slug) do nothing;
 
 -- Tags de départ proposés à la création d'une tâche (la liste s'enrichit
 -- ensuite librement depuis le formulaire).

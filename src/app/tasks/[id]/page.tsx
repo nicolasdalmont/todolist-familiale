@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getComments, getProfile, getTask } from "@/lib/queries";
+import { getCategories, getComments, getProfile, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "@/components/Badge";
@@ -12,7 +12,7 @@ import { CommentThread } from "@/components/CommentThread";
 import { Time } from "@/components/Time";
 import { IconArrowLeft, IconCalendar, IconCalendarPlus, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { isOverdue, recurrenceLabel } from "@/lib/format";
-import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
+import { categoryIcon, resolveCategory } from "@/lib/categories";
 import { canEdit } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
@@ -28,13 +28,15 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   const task = await getTask(supabase, params.id, profile.id);
   if (!task) notFound();
 
-  const [creator, comments] = await Promise.all([
+  const [creator, comments, categories] = await Promise.all([
     getProfile(supabase, task.created_by),
     getComments(supabase, task.id),
+    getCategories(supabase),
   ]);
 
   const overdue = isOverdue(task.due_at, task.status);
-  const CategoryIcon = CATEGORY_ICONS[task.category];
+  const category = resolveCategory(task.category, categories);
+  const CategoryIcon = categoryIcon(category.icon);
   const editable = canEdit(task, profile.id);
   const editors = (task.assignees ?? []).filter((a) => a.role === "editor");
   const viewers = (task.assignees ?? []).filter((a) => a.role === "viewer");
@@ -89,7 +91,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
           ) : null}
 
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
-            <CategoryIcon className="h-4 w-4" /> Catégorie : <strong className="ml-1 text-ink">{CATEGORY_LABELS[task.category]}</strong>
+            <CategoryIcon className="h-4 w-4" /> Catégorie : <strong className="ml-1 text-ink">{category.label}</strong>
           </div>
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
             <IconCalendar className="h-4 w-4" /> Échéance : <strong className="ml-1 text-ink"><Time iso={task.due_at} /></strong>

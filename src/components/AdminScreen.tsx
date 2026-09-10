@@ -1,27 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import type { Member, UserStats } from "@/lib/types";
+import type { Category, Member, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
+import { CategoryManager } from "./CategoryManager";
 import { UserStatsList } from "./UserStatsList";
-import { IconBarChart, IconUsers } from "./Icons";
+import { IconBarChart, IconTag, IconUsers } from "./Icons";
 
-// Écran /admin réorganisé (voir 6.9) : deux onglets — « Membres »
-// (gestion des comptes, la fonction principale) et « Activité »
-// (statistiques par membre, inchangées). Réservé au rôle admin, protégé
+// Écran /admin réorganisé (voir 6.9) : trois onglets — « Membres »
+// (gestion des comptes), « Catégories » (catégories de tâches) et
+// « Activité » (statistiques par membre). Réservé au rôle admin, protégé
 // côté serveur dans src/app/admin/page.tsx.
-type Tab = "members" | "activity";
+type Tab = "members" | "categories" | "activity";
 
 export function AdminScreen({
   currentUserId,
   members,
+  categories,
   stats,
 }: {
   currentUserId: string;
   members: Member[];
+  categories: Category[];
   stats: UserStats[];
 }) {
   const [tab, setTab] = useState<Tab>("members");
+
+  const tabs = [
+    { value: "members" as const, label: "Membres", Icon: IconUsers },
+    { value: "categories" as const, label: "Catégories", Icon: IconTag },
+    { value: "activity" as const, label: "Activité", Icon: IconBarChart },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -30,12 +39,7 @@ export function AdminScreen({
         aria-label="Sections de l'administration"
         className="flex self-start overflow-hidden rounded-full border border-line text-[13px] font-semibold"
       >
-        {(
-          [
-            { value: "members" as const, label: "Membres", Icon: IconUsers },
-            { value: "activity" as const, label: "Activité", Icon: IconBarChart },
-          ]
-        ).map((t, i) => (
+        {tabs.map((t, i) => (
           <button
             key={t.value}
             type="button"
@@ -54,6 +58,8 @@ export function AdminScreen({
 
       {tab === "members" ? (
         <UserManager currentUserId={currentUserId} members={members} />
+      ) : tab === "categories" ? (
+        <CategoryManager categories={categories} />
       ) : (
         <UserStatsList stats={stats} />
       )}

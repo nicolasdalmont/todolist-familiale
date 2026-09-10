@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ActivityLogEntry, ChecklistItem, Comment, Member, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ActivityLogEntry, Category, ChecklistItem, Comment, Member, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canEdit, canView } from "./access";
+import { DEFAULT_CATEGORIES } from "./categories";
 import { isOverdue } from "./format";
 
 type DB = SupabaseClient<any, "public", any>;
@@ -19,6 +20,24 @@ export async function getProfiles(supabase: DB): Promise<Profile[]> {
 export async function getProfile(supabase: DB, id: string): Promise<Profile | null> {
   const { data } = await supabase.from("users").select(PROFILE_COLUMNS).eq("id", id).maybeSingle();
   return data ?? null;
+}
+
+// Catégories de tâches (table `categories`, migration 009). Petite table
+// (une poignée de lignes) chargée telle quelle par les écrans qui en ont
+// besoin : liste et détail des tâches, formulaires, onglet admin.
+export async function getCategories(supabase: DB): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("slug, label, icon, position")
+    .order("position");
+  if (error) {
+    // Table pas encore créée (migration 009) : on sert les catégories
+    // historiques, l'appli reste fonctionnelle le temps de la migration —
+    // même principe de tolérance que getRecentActivity().
+    console.error("getCategories:", error.message);
+    return DEFAULT_CATEGORIES;
+  }
+  return (data ?? []).length > 0 ? data! : DEFAULT_CATEGORIES;
 }
 
 export async function getTags(supabase: DB): Promise<Tag[]> {

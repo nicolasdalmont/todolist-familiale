@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin-guard";
 import { pickAvatarColor } from "@/lib/avatar-colors";
 import type { Role } from "@/lib/types";
 
@@ -14,19 +13,6 @@ import type { Role } from "@/lib/types";
 // le supprimer (et tout ce qu'il a créé).
 
 type Result = { error?: string; ok?: boolean; tempPassword?: string; name?: string };
-
-// Toute action ici commence par ça : session valide + rôle admin. Renvoie
-// aussi le client Supabase, déjà nécessaire ensuite.
-async function requireAdmin() {
-  const me = await getCurrentUser();
-  if (!me) redirect("/login");
-  if (me.role !== "admin") {
-    // Même posture que les pages restreintes : on ne confirme pas
-    // l'existence de la fonctionnalité à un non-admin.
-    throw new Error("Réservé à l'administrateur.");
-  }
-  return { me, supabase: createAdminClient() };
-}
 
 function cleanTempPassword(raw: unknown): string | null {
   const value = String(raw ?? "").trim();

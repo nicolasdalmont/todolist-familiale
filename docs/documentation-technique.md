@@ -3,14 +3,16 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 10/09/2026. Lot de ce jour : **suite d'audit UX
-complète** (6.16, 24 constats traités) — barre d'onglets mobile, tirer
-pour rafraîchir, toasts, confirmation / suppression annulable, pages
-système à la marque, retour à la destination après connexion (`?next=`),
-raccourcis d'échéance, cohérence des tuiles et des deux fils de
-l'accueil, fil « Partagées avec toi », accessibilité (focus,
-`aria-label`, `aria-pressed`, `<time>`), zones sûres iOS, salutation
-selon l'heure.
+Dernière mise à jour : 10/09/2026. Lots de ce jour : **gestion des
+comptes depuis l'écran admin** (6.9 — créer / réinitialiser / supprimer
+un membre, onglet « Membres » ; migration `008_user_management.sql`) et
+**suite d'audit UX complète** (6.16, 24 constats traités) — barre
+d'onglets mobile, tirer pour rafraîchir, toasts, confirmation /
+suppression annulable, pages système à la marque, retour à la destination
+après connexion (`?next=`), raccourcis d'échéance, cohérence des tuiles et
+des deux fils de l'accueil, fil « Partagées avec toi », accessibilité
+(focus, `aria-label`, `aria-pressed`, `<time>`), zones sûres iOS,
+salutation selon l'heure.
 
 Lot du 04/09/2026 : **renommage en
 « Checkberry » + nouveau thème rose framboise sur fond blanc** (9),
@@ -137,12 +139,13 @@ Entièrement maison, décrite dans `src/lib/auth.ts` et `src/middleware.ts` :
   depuis l'écran "Mon compte" (`/compte`, `changePasswordAction` — voir
   6.14). Les deux vérifient le mot de passe actuel ; la version connectée
   ne rouvre pas de session (le cookie JWT ne dépend pas du hash).
-- **Création de compte** : pas d'interface dédiée — se fait en SQL direct
-  dans Supabase (voir README, section "Authentification"). Claude peut
-  précalculer le hash scrypt d'un mot de passe temporaire sur demande.
-- **Mot de passe oublié** : l'administrateur redéfinit `password_hash` en
-  base et repasse `password_set` à `false` ; l'utilisateur retombe sur le
-  flux de première connexion.
+- **Création de compte / mot de passe oublié** : depuis l'application, par
+  un compte administrateur — onglet Admin → « Membres » (voir 6.9).
+  Créer un membre pose un mot de passe temporaire et `password_set =
+  false` ; « Réinitialiser le mot de passe » fait de même pour un membre
+  existant. Le seul compte à créer hors application est le tout premier
+  administrateur, semé par `supabase/recreate_full_schema.sql`
+  (« Admin » / « bonjour2026 »).
 
 Ce module gère uniquement *qui est connecté* ; il ne dit rien de *ce que
 cette personne a le droit de voir ou modifier une fois connectée* — c'est
@@ -174,6 +177,8 @@ Deux sources complémentaires, toutes deux dans `supabase/` :
    - `005_activity_log.sql` — table `activity_log` (voir 6.12).
    - `006_notifications.sql` — table `notifications` (voir 6.15).
    - `007_push_subscriptions.sql` — table `push_subscriptions` (voir 6.15).
+   - `008_user_management.sql` — `ON DELETE CASCADE` sur `tasks.created_by`
+     et `comments.author_id` (suppression d'un compte, voir 6.9).
 
 Toute nouvelle évolution du schéma passe par un nouveau fichier numéroté
 dans `supabase/migrations/` (voir section 10), et `recreate_full_schema.sql`
@@ -749,13 +754,58 @@ Server Components). Utile pour reprendre la main quand on veut forcer une
 mise à jour des *données* sans attendre — le rafraîchissement automatique
 ci-dessus ne porte, lui, que sur le *code*.
 
-### 6.9 Statistiques admin (`/admin`)
+### 6.9 Administration (`/admin`)
 
 Écran réservé au compte de rôle `admin` (lien "Admin" masqué pour les
-autres dans `Topbar.tsx` ; page elle-même protégée côté serveur par un
-`notFound()` sinon, même logique que les autres pages restreintes de
-l'appli — voir 6.1). Affiche, pour chaque membre de la famille : sa
-dernière activité (`users.last_login_at`, migration
+autres dans `Topbar.tsx` sur desktop, et remplacé par une entrée
+« Espace admin » sur `/compte` en mobile — voir 6.16 ; page elle-même
+protégée côté serveur par un `notFound()` sinon, même logique que les
+autres pages restreintes de l'appli — voir 6.1). Deux onglets
+(`AdminScreen.tsx`, contrôle segmenté) : **Membres** et **Activité**.
+
+#### Onglet « Membres » — gestion des comptes (10/09/2026)
+
+`src/components/UserManager.tsx` ; les trois opérations sont des Server
+Actions de `src/lib/admin-actions.ts`, chacune précédée de
+`requireAdmin()` (session valide + `role === "admin"`, sinon `redirect`
+ou `throw` — on ne confirme pas la fonctionnalité à un non-admin).
+
+- **Créer un membre** (`createMemberAction`) : prénom (unique — une
+  collision renvoie une erreur lisible via le code Postgres `23505`),
+  rôle (`Membre` / `Administrateur`), **mot de passe temporaire** (champ
+  en clair, bouton « Générer » → `generateTempPassword()` dans
+  `src/lib/temp-password.ts`, un mot + 3 chiffres, ex. `myrtille-750`).
+  Le compte est créé avec `password_set = false` : à sa première
+  connexion, l'application lui fait remplacer ce mot de passe par le
+  sien (flux de 6.1 / section 4). Un panneau vert persistant rappelle le
+  mot de passe à transmettre. La couleur d'avatar est attribuée
+  automatiquement (`pickAvatarColor()`, `src/lib/avatar-colors.ts` — la
+  première teinte non déjà prise).
+- **Réinitialiser le mot de passe** (`resetMemberPasswordAction`) :
+  nouveau mot de passe temporaire + `password_set = false` → la personne
+  retombe sur le flux de première connexion. Le cookie de session
+  existant reste techniquement valide (le JWT ne dépend pas du hash) —
+  sans conséquence pour le cas d'usage principal (mot de passe oublié :
+  la personne est de toute façon déconnectée).
+- **Supprimer un membre** (`deleteMemberAction`) : `ConfirmDialog` qui
+  **détaille ce qui part avec le compte** (tâches créées, dont partagées ;
+  commentaires). Garde-fous : on ne peut pas se supprimer soi-même, ni
+  supprimer le **dernier administrateur**. La suppression fait le ménage
+  explicite (tâches créées → cascade sur assigné(e)s / commentaires /
+  tags / checklist / activité / notifications ; commentaires laissés
+  ailleurs ; lignes d'activité) puis supprime la ligne `users`. La
+  **migration `008_user_management.sql`** met aussi `tasks.created_by` et
+  `comments.author_id` en `ON DELETE CASCADE` (schéma propre pour un
+  nouveau déploiement) ; le code ne dépend pas d'elle. Un compte supprimé
+  ne peut plus se connecter et `getCurrentUser()` le traite comme absent
+  à la navigation suivante.
+
+Plus besoin de SQL pour gérer les comptes (voir section 4 et 8.4).
+
+#### Onglet « Activité » — statistiques par membre
+
+`src/components/UserStatsList.tsx` (inchangé). Affiche, pour chaque membre
+de la famille : sa dernière activité (`users.last_login_at`, migration
 `003_last_login.sql`), et 4 compteurs de tâches créées, ventilés sur deux
 axes — total / 7 derniers jours, et privées / partagées (sur le champ
 dérivé `tasks.visibility`, voir 6.1) — présentés sous forme d'un petit
@@ -1427,11 +1477,10 @@ Conformément au phasage du cahier des charges :
   reconnexion) — le service worker (`public/sw.js`) ne gère que le cache
   de l'app shell (installabilité PWA) et les notifications push (voir
   6.15), pas les mutations créées hors-ligne.
-- Interface d'administration pour la création de comptes (actuellement
-  faite directement en SQL dans Supabase).
 
-Les **notifications Web Push + pastille d'icône** (initialement listées
-ici) sont désormais implémentées — voir 6.15.
+Les **notifications Web Push + pastille d'icône** et l'**interface
+d'administration des comptes** (initialement listées ici) sont désormais
+implémentées — voir 6.15 et 6.9.
 
 ## 9. Charte graphique — thème « Checkberry » (04/09/2026)
 
@@ -1519,7 +1568,8 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
   reflet fidèle de la structure. Migrations à ce jour :
   `001_categories_and_tags.sql`, `002_sharing_roles.sql`,
   `003_last_login.sql`, `004_checklist.sql`, `005_activity_log.sql`,
-  `006_notifications.sql`, `007_push_subscriptions.sql`.
+  `006_notifications.sql`, `007_push_subscriptions.sql`,
+  `008_user_management.sql`.
 - **Variables d'environnement** (Vercel → Project Settings → Environment
   Variables, type "Secret") : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
   (Supabase → Project Settings → API), `SESSION_SECRET` (chaîne aléatoire
@@ -1539,8 +1589,11 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/lib/auth.ts` | Hash de mot de passe, session JWT |
 | `src/lib/access.ts` | Contrôle d'accès aux tâches (`canView`/`canEdit`/`computeVisibility`/`getTaskAccess`) |
 | `src/lib/supabase/admin.ts` | Client Supabase service_role (+ `cache: "no-store"`) |
-| `src/lib/queries.ts` | Lectures (profils, tâches, tags, commentaires, stats admin, activité, notifications — `getMyNotifications`, pastille — `getBadgeCount`) — filtrées par `access.ts` |
+| `src/lib/queries.ts` | Lectures (profils, membres — `getMembers`, tâches, tags, commentaires, stats admin, activité, notifications — `getMyNotifications`, pastille — `getBadgeCount`) — filtrées par `access.ts` |
 | `src/lib/actions.ts` | Server Actions (écritures : auth + mot de passe, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`, notifications lues) — vérifiées par `access.ts` |
+| `src/lib/admin-actions.ts` | Server Actions de gestion des comptes (créer / réinitialiser / supprimer un membre) — `requireAdmin()` (voir 6.9) |
+| `src/lib/temp-password.ts` | `generateTempPassword()` — mot de passe temporaire lisible (voir 6.9) |
+| `src/lib/avatar-colors.ts` | Palette + `pickAvatarColor()` — couleur d'avatar à la création d'un membre |
 | `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`, `NotificationType`, `NotificationItem`) |
 | `src/lib/format.ts` | Formatage de dates (heure de Paris, année si ≠ année courante), `relativeTime` plafonné, statuts, récurrence, clés de jour civil, `dueDatePreset()` (raccourcis d'échéance) |
 | `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
@@ -1571,7 +1624,10 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
-| `src/app/admin/page.tsx` | Statistiques par utilisateur, réservé au rôle admin (voir 6.9) |
+| `src/app/admin/page.tsx` | Écran d'administration, réservé au rôle admin — charge membres + stats (voir 6.9) |
+| `src/components/AdminScreen.tsx` | Bascule d'onglets « Membres » / « Activité » de l'écran admin |
+| `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
+| `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
 | `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |
 | `src/components/PendingOverlay.tsx` | Gel d'écran global + indicateur de traitement en cours (voir 6.11) |
 | `src/components/Toast.tsx` | Toasts en bas d'écran + `setFlash()` (message qui survit à un redirect serveur) — voir 6.16 |

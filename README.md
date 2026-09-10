@@ -33,14 +33,11 @@ sans appel réseau à Supabase.
 
 - **Connexion.** L'écran affiche les membres de la famille (prénom +
   avatar) ; on clique sur son profil puis on entre son mot de passe.
-- **Création de compte (administrateur)** : ajouter une ligne dans la table
-  `users` via le SQL Editor de Supabase, avec `password_set = false` et un
-  `password_hash` correspondant à un mot de passe temporaire. Comme il n'y
-  a pas encore d'interface d'administration dans l'application (voir
-  ci-dessous), c'est actuellement la seule façon de créer un compte : le
-  plus simple est de dupliquer la ligne de bootstrap de
-  `supabase/recreate_full_schema.sql` en changeant `name`, ou de redemander à Claude de
-  précalculer un hash pour un nouveau mot de passe temporaire.
+- **Création de compte** : depuis l'application, avec un compte
+  administrateur → onglet **Admin → « Membres » → « Ajouter un membre »**
+  (prénom, rôle, mot de passe temporaire généré). Voir la doc technique
+  §6.9. Seul le tout premier administrateur est créé hors application
+  (bootstrap ci-dessous).
 - **Première connexion** : l'utilisateur choisit son profil, entre le mot
   de passe temporaire, puis définit immédiatement son propre mot de passe
   dans le même écran. `password_set` passe alors à `true`.
@@ -48,17 +45,18 @@ sans appel réseau à Supabase.
   "Changer mon mot de passe", après avoir choisi son profil), soit une fois
   connecté depuis l'écran "Mon compte" (clic sur son avatar). Les deux
   demandent le mot de passe actuel puis le nouveau.
-- **Mot de passe oublié** : l'administrateur redéfinit un
-  `password_hash` temporaire directement en base (SQL Editor Supabase) et
-  repasse `password_set` à `false` — l'utilisateur retombe alors sur
-  l'écran de première connexion.
+- **Mot de passe oublié** : un administrateur clique « Réinitialiser le
+  mot de passe » sur la fiche du membre (onglet « Membres ») — un nouveau
+  mot de passe temporaire est généré et le membre retombe sur l'écran de
+  première connexion.
 
 ### Bootstrap : premier compte administrateur
 
 `supabase/recreate_full_schema.sql` crée automatiquement un premier
 utilisateur `Admin` avec le mot de passe temporaire **`bonjour2026`**. Se
-connecter avec ce compte puis définir immédiatement un mot de passe
-personnel via l'écran de première connexion.
+connecter avec ce compte, définir immédiatement un mot de passe personnel
+via l'écran de première connexion, puis créer les autres membres depuis
+l'onglet **Admin → « Membres »**.
 
 ## Variables d'environnement
 
@@ -102,7 +100,7 @@ Structure complète et à jour : `supabase/recreate_full_schema.sql`
 (exécutable, réservé à la reconstruction d'un environnement — voir la
 documentation technique §5.3). Évolutions successives appliquées sur la
 base réelle : `supabase/migrations/` (scripts additifs numérotés, 001 à
-007). Tables : `users`, `tasks`, `task_assignees` (partage multiple, avec
+008). Tables : `users`, `tasks`, `task_assignees` (partage multiple, avec
 rôle), `comments`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
 `notifications`, `push_subscriptions`.
 RLS est activé sur toutes les tables mais sans policy : tout accès légitime
@@ -136,8 +134,6 @@ pas par RLS.
 - Offline-first réel (file d'attente IndexedDB + réconciliation à la
   reconnexion) — le service worker gère le cache de l'app shell et les
   notifications push, pas les mutations créées hors-ligne.
-- Interface d'administration pour la création de comptes (actuellement
-  faite directement en SQL dans Supabase).
 
 ## Développement local (optionnel)
 

@@ -1,4 +1,8 @@
 import type { Task } from "./types";
+import { APP_NAME } from "./app-config";
+
+// Identifiant ASCII stable dérivé du nom de l'appli, pour PRODID / UID.
+const APP_SLUG = APP_NAME.normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "Checkberry";
 
 // Génération d'un fichier iCalendar (`.ics`, RFC 5545) à partir d'une
 // tâche datée. Servi par src/app/api/tasks/[id]/calendar/route.ts avec un
@@ -51,11 +55,11 @@ export function buildTaskICS(
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Checkberry//FR",
+    `PRODID:-//${APP_SLUG}//FR`,
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:${task.id}@checkberry`,
+    `UID:${task.id}@${APP_SLUG.toLowerCase()}`,
     `DTSTAMP:${toICSDate(new Date())}`,
     `DTSTART:${toICSDate(start)}`,
     `DTEND:${toICSDate(end)}`,

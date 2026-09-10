@@ -83,6 +83,7 @@ drop table if exists public.checklist_items cascade;
 drop table if exists public.task_tags cascade;
 drop table if exists public.tags cascade;
 drop table if exists public.categories cascade;
+drop table if exists public.app_settings cascade;
 drop table if exists public.comments cascade;
 drop table if exists public.task_assignees cascade;
 drop table if exists public.tasks cascade;
@@ -169,6 +170,14 @@ create table public.categories (
 alter table public.tasks
   add constraint tasks_category_fkey
   foreign key (category) references public.categories(slug) on delete restrict;
+
+-- Réglages d'instance : une seule ligne (id = 1). Migration
+-- 010_app_settings.sql. Voir l'onglet « Réglages » de l'écran admin.
+create table public.app_settings (
+  id int primary key default 1 check (id = 1),
+  reminder_enabled boolean not null default true,
+  updated_at timestamptz not null default now()
+);
 
 -- Tags libres (créés à la volée depuis le formulaire de tâche). Migration
 -- 001_categories_and_tags.sql.
@@ -261,6 +270,7 @@ alter table public.tasks enable row level security;
 alter table public.task_assignees enable row level security;
 alter table public.comments enable row level security;
 alter table public.categories enable row level security;
+alter table public.app_settings enable row level security;
 alter table public.tags enable row level security;
 alter table public.task_tags enable row level security;
 alter table public.checklist_items enable row level security;
@@ -291,6 +301,9 @@ values (
   'admin',
   false
 );
+
+-- Ligne unique des réglages d'instance.
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
 
 -- Catégories de départ (modifiables ensuite depuis l'écran admin). « autre »
 -- est la catégorie de repli, non supprimable côté application.

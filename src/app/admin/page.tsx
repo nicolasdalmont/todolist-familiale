@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCategories, getMembers, getUserStats } from "@/lib/queries";
+import { getAppSettings, getCategories, getMembers, getUserStats } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { AdminScreen } from "@/components/AdminScreen";
 import { IconUsers } from "@/components/Icons";
@@ -20,9 +20,10 @@ export default async function AdminPage() {
   if (profile.role !== "admin") notFound();
 
   const supabase = createAdminClient();
-  const [members, categories, stats] = await Promise.all([
+  const [members, categories, settings, stats] = await Promise.all([
     getMembers(supabase),
     getCategories(supabase),
+    getAppSettings(supabase),
     getUserStats(supabase),
   ]);
 
@@ -39,6 +40,7 @@ export default async function AdminPage() {
           currentUserId={profile.id}
           members={members}
           categories={categories}
+          settings={settings}
           stats={stats}
         />
       </main>

@@ -5,12 +5,14 @@ import { PendingOverlayProvider } from "@/components/PendingOverlay";
 import { ToastProvider } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { APP_NAME } from "@/lib/app-config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Checkberry",
+  title: APP_NAME,
   description: "Gestion de tâches partagées en famille.",
-  manifest: "/manifest.json",
+  // manifest : généré par src/app/manifest.ts (/manifest.webmanifest),
+  // lié automatiquement par Next.
   // Favicon : fichiers src/app/icon.svg (+ icon.png de repli), détectés
   // automatiquement par l'App Router. Ici on ne déclare que l'icône
   // apple-touch (écran d'accueil iOS), pour laquelle on veut la version 192.

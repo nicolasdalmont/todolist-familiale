@@ -1,27 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import type { Category, Member, UserStats } from "@/lib/types";
+import type { AppSettings, Category, Member, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
+import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
-import { IconBarChart, IconTag, IconUsers } from "./Icons";
+import { IconBarChart, IconSliders, IconTag, IconUsers } from "./Icons";
 
-// Écran /admin réorganisé (voir 6.9) : trois onglets — « Membres »
-// (gestion des comptes), « Catégories » (catégories de tâches) et
-// « Activité » (statistiques par membre). Réservé au rôle admin, protégé
-// côté serveur dans src/app/admin/page.tsx.
-type Tab = "members" | "categories" | "activity";
+// Écran /admin réorganisé (voir 6.9) : quatre onglets — « Membres »
+// (gestion des comptes), « Catégories » (catégories de tâches),
+// « Réglages » (rappel + infos d'instance) et « Activité » (statistiques
+// par membre). Réservé au rôle admin, protégé côté serveur dans
+// src/app/admin/page.tsx.
+type Tab = "members" | "categories" | "settings" | "activity";
 
 export function AdminScreen({
   currentUserId,
   members,
   categories,
+  settings,
   stats,
 }: {
   currentUserId: string;
   members: Member[];
   categories: Category[];
+  settings: AppSettings;
   stats: UserStats[];
 }) {
   const [tab, setTab] = useState<Tab>("members");
@@ -29,6 +33,7 @@ export function AdminScreen({
   const tabs = [
     { value: "members" as const, label: "Membres", Icon: IconUsers },
     { value: "categories" as const, label: "Catégories", Icon: IconTag },
+    { value: "settings" as const, label: "Réglages", Icon: IconSliders },
     { value: "activity" as const, label: "Activité", Icon: IconBarChart },
   ];
 
@@ -60,6 +65,8 @@ export function AdminScreen({
         <UserManager currentUserId={currentUserId} members={members} />
       ) : tab === "categories" ? (
         <CategoryManager categories={categories} />
+      ) : tab === "settings" ? (
+        <SettingsPanel settings={settings} />
       ) : (
         <UserStatsList stats={stats} />
       )}

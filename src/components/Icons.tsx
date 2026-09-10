@@ -276,6 +276,17 @@ export function IconX({ className = "" }: IconProps) {
   );
 }
 
+// Réglages (onglet « Réglages » de l'écran admin).
+export function IconSliders({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="15" cy="7" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="9" cy="17" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 // Chevron du volet dépliable "Filtres" de la liste des tâches — voir
 // src/components/TaskFilterList.tsx. Pivote de 180° (classe `rotate-180`
 // posée par l'appelant) quand le volet est ouvert.

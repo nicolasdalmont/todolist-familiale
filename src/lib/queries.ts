@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ActivityLogEntry, Category, ChecklistItem, Comment, Member, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ActivityLogEntry, AppSettings, Category, ChecklistItem, Comment, Member, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canEdit, canView } from "./access";
 import { DEFAULT_CATEGORIES } from "./categories";
 import { isOverdue } from "./format";
@@ -20,6 +20,22 @@ export async function getProfiles(supabase: DB): Promise<Profile[]> {
 export async function getProfile(supabase: DB, id: string): Promise<Profile | null> {
   const { data } = await supabase.from("users").select(PROFILE_COLUMNS).eq("id", id).maybeSingle();
   return data ?? null;
+}
+
+// Réglages d'instance (table `app_settings`, une ligne — migration 010).
+// Tolère l'absence de la table (migration pas encore jouée) : rappel
+// activé par défaut.
+export async function getAppSettings(supabase: DB): Promise<AppSettings> {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("reminder_enabled")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error("getAppSettings:", error.message);
+    return { reminderEnabled: true };
+  }
+  return { reminderEnabled: data.reminder_enabled as boolean };
 }
 
 // Catégories de tâches (table `categories`, migration 009). Petite table

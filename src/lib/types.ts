@@ -43,6 +43,13 @@ export interface Tag {
   name: string;
 }
 
+// Réglages d'instance (table `app_settings`, une ligne — migration 010).
+// Voir getAppSettings() dans src/lib/queries.ts et l'onglet « Réglages »
+// de l'écran admin.
+export interface AppSettings {
+  reminderEnabled: boolean;
+}
+
 export interface Comment {
   id: string;
   task_id: string;

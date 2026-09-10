@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAppSettings } from "@/lib/queries";
 import { notifyTaskParticipants } from "@/lib/notifications";
 import { dateKeyFromDate, dateKeyFromIso, formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-// Rappel quotidien des tâches dues aujourd'hui (jour civil de Paris — voir
-// src/lib/timezone.ts), déclenché par Vercel Cron (voir vercel.json,
-// 07:00 UTC ≈ 8-9h à Paris selon la saison). Notifie chaque participant
+// Rappel quotidien des tâches dues aujourd'hui (jour civil de l'appli —
+// voir src/lib/timezone.ts), déclenché une fois par jour par Vercel Cron
+// (voir vercel.json). Peut être coupé depuis l'onglet « Réglages » de
+// l'admin (app_settings.reminder_enabled, migration 010) sans redéployer.
+// L'heure du déclenchement, elle, est le `schedule` du cron (Vercel Hobby
+// ne permet pas plus d'un déclenchement par jour). Notifie chaque participant
 // (créateur + assigné(e)s — notifyTaskParticipants(), src/lib/
 // notifications.ts, in-app + push), y compris sur une tâche privée : ce
 // n'est pas l'action d'un autre membre dont on informe les participants,
@@ -30,6 +34,12 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  const settings = await getAppSettings(supabase);
+  if (!settings.reminderEnabled) {
+    return NextResponse.json({ ok: true, skipped: "reminder disabled" });
+  }
+
   const todayKey = dateKeyFromDate(new Date());
 
   const { data: tasks, error } = await supabase

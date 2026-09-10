@@ -3,14 +3,15 @@ import type { Profile } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
 import { IconBerry } from "./Icons";
+import { APP_NAME } from "@/lib/app-config";
 
 export function Topbar({ user }: { user: Profile }) {
   return (
     <header className="pt-safe sticky top-0 z-20 flex min-h-[60px] items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur">
       <div className="flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 text-[17px] font-extrabold">
+        <Link href="/" className="flex items-center gap-2 text-[17px] font-extrabold lowercase">
           <IconBerry className="h-[30px] w-[30px]" />
-          checkberry
+          {APP_NAME}
         </Link>
         {/* Sur mobile, la navigation passe par la barre d'onglets du bas
             (BottomNav) : « Tâches » y ferait doublon, et « Admin » (rare,

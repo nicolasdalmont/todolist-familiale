@@ -5,6 +5,7 @@ import { loginAction, setPasswordAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
 import { Avatar } from "./Avatar";
 import { IconArrowLeft, IconBerry } from "./Icons";
+import { APP_NAME } from "@/lib/app-config";
 import type { Profile } from "@/lib/types";
 
 type Step =
@@ -64,7 +65,7 @@ export function LoginForm({ profiles, nextPath = "/" }: { profiles: Profile[]; n
       <div className="flex min-h-dvh flex-col items-center justify-center gap-7 bg-paper p-6">
         <div className="flex flex-col items-center gap-2.5 text-center">
           <IconBerry className="h-16 w-16" />
-          <h1 className="text-xl font-extrabold">checkberry</h1>
+          <h1 className="text-xl font-extrabold lowercase">{APP_NAME}</h1>
           <p className="max-w-xs text-[13.5px] text-ink-muted">Choisis ton profil pour continuer.</p>
         </div>
 

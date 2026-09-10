@@ -73,6 +73,6 @@ export const config = {
   // vers /login — le faire passer par le middleware, qui verrait encore un
   // JWT signé valide, le renverrait vers `/` et empêcherait le nettoyage.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.json|sw.js|api/version|api/push|api/cron|api/session).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.webmanifest|sw.js|api/version|api/push|api/cron|api/session).*)",
   ],
 };

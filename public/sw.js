@@ -18,11 +18,12 @@
 // cache. Le nom de cache change (v1 → v2) pour purger l'ancien cache
 // fautif chez les utilisateurs déjà installés (voir l'écoute "activate").
 // v3 (04/09/2026) : renommage en « Checkberry » + nouveau thème rose —
-// manifest.json et les icônes de l'app shell ont changé, le nom de cache
-// change donc pour purger l'ancien chez les PWA déjà installées (voir
-// l'écoute "activate").
-const CACHE_NAME = "checkberry-shell-v3";
-const APP_SHELL = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
+// manifest et icônes de l'app shell ont changé, le nom de cache change
+// donc pour purger l'ancien chez les PWA déjà installées.
+// v4 (10/09/2026) : le manifest est désormais généré
+// (/manifest.webmanifest, voir src/app/manifest.ts) — l'URL cachée change.
+const CACHE_NAME = "checkberry-shell-v4";
+const APP_SHELL = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

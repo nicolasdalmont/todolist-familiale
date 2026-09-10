@@ -10,8 +10,13 @@
 // « 14:30 » saisie dans le formulaire était stockée telle quelle comme
 // 14:30 UTC (soit 16:30 à Paris l'été), et `formatDate` la réaffichait en
 // UTC — les deux erreurs se compensaient dans l'appli mais pas ailleurs
-// (lien Google Agenda, voir 6.13). On force donc Europe/Paris partout.
-export const APP_TIMEZONE = "Europe/Paris";
+// (lien Google Agenda, voir 6.13). On force donc un fuseau unique partout.
+//
+// Configurable par déploiement via NEXT_PUBLIC_APP_TIMEZONE (nom IANA, ex.
+// « America/Montreal ») — inline au build, lu côté serveur comme client.
+// Par défaut Europe/Paris. Voir la section « Réglages » de l'écran admin
+// (informations d'instance) et le guide de déploiement.
+export const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE || "Europe/Paris";
 
 // Décalage d'un fuseau par rapport à UTC, en minutes, pour un instant donné
 // — positif si le fuseau est en avance sur UTC (Paris : +60 l'hiver, +120

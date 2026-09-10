@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { createAdminClient } from "./supabase/admin";
 import type { Profile } from "./types";
@@ -144,4 +145,20 @@ export async function getCurrentUser(): Promise<Profile | null> {
 
   const { last_login_at: _lastSeen, ...profile } = data;
   return profile as Profile;
+}
+
+// À utiliser en tête de chaque page/écran authentifié à la place de
+// `getCurrentUser()` + redirection manuelle : renvoie le profil, ou
+// redirige.
+//  - pas de cookie / signature invalide  → `/login`
+//  - cookie valide mais compte disparu (membre supprimé pendant qu'il
+//    était connecté) → `/api/session/end`, qui efface le cookie puis
+//    renvoie vers `/login` (un Server Component ne peut pas effacer un
+//    cookie lui-même, et le middleware ne voit pas que le compte n'existe
+//    plus — sans ça, `/` ⇄ `/login` boucleraient).
+export async function requireUser(): Promise<Profile> {
+  const profile = await getCurrentUser();
+  if (profile) return profile;
+  const staleSession = (await getSessionUserId()) !== null;
+  redirect(staleSession ? "/api/session/end" : "/login");
 }

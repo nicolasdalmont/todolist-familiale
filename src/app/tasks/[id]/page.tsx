@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getComments, getProfile, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -18,8 +18,7 @@ import { canEdit } from "@/lib/access";
 export const dynamic = "force-dynamic";
 
 export default async function TaskDetailPage({ params }: { params: { id: string } }) {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   const supabase = createAdminClient();
   // getTask renvoie null si la tâche n'existe pas OU si profile.id n'y a

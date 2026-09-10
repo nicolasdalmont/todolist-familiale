@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
@@ -10,8 +9,7 @@ import { IconArrowLeft, IconBarChart } from "@/components/Icons";
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   return (
     <div className="min-h-dvh bg-paper">

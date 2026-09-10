@@ -68,7 +68,11 @@ export const config = {
   // /api/cron exclu de même : /api/cron/reminders (voir vercel.json) est
   // appelée par Vercel Cron, jamais par un navigateur — aucun cookie de
   // session à vérifier, la route s'authentifie elle-même via CRON_SECRET.
+  //
+  // /api/session exclu : /api/session/end efface le cookie et redirige
+  // vers /login — le faire passer par le middleware, qui verrait encore un
+  // JWT signé valide, le renverrait vers `/` et empêcherait le nettoyage.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.json|sw.js|api/version|api/push|api/cron).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.json|sw.js|api/version|api/push|api/cron|api/session).*)",
   ],
 };

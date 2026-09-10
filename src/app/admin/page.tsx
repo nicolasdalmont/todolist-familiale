@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getMembers, getUserStats } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -16,8 +16,7 @@ export const dynamic = "force-dynamic";
 // « Membres » (gestion des comptes) et « Activité » (statistiques) — voir
 // 6.9.
 export default async function AdminPage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
   if (profile.role !== "admin") notFound();
 
   const supabase = createAdminClient();

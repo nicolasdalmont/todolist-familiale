@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getTags, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -26,8 +25,7 @@ export default async function TasksPage({
 }: {
   searchParams: { dueFrom?: string; dueAtMost?: string; overdue?: string; readOnly?: string };
 }) {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   const supabase = createAdminClient();
   const [tasks, allTags, categories] = await Promise.all([

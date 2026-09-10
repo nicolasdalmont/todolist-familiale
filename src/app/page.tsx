@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyNotifications, getRecentActivity, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -13,8 +12,7 @@ import { IconPlus } from "@/components/Icons";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   const supabase = createAdminClient();
   // getTasks ne renvoie que les tâches visibles par profile.id (créées par

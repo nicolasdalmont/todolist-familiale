@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getProfiles, getTags, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -11,8 +11,7 @@ import { canEdit } from "@/lib/access";
 export const dynamic = "force-dynamic";
 
 export default async function EditTaskPage({ params }: { params: { id: string } }) {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   const supabase = createAdminClient();
   const task = await getTask(supabase, params.id, profile.id);

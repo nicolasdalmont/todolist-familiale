@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getProfiles, getTags } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
@@ -10,8 +9,7 @@ import { IconArrowLeft } from "@/components/Icons";
 export const dynamic = "force-dynamic";
 
 export default async function NewTaskPage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await requireUser();
 
   const supabase = createAdminClient();
   const [profiles, allTags, categories] = await Promise.all([

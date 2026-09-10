@@ -14,6 +14,14 @@ type Result = { error?: string; ok?: boolean };
 const ICON_NAMES = new Set(CATEGORY_ICON_CHOICES.map((c) => c.name));
 const cleanIcon = (raw: unknown) => (ICON_NAMES.has(String(raw)) ? String(raw) : "dots");
 
+// PostgREST renvoie ce code quand la table n'existe pas encore : la
+// migration 009 n'a pas été jouée. Message explicite plutôt qu'une erreur
+// générique.
+const MIGRATION_MISSING = "Applique d'abord la migration 009_categories.sql dans Supabase.";
+function tableMissing(error: { code?: string } | null): boolean {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
+
 // Les catégories apparaissent sur beaucoup d'écrans (liste, détail,
 // formulaires, admin) — on invalide tout l'arbre plutôt que d'énumérer.
 function revalidate() {
@@ -30,7 +38,8 @@ export async function createCategoryAction(formData: FormData): Promise<Result> 
   const slug = slugifyCategory(label);
   if (!slug) return { error: "Ce nom ne donne aucun identifiant valide (essaie avec des lettres)." };
 
-  const { data: existing } = await supabase.from("categories").select("slug, position");
+  const { data: existing, error: listErr } = await supabase.from("categories").select("slug, position");
+  if (tableMissing(listErr)) return { error: MIGRATION_MISSING };
   if ((existing ?? []).some((c) => c.slug === slug)) {
     return { error: "Une catégorie très proche existe déjà." };
   }
@@ -66,6 +75,7 @@ export async function updateCategoryAction(
   if (Object.keys(update).length === 0) return { ok: true };
 
   const { error } = await supabase.from("categories").update(update).eq("slug", slug);
+  if (tableMissing(error)) return { error: MIGRATION_MISSING };
   if (error) return { error: "Impossible d'enregistrer. Réessaie." };
 
   revalidate();
@@ -77,10 +87,11 @@ export async function updateCategoryAction(
 export async function moveCategoryAction(slug: string, direction: "up" | "down"): Promise<Result> {
   const { supabase } = await requireAdmin();
 
-  const { data: cats } = await supabase
+  const { data: cats, error: listErr } = await supabase
     .from("categories")
     .select("slug, position")
     .order("position");
+  if (tableMissing(listErr)) return { error: MIGRATION_MISSING };
   const list = cats ?? [];
   const i = list.findIndex((c) => c.slug === slug);
   if (i === -1) return { error: "Catégorie introuvable." };
@@ -103,9 +114,10 @@ export async function deleteCategoryAction(slug: string): Promise<Result> {
     return { error: "« Autre » ne peut pas être supprimée (catégorie de repli)." };
   }
 
-  const { count } = await supabase
+  const { count, error: countErr } = await supabase
     .from("categories")
     .select("slug", { count: "exact", head: true });
+  if (tableMissing(countErr)) return { error: MIGRATION_MISSING };
   if ((count ?? 0) <= 1) return { error: "Impossible de supprimer la dernière catégorie." };
 
   // Réaffecte d'abord les tâches concernées à « autre » (la FK est en

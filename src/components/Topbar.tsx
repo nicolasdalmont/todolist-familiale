@@ -12,14 +12,23 @@ export function Topbar({ user }: { user: Profile }) {
           <IconBerry className="h-[30px] w-[30px]" />
           checkberry
         </Link>
-        <Link href="/tasks" className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+        {/* Sur mobile, la navigation passe par la barre d'onglets du bas
+            (BottomNav) : « Tâches » y ferait doublon, et « Admin » (rare,
+            réservé) est accessible depuis « Mon compte ». On ne garde donc
+            ces liens dans le bandeau qu'à partir de sm, où il n'y a pas de
+            barre du bas. Le contrôle d'accès admin reste côté serveur
+            (src/app/admin/page.tsx) — masquer le lien n'est qu'un confort. */}
+        <Link
+          href="/tasks"
+          className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
+        >
           Tâches
         </Link>
-        {/* Onglet réservé au compte admin — la page elle-même se protège
-            aussi côté serveur (voir src/app/admin/page.tsx) : masquer ce
-            lien n'est qu'un confort d'affichage, pas le contrôle d'accès. */}
         {user.role === "admin" ? (
-          <Link href="/admin" className="text-[13px] font-semibold text-ink-muted hover:text-ink">
+          <Link
+            href="/admin"
+            className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
+          >
             Admin
           </Link>
         ) : null}

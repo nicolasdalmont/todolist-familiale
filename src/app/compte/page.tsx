@@ -5,7 +5,7 @@ import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
 import { NotificationsToggle } from "@/components/NotificationsToggle";
-import { IconArrowLeft } from "@/components/Icons";
+import { IconArrowLeft, IconBarChart } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,22 @@ export default async function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* La barre d'onglets du bas ne porte pas d'entrée « Admin » (rare,
+            réservée) : sur mobile, elle est accessible ici. Sur desktop, le
+            bandeau supérieur s'en charge — d'où le sm:hidden. */}
+        {profile.role === "admin" ? (
+          <Link
+            href="/admin"
+            className="mb-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm hover:border-brand/50 sm:hidden"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
+              <IconBarChart className="h-4 w-4" />
+            </span>
+            <span className="text-sm font-bold">Espace admin</span>
+            <IconArrowLeft className="ml-auto h-4 w-4 rotate-180 text-ink-muted" />
+          </Link>
+        ) : null}
 
         <section className="mb-4 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <h3 className="mb-3 text-sm font-bold">Notifications</h3>

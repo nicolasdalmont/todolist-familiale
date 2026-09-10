@@ -139,6 +139,23 @@ export interface NotificationItem {
 // Les compteurs de tâches sont ventilés privé/partagé (sur le champ
 // dérivé Task.visibility, voir access.ts) plutôt qu'un simple total, sur
 // demande explicite de l'utilisateur.
+// Un membre, pour l'onglet « Membres » de l'écran admin
+// (src/components/UserManager.tsx) — voir getMembers() dans
+// src/lib/queries.ts. Les compteurs servent à prévenir de ce qui sera
+// supprimé avec le compte.
+export interface Member {
+  id: string;
+  name: string;
+  role: Role;
+  color: string;
+  password_set: boolean;
+  created_at: string;
+  lastSeenAt: string | null;
+  createdTasks: number;
+  sharedTasks: number;
+  authoredComments: number;
+}
+
 export interface UserStats {
   id: string;
   name: string;

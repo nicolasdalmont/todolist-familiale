@@ -41,6 +41,10 @@
 --     activity_log.task_id : "on delete cascade" — supprimer une tâche
 --     doit supprimer tout ce qui lui est rattaché (voir les migrations
 --     001/004/005).
+--   - tasks.created_by et comments.author_id : "on delete cascade" —
+--     supprimer un compte (onglet « Membres » de l'écran admin) supprime
+--     les tâches qu'il a créées et ses commentaires ; migration
+--     008_user_management.sql.
 --   - activity_log.actor_id : "on delete set null" — une ligne d'activité
 --     doit survivre à la suppression du compte de son auteur (elle devient
 --     alors invisible dans le fil plutôt que de bloquer la suppression du
@@ -119,7 +123,7 @@ create table public.tasks (
   -- src/lib/access.ts), jamais saisie directement par l'utilisateur.
   visibility text not null default 'shared'
     check (visibility in ('shared', 'private')),
-  created_by uuid not null references public.users(id),
+  created_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz default now(),
   -- Catégorie principale de la tâche — voir src/lib/categories.ts pour les
   -- libellés/icônes affichés. Migration 001_categories_and_tags.sql.
@@ -141,7 +145,7 @@ create table public.task_assignees (
 create table public.comments (
   id uuid primary key default gen_random_uuid(),
   task_id uuid references public.tasks(id) on delete cascade,
-  author_id uuid not null references public.users(id),
+  author_id uuid not null references public.users(id) on delete cascade,
   body text not null,
   created_at timestamptz default now()
 );
@@ -253,11 +257,10 @@ alter table public.push_subscriptions enable row level security;
 --    (scrypt, sel 16 octets, clé dérivée 64 octets, format
 --    "sel_hex:cle_derivee_hex").
 --
---    Renommer ce compte et recréer les autres membres de la famille
---    ensuite, à la main, en SQL (pas d'interface dédiée pour l'instant —
---    voir section 8.4 de la doc technique) :
---      insert into public.users (name, password_hash, role, password_set)
---      values ('Prénom', '<hash précalculé par Claude sur demande>', 'user', false);
+--    Se connecter avec « Admin » / « bonjour2026 », définir son propre mot
+--    de passe, puis créer les autres membres depuis l'application :
+--    onglet Admin → « Membres » → « Ajouter un membre » (voir section 6.9
+--    de la doc technique). Plus besoin de SQL pour gérer les comptes.
 -- ---------------------------------------------------------------------
 
 insert into public.users (name, password_hash, role, password_set)

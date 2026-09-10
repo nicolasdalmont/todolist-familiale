@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ActivityLogEntry, ChecklistItem, Comment, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
+import type { ActivityLogEntry, ChecklistItem, Comment, Member, NotificationItem, Profile, ShareRole, Tag, Task, UserStats } from "./types";
 import { canEdit, canView } from "./access";
 import { isOverdue } from "./format";
 
@@ -257,6 +257,41 @@ export async function getBadgeCount(supabase: DB, userId: string): Promise<numbe
   // la tuile "En retard" affichent toujours le même chiffre.
   const overdue = tasks.filter((t) => canEdit(t, userId) && isOverdue(t.due_at, t.status)).length;
   return unread + overdue;
+}
+
+// Liste des membres pour l'onglet « Membres » de l'écran admin
+// (src/components/UserManager.tsx). Comme getUserStats, on compte côté
+// application plutôt qu'en SQL agrégé (poignée de comptes, quelques
+// dizaines de tâches). `createdTasks` / `sharedTasks` / `authoredComments`
+// servent à afficher, avant suppression d'un membre, ce qui sera supprimé
+// avec lui (les tâches qu'il a créées et ses commentaires — voir
+// deleteMemberAction dans src/lib/admin-actions.ts).
+export async function getMembers(supabase: DB): Promise<Member[]> {
+  const [{ data: users, error: uErr }, { data: tasks, error: tErr }, { data: comments, error: cErr }] =
+    await Promise.all([
+      supabase.from("users").select("id, name, role, color, password_set, created_at, last_login_at").order("name"),
+      supabase.from("tasks").select("created_by, visibility"),
+      supabase.from("comments").select("author_id"),
+    ]);
+  if (uErr) throw new Error(uErr.message);
+  if (tErr) throw new Error(tErr.message);
+  if (cErr) throw new Error(cErr.message);
+
+  return (users ?? []).map((u) => {
+    const own = (tasks ?? []).filter((t) => t.created_by === u.id);
+    return {
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      color: u.color,
+      password_set: u.password_set,
+      created_at: u.created_at,
+      lastSeenAt: u.last_login_at,
+      createdTasks: own.length,
+      sharedTasks: own.filter((t) => t.visibility === "shared").length,
+      authoredComments: (comments ?? []).filter((c) => c.author_id === u.id).length,
+    };
+  });
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

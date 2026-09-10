@@ -4,6 +4,7 @@ import { AppUpdateWatcher } from "@/components/AppUpdateWatcher";
 import { PendingOverlayProvider } from "@/components/PendingOverlay";
 import { ToastProvider } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="font-sans antialiased">
         <ToastProvider>
-          <PendingOverlayProvider>{children}</PendingOverlayProvider>
+          <PendingOverlayProvider>
+            <PullToRefresh>{children}</PullToRefresh>
+          </PendingOverlayProvider>
           <BottomNav />
         </ToastProvider>
         <ServiceWorkerRegister />

@@ -7,6 +7,13 @@ body {
   @apply bg-paper text-ink;
 }
 
+/* Neutralise le pull-to-refresh natif du navigateur mobile : l'appli
+   fournit le sien (src/components/PullToRefresh.tsx), on évite le double
+   déclenchement. Sans effet dans une PWA installée (pas de geste natif). */
+body {
+  overscroll-behavior-y: contain;
+}
+
 @layer base {
   /* Anneau de focus visible et cohérent sur toute l'appli — les champs se
      contentaient d'un changement de bordure d'1 px (outline-none partout),

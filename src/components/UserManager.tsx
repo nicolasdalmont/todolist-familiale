@@ -7,6 +7,7 @@ import {
   createMemberAction,
   deleteMemberAction,
   resetMemberPasswordAction,
+  updateMemberAction,
 } from "@/lib/admin-actions";
 import { generateTempPassword } from "@/lib/temp-password";
 import { useToast } from "@/components/Toast";
@@ -40,6 +41,11 @@ export function UserManager({
   const [resetPassword, setResetPassword] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState<"user" | "admin">("user");
+  const [editError, setEditError] = useState<string | null>(null);
+
   const [deleting, setDeleting] = useState<Member | null>(null);
 
   // Panneau persistant après création / réinitialisation : le mot de passe
@@ -60,6 +66,34 @@ export function UserManager({
     setResetPassword(generateTempPassword());
     setResetError(null);
     setResettingId(id);
+    setEditingId(null);
+  }
+
+  function openEdit(m: Member) {
+    setEditName(m.name);
+    setEditRole(m.role);
+    setEditError(null);
+    setEditingId(m.id);
+    setResettingId(null);
+  }
+
+  function handleEdit(e: FormEvent, member: Member) {
+    e.preventDefault();
+    setEditError(null);
+    const isSelf = member.id === currentUserId;
+    startTransition(async () => {
+      const res = await updateMemberAction(member.id, {
+        name: editName,
+        role: isSelf ? undefined : editRole,
+      });
+      if (res.error) {
+        setEditError(res.error);
+        return;
+      }
+      setEditingId(null);
+      toast.show({ message: "Membre mis à jour", tone: "success" });
+      router.refresh();
+    });
   }
 
   function handleCreate(e: FormEvent) {
@@ -275,25 +309,97 @@ export function UserManager({
                   </div>
                 </div>
 
-                {!isSelf ? (
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => (editingId === m.id ? setEditingId(null) : openEdit(m))}
+                    className="text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+                  >
+                    Modifier
+                  </button>
+                  {!isSelf ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => (resettingId === m.id ? setResettingId(null) : openReset(m.id))}
+                        className="text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+                      >
+                        Réinitialiser le mot de passe
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(m)}
+                        className="text-[12px] font-semibold text-red-600 underline-offset-2 hover:underline"
+                      >
+                        Supprimer
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {editingId === m.id ? (
+                <form
+                  onSubmit={(e) => handleEdit(e, m)}
+                  className="mt-3 flex flex-col gap-2.5 border-t border-line-soft pt-3"
+                >
+                  <div>
+                    <label className="mb-1 block text-[12px] font-bold" htmlFor={`edit-name-${m.id}`}>
+                      Prénom
+                    </label>
+                    <input
+                      id={`edit-name-${m.id}`}
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded-xl border border-line px-3 py-2 text-[13.5px] outline-none focus:border-brand"
+                    />
+                  </div>
+                  {!isSelf ? (
+                    <div>
+                      <span className="mb-1 block text-[12px] font-bold">Rôle</span>
+                      <div className="flex self-start overflow-hidden rounded-full border border-line text-[12px] font-semibold">
+                        {([
+                          { value: "user" as const, label: "Membre" },
+                          { value: "admin" as const, label: "Administrateur" },
+                        ]).map((opt, i) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            aria-pressed={editRole === opt.value}
+                            onClick={() => setEditRole(opt.value)}
+                            className={`px-3 py-1 ${i > 0 ? "border-l border-line" : ""} ${
+                              editRole === opt.value ? "bg-brand text-white" : "bg-surface text-ink-muted"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {editError ? (
+                    <p className="text-[12px] font-semibold text-red-600">{editError}</p>
+                  ) : null}
+                  <div className="flex gap-2">
                     <button
-                      type="button"
-                      onClick={() => (resettingId === m.id ? setResettingId(null) : openReset(m.id))}
-                      className="text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+                      type="submit"
+                      disabled={isPending}
+                      className="flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50"
                     >
-                      Réinitialiser le mot de passe
+                      <IconCheck className="h-3.5 w-3.5" /> Enregistrer
                     </button>
                     <button
                       type="button"
-                      onClick={() => setDeleting(m)}
-                      className="text-[12px] font-semibold text-red-600 underline-offset-2 hover:underline"
+                      onClick={() => setEditingId(null)}
+                      className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[12.5px] font-bold text-ink-muted"
                     >
-                      Supprimer
+                      Annuler
                     </button>
                   </div>
-                ) : null}
-              </div>
+                </form>
+              ) : null}
 
               {resettingId === m.id ? (
                 <form

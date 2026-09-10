@@ -8,10 +8,10 @@ import { pickAvatarColor } from "@/lib/avatar-colors";
 import type { Role } from "@/lib/types";
 
 // Gestion des comptes, réservée au rôle admin (onglet « Membres » de
-// l'écran /admin — voir src/components/UserManager.tsx). Trois opérations :
-// créer un membre avec un mot de passe temporaire, réinitialiser le mot de
-// passe d'un membre (retour au flux de première connexion), supprimer un
-// membre (et tout ce qu'il a créé).
+// l'écran /admin — voir src/components/UserManager.tsx) : créer un membre
+// avec un mot de passe temporaire, modifier son prénom / son rôle,
+// réinitialiser son mot de passe (retour au flux de première connexion),
+// le supprimer (et tout ce qu'il a créé).
 
 type Result = { error?: string; ok?: boolean; tempPassword?: string; name?: string };
 
@@ -88,6 +88,60 @@ export async function resetMemberPasswordAction(userId: string, tempPassword: st
   revalidatePath("/admin");
   revalidatePath("/login");
   return { ok: true, name: target.name as string, tempPassword: clean };
+}
+
+export async function updateMemberAction(
+  userId: string,
+  patch: { name?: string; role?: Role }
+): Promise<Result> {
+  const { me, supabase } = await requireAdmin();
+  if (!userId) return { error: "Membre introuvable." };
+
+  const { data: target } = await supabase
+    .from("users")
+    .select("id, name, role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!target) return { error: "Membre introuvable." };
+
+  const update: { name?: string; role?: Role } = {};
+
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) return { error: "Indique un prénom." };
+    if (name.length > 40) return { error: "Ce prénom est trop long." };
+    if (name !== target.name) update.name = name;
+  }
+
+  if (patch.role !== undefined) {
+    const role: Role = patch.role === "admin" ? "admin" : "user";
+    if (userId === me.id && role !== me.role) {
+      return { error: "Tu ne peux pas changer ton propre rôle." };
+    }
+    if (target.role === "admin" && role !== "admin") {
+      const { count } = await supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin");
+      if ((count ?? 0) <= 1) {
+        return { error: "Impossible de retirer le rôle du dernier administrateur." };
+      }
+    }
+    if (role !== target.role) update.role = role;
+  }
+
+  if (Object.keys(update).length === 0) return { ok: true };
+
+  const { error } = await supabase.from("users").update(update).eq("id", userId);
+  if (error) {
+    if (error.code === "23505") return { error: `Un membre porte déjà le prénom « ${update.name} ».` };
+    return { error: "Impossible d'enregistrer. Réessaie." };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/login");
+  revalidatePath("/");
+  return { ok: true, name: update.name ?? (target.name as string) };
 }
 
 export async function deleteMemberAction(userId: string): Promise<Result> {

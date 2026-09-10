@@ -45,7 +45,7 @@ export default async function HomePage() {
       </main>
       <Link
         href="/tasks/new"
-        className="fixed bottom-safe right-5 flex h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40"
+        className="fixed bottom-safe right-5 hidden h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40 sm:flex"
         title="Nouvelle tâche"
         aria-label="Nouvelle tâche"
       >

@@ -16,7 +16,7 @@ export default async function AccountPage() {
   return (
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
-      <main className="mx-auto max-w-[720px] px-4 pb-16 pt-1">
+      <main className="mx-auto max-w-[720px] px-4 pb-24 pt-1 sm:pb-16">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">
           <Link
             href="/"

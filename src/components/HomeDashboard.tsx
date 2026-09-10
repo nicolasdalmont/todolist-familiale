@@ -8,6 +8,7 @@ import { APP_TIMEZONE } from "@/lib/timezone";
 import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
+import { NotificationsNudge } from "./NotificationsNudge";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
 // Calcule les trois compteurs "En retard" / "Aujourd'hui" / "Cette semaine"
@@ -161,6 +162,8 @@ export function HomeDashboard({
           </span>
         </Link>
       </div>
+
+      <NotificationsNudge />
 
       <AttentionFeed notifications={notifications} />
 

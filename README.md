@@ -123,6 +123,9 @@ pas par RLS.
 - Export d'une tâche datée vers le calendrier de l'appareil (fichier
   `.ics`). Voir §6.13.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
+- Sur mobile, navigation par une barre d'onglets en bas d'écran
+  (Accueil · Tâches · Créer · Compte) ; sur desktop, par le bandeau
+  supérieur. Suite d'améliorations UX du 10/09/2026 : voir §6.16.
 
 ## Ce qui n'est pas encore implémenté
 

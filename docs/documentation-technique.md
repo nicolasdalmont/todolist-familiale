@@ -3,7 +3,13 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 04/09/2026. Grand lot de ce jour : **renommage en
+Dernière mise à jour : 10/09/2026. Lot de ce jour : **suite d'audit UX**
+(6.16) — barre d'onglets mobile, toasts, suppression annulable, pages
+système à la marque, retour à la destination après connexion (`?next=`),
+raccourcis d'échéance, cohérence des tuiles de l'accueil, accessibilité
+(focus, `aria-label`, `aria-pressed`, `<time>`), zones sûres iOS.
+
+Lot du 04/09/2026 : **renommage en
 « Checkberry » + nouveau thème rose framboise sur fond blanc** (9),
 passage de l'appli en fuseau Europe/Paris de bout en bout (8.1), écran
 « Mon compte »
@@ -113,12 +119,16 @@ Entièrement maison, décrite dans `src/lib/auth.ts` et `src/middleware.ts` :
   changer déconnecte tout le monde.
 - **Middleware** (`src/middleware.ts`, Edge runtime) : vérifie uniquement
   la signature du JWT (aucun appel réseau à Supabase) ; redirige vers
-  `/login` si absent/invalide, et redirige un utilisateur déjà connecté
-  qui visite `/login` vers `/`.
+  `/login` si absent/invalide — en ajoutant `?next=<chemin demandé>` pour
+  y revenir après connexion (`safeNextPath()` dans `src/lib/nav.ts` valide
+  que c'est bien un chemin interne) —, et redirige un utilisateur déjà
+  connecté qui visite `/login` vers `/`.
 - **Parcours de connexion** (`LoginForm.tsx`) : grille des profils
   (prénom + avatar) → mot de passe. Si `password_set = false` (première
   connexion), le même écran demande le mot de passe temporaire puis fait
   saisir immédiatement un mot de passe personnel (`setPasswordAction`).
+  `loginAction` / `setPasswordAction` redirigent vers le `next` transmis
+  (chemin interne) s'il y en a un, sinon vers `/`.
 - **Changer son mot de passe** : depuis l'écran de connexion (lien
   "Changer mon mot de passe", `setPasswordAction`) ou, une fois connecté,
   depuis l'écran "Mon compte" (`/compte`, `changePasswordAction` — voir
@@ -401,7 +411,11 @@ formulaire de tâche (`TaskForm.tsx`) affiche un `<input datetime-local>`
 contrôlé, avec un lien **« Retirer l'échéance »** qui le vide — la saisie
 vide est traduite en `due_at = null` par les Server Actions
 (`dueAtRaw ? … : null`). Saisie et affichage sont en heure de Paris (voir
-8.1).
+8.1). Trois **raccourcis** sous le champ (« Ce soir » 18 h, « Demain
+matin » 8 h, « Ce week-end » samedi 10 h — `dueDatePreset()` dans
+`src/lib/format.ts`) posent une heure raisonnable plutôt que le 00:00 que
+le sélecteur natif retient souvent, ce qui rendrait une tâche « pour
+aujourd'hui » aussitôt en retard (audit UX du 10/09/2026, voir 6.16).
 
 **Récurrence** stockée en JSON dans `tasks.recurrence` : `{ type: "none" | "daily" |
 "weekly" | "monthly" | "custom", interval?, unit?: "days"|"weeks"|"months" }`.
@@ -414,7 +428,9 @@ même description, la même catégorie, les mêmes tags, la même checklist
 (décochée — voir 6.10) et **les mêmes partages (personne + rôle)**, pour
 que la confidentialité d'une tâche récurrente reste cohérente d'une
 occurrence à l'autre. Si la tâche récurrente n'a pas d'échéance, aucune
-occurrence n'est régénérée (rien à incrémenter). Les commentaires, eux,
+occurrence n'est régénérée (rien à incrémenter) — le formulaire affiche
+alors un avertissement dès qu'un type de récurrence est choisi sans
+échéance (audit UX du 10/09/2026, voir 6.16). Les commentaires, eux,
 ne sont jamais recopiés sur une nouvelle occurrence — ils sont propres à
 chaque instance de la tâche. **Cette régénération automatique n'est pas
 journalisée dans le fil d'activité** (voir 6.12) — seul le changement de
@@ -515,13 +531,13 @@ les tâches `todo`/`in_progress` (`open` dans `HomeDashboard.tsx`), "En
 retard" exclut `done`/`archived` par construction de `isOverdue()`.
 
 Les tuiles "Aujourd'hui" et "Cette semaine" sont des liens vers
-`/tasks?dueAtMost=YYYY-MM-DD` (voir 6.7) : le nombre affiché sur la tuile
-(échéance strictement dans la période) peut donc différer du nombre de
-tâches affichées après le clic, qui inclut en plus tout ce qui est déjà
-en retard — comportement voulu. La tuile "En retard" est un lien vers
-`/tasks?overdue=1`, qui active le nouveau filtre "En retard uniquement"
-de `TaskFilterList.tsx` (voir 6.7) — celui-ci n'a pas cette différence
-cumulative : il ne montre que les tâches réellement en retard.
+`/tasks?dueFrom=YYYY-MM-DD&dueAtMost=YYYY-MM-DD` (voir 6.7) : depuis le
+10/09/2026 elles passent **les deux bornes** de l'intervalle, de sorte
+que la liste obtenue au clic affiche exactement ce que la tuile a compté.
+Auparavant seule `?dueAtMost=` était passée et la liste laissait aussi
+entrer les tâches déjà en retard (audit UX INC-1, voir 6.16). La tuile
+"En retard" est un lien vers `/tasks?overdue=1`, qui active le filtre
+"En retard uniquement" de `TaskFilterList.tsx` (voir 6.7).
 
 ### 6.7 Liste des tâches, recherche et filtres (`/tasks`)
 
@@ -603,21 +619,32 @@ n'aurait plus de sens dans cette disposition empilée) :
      (`CATEGORY_SELECT_ORDER` dans `TaskFilterList.tsx`) — demande
      explicite de l'utilisateur, "Autre" étant la catégorie fourre-tout,
      pas une catégorie comme les autres.
-   - **Échéance** : `<input type="date">` "au plus tard le", avec un
-     bouton "Effacer" quand une date est choisie — ne garde que les
-     tâches ayant une échéance renseignée et inférieure ou égale à la
-     date choisie (donc y compris les tâches déjà en retard). Peut être
-     pré-rempli via `?dueAtMost=` (utilisé par les tuiles
-     "Aujourd'hui"/"Cette semaine" de l'accueil, voir 6.6).
-3. **Partagé/Privé │ en retard uniquement** (inchangé depuis son ajout) :
-   - Partagé/Privé : trois boutons (Toutes / Partagées / Privées), filtre
-     sur le champ dérivé `visibility` (voir 6.1).
+   - **Échéance** : un **intervalle** « du … au … » — deux `<input
+     type="date">` (`dueFrom` et `dueAtMost`), avec un bouton « Effacer »
+     qui vide les deux. Ne garde que les tâches ayant une échéance
+     renseignée comprise dans l'intervalle (bornes incluses ; une seule
+     borne suffit). Pré-remplissable via `?dueFrom=` et/ou `?dueAtMost=` :
+     les tuiles « Aujourd'hui » et « Cette semaine » de l'accueil passent
+     **les deux bornes** pour cadrer un intervalle exact, afin que la
+     liste affiche précisément ce que la tuile a compté (auparavant seule
+     `?dueAtMost=` était passée, ce qui laissait aussi entrer les tâches
+     en retard — corrigé le 10/09/2026, voir 6.16).
+3. **Partagé/Privé │ en retard uniquement** :
+   - Partagé/Privé : **contrôle segmenté** (Toutes / Partagées / Privées,
+     segments accolés dans un seul cadre plutôt que trois pilules
+     séparées, pour signaler qu'ils s'excluent), filtre sur le champ
+     dérivé `visibility` (voir 6.1).
    - En retard uniquement : bouton à bascule, même définition que la
      tuile "En retard" de l'accueil (`isOverdue()`) — voir 6.6. Pré-activé
      via `?overdue=1`, utilisé par cette tuile.
 4. **Tags** — sélection multiple, logique OR (une tâche matche si elle a
-   au moins un des tags cochés), inchangé. Pas de séparateur sur cette
-   ligne, qui ne porte qu'un seul groupe de filtres.
+   au moins un des tags cochés). Pas de séparateur sur cette ligne, qui ne
+   porte qu'un seul groupe de filtres.
+
+Les pilules de sélection multiple (statuts, tags) affichent une **coche**
+quand elles sont actives, et tous ces boutons portent `aria-pressed` +
+`role="group"` — l'affordance ne repose plus uniquement sur la couleur
+(audit UX du 10/09/2026, voir 6.16).
 
 Tous les critères actifs se cumulent (ET logique entre les lignes et entre
 portée/statut, OU logique entre les statuts cochés et entre les tags
@@ -641,8 +668,8 @@ l'onglet/l'appli reste ouvert(e) — pas `localStorage`, qui survivrait à
 une fermeture, ce qui n'est pas ce qui est demandé.
 
 - **Écriture** : un `useEffect` sérialise l'état courant (portée, statuts,
-  catégorie, échéance, partagé/privé, en retard uniquement, tags, texte de
-  recherche) à chaque changement.
+  catégorie, intervalle d'échéance `dueFrom`/`dueAtMost`, partagé/privé,
+  en retard uniquement, tags, texte de recherche) à chaque changement.
 - **Lecture** : restaurée par un second `useEffect`, exécuté **une seule
   fois après le premier rendu**, jamais dans les `useState` d'initialisation
   eux-mêmes — `sessionStorage` n'existe pas côté serveur, l'y lire aurait
@@ -651,9 +678,9 @@ une fermeture, ce qui n'est pas ce qui est demandé.
   classique d'avertissement d'hydratation React.
 - **Ignorée en arrivant depuis une tuile de l'accueil** (`cameFromTile` —
   voir portée ci-dessus) : les valeurs de l'URL (`?overdue=1`,
-  `?dueAtMost=`) priment alors sur tout ce qui aurait pu être mémorisé, un
-  clic sur une tuile étant une intention explicite ("montre-moi exactement
-  ça").
+  `?dueFrom=`, `?dueAtMost=`) priment alors sur tout ce qui aurait pu être
+  mémorisé, un clic sur une tuile étant une intention explicite
+  ("montre-moi exactement ça").
 - Échec silencieux si `sessionStorage` est indisponible (navigation
   privée, quota) : le filtre ne survit simplement pas à la navigation,
   sans rien bloquer.
@@ -1071,11 +1098,94 @@ Trois façons de marquer lu :
 Toutes filtrent par `user_id` : on ne peut marquer que ses propres
 notifications. Chaque action fait `revalidatePath("/")`.
 
+### 6.16 Suite d'audit UX (10/09/2026)
+
+Un audit UX de l'ensemble de l'application a donné lieu à une série de
+correctifs regroupés ici. Les priorités **hautes et moyennes** ont été
+livrées ; les basses sont en attente. Les modifications les plus visibles :
+
+**Navigation**
+
+- **Barre d'onglets en bas d'écran sur mobile** (`BottomNav.tsx`, montée
+  une fois dans `layout.tsx`) : Accueil · Tâches · Créer · Compte, avec
+  `aria-current` sur l'onglet actif et `env(safe-area-inset-bottom)`.
+  Masquée à partir de `sm` (le desktop garde le bandeau supérieur + le
+  bouton flottant, lui devenu `sm:` uniquement). Se retire d'elle-même
+  sur `/login`.
+- **Bandeau supérieur épuré sur mobile** : les liens « Tâches » et
+  « Admin » passent en `sm:block` (doublon avec la barre du bas). « Espace
+  admin » réapparaît alors sur `/compte` pour les administrateurs (`sm:hidden`).
+- **Retour à la destination après connexion** : le middleware ajoute
+  `?next=<chemin>` à la redirection vers `/login` ; `loginAction` /
+  `setPasswordAction` y reviennent après authentification. `safeNextPath()`
+  (`src/lib/nav.ts`) n'autorise qu'un chemin interne absolu (jamais une URL
+  externe). Utile pour les liens profonds, notamment depuis une
+  notification push.
+
+**Retour d'action et suppressions**
+
+- **Toasts** (`Toast.tsx`, `ToastProvider` monté dans `layout.tsx`) :
+  messages éphémères en bas d'écran — « Tâche créée / enregistrée /
+  supprimée », « Statut : … », « Commentaire ajouté ». Pour les actions
+  qui redirigent côté serveur (création/modification), le message est
+  déposé en `sessionStorage` (`checkberry:flash`, helper `setFlash()`) et
+  ramassé par le provider au montage suivant.
+- **Confirmation de suppression d'une tâche** : `ConfirmDialog.tsx` à la
+  marque remplace `window.confirm()`.
+- **Suppression annulable** des commentaires et des items de checklist
+  (`useUndoableDelete.ts`) : l'élément disparaît immédiatement, un toast
+  « … supprimé · Annuler » laisse ~5 s, l'appel serveur n'est envoyé qu'à
+  l'expiration du délai (ou tout de suite si l'écran est quitté avant —
+  flush au démontage).
+- **UI optimiste** pour cocher un item de checklist (`ChecklistSection.tsx`,
+  état local `overrides`) : la case réagit sans figer l'écran. Implémenté
+  à la main, `useOptimistic` n'existant pas dans React 18.3.
+
+**Pages système**
+
+- `src/app/error.tsx`, `not-found.tsx`, `loading.tsx` — à la marque
+  (fond `paper`, `IconBerry`, retour à l'accueil). Sans `error.tsx`, une
+  exception levée par une Server Action affichait l'écran d'erreur brut de
+  Next.
+
+**Formulaire de tâche**
+
+- Raccourcis d'échéance « Ce soir / Demain matin / Ce week-end »
+  (`dueDatePreset()`) — voir 6.3.
+- Avertissement « récurrence sans échéance » — voir 6.3.
+
+**Accessibilité et dates**
+
+- Anneau `:focus-visible` global (`globals.css`), `aria-label` sur tous
+  les contrôles à icône seule, `aria-pressed` + `role="group"` sur les
+  pilules de filtre / catégorie / statut, contrôle segmenté pour la
+  visibilité, coche sur les multi-sélections actives, cibles tactiles
+  portées vers 44 px (utilitaire `.tap-target`).
+- Composant `Time.tsx` : enveloppe `<time datetime="…">` autour des dates
+  affichées.
+- `min-h-dvh` au lieu de `min-h-screen` ; `env(safe-area-inset-*)` sur le
+  bouton flottant et le bandeau supérieur.
+- `formatDate()` ajoute l'année quand elle diffère de l'année courante ;
+  `relativeTime()` plafonne à « hier / il y a n j » sur 7 jours puis
+  bascule sur une date absolue (`formatDateOnly()`) — voir 8.1.
+
+**Découverte des notifications**
+
+- `NotificationsNudge.tsx` : bannière unique et rejetable sur l'accueil
+  (au-dessus de « À ton attention »), affichée seulement si le push est
+  réellement activable ici et pas déjà en place. Rejet mémorisé
+  (`localStorage`, `checkberry:notif-nudge-dismissed`).
+
+**Icône**
+
+- `IconCalendarPlus` distincte pour l'export agenda sur l'écran de détail,
+  pour ne plus réutiliser l'icône d'échéance avec deux sens différents.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
 |---|---|
-| `/login` | Grille des profils + connexion / première connexion / changement de mot de passe |
+| `/login` | Grille des profils + connexion / première connexion / changement de mot de passe ; honore `?next=` (voir 4) |
 | `/` | Écran d'accueil (bienvenue, compteurs, fil « À ton attention » — 6.15, activité du jour — 6.12) |
 | `/tasks` | Liste des tâches (recherche + volet de filtres, voir 6.7) |
 | `/tasks/new` | Formulaire de création |
@@ -1113,7 +1223,11 @@ stockés en UTC (`tasks.due_at` est un `timestamptz`) ; toute la conversion
   `<input datetime-local>` comme une heure de Paris avant de la stocker
   (`createTaskAction` / `updateTaskAction`, `src/lib/actions.ts`).
 - **Affichage** : `formatDate()` force `timeZone: "Europe/Paris"` (elle
-  tourne côté serveur, donc à l'heure de Vercel/UTC sans ça).
+  tourne côté serveur, donc à l'heure de Vercel/UTC sans ça). Depuis le
+  10/09/2026 elle ajoute l'**année** quand celle-ci diffère de l'année
+  courante (à Paris), et `relativeTime()` ne renvoie « il y a n j » que
+  jusqu'à 7 jours (« hier » à 1 jour) avant de basculer sur une date
+  absolue via `formatDateOnly()` — « 47 j » ne disait plus rien.
 - **Pré-remplissage du formulaire** : `toDatetimeLocalValue()` reconvertit
   l'instant UTC vers l'heure de Paris via `Intl`, quel que soit le fuseau
   du navigateur.
@@ -1231,7 +1345,16 @@ Palette définie dans `tailwind.config.ts` :
   « En retard », « Privée », erreurs de formulaire, bouton Supprimer) —
   volontairement **distinct** du rose de la marque, pour que l'alerte se
   lise comme telle. **Succès** : `emerald-*` (visibilité « Partagée »,
-  confirmation de mot de passe).
+  confirmation de mot de passe, toasts de succès). **Avertissement** :
+  `amber-*` (récurrence sans échéance).
+
+`src/app/globals.css` ajoute, en plus des `@tailwind`, quelques
+utilitaires transverses : anneau `:focus-visible` global (accent
+`brand`), marges de sécurité iOS (`pb-safe` / `pt-safe` / `bottom-safe`,
+`env(safe-area-inset-*)`) et `.tap-target` (zone tactile ≥ 44 px autour
+d'une petite icône). Les pages utilisent `min-h-dvh` (et non
+`min-h-screen`) pour composer avec les barres d'outils mobiles
+rétractables. Voir 6.16.
 
 Icônes : jeu SVG inline maison (`src/components/Icons.tsx`, trait fin,
 couleur pilotée par `currentColor`). Exception : `IconBerry`, le logo
@@ -1305,22 +1428,25 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 
 | Fichier | Rôle |
 |---|---|
-| `src/middleware.ts` | Garde d'authentification (Edge) |
+| `src/middleware.ts` | Garde d'authentification (Edge) — redirige vers `/login?next=…` (voir 4) |
+| `src/lib/nav.ts` | `safeNextPath()` — valide la destination `?next=` (chemin interne uniquement) |
 | `src/lib/auth.ts` | Hash de mot de passe, session JWT |
 | `src/lib/access.ts` | Contrôle d'accès aux tâches (`canView`/`canEdit`/`computeVisibility`/`getTaskAccess`) |
 | `src/lib/supabase/admin.ts` | Client Supabase service_role (+ `cache: "no-store"`) |
 | `src/lib/queries.ts` | Lectures (profils, tâches, tags, commentaires, stats admin, activité, notifications — `getMyNotifications`, pastille — `getBadgeCount`) — filtrées par `access.ts` |
 | `src/lib/actions.ts` | Server Actions (écritures : auth + mot de passe, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`, notifications lues) — vérifiées par `access.ts` |
 | `src/lib/types.ts` | Types TypeScript partagés (dont `ActivityType`, `NotificationType`, `NotificationItem`) |
-| `src/lib/format.ts` | Formatage de dates (heure de Paris), statuts, récurrence, clés de jour civil |
+| `src/lib/format.ts` | Formatage de dates (heure de Paris, année si ≠ année courante), `relativeTime` plafonné, statuts, récurrence, clés de jour civil, `dueDatePreset()` (raccourcis d'échéance) |
 | `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
 | `src/lib/calendar.ts` | `buildTaskICS()` — génère le fichier `.ics` d'une tâche pour l'agenda de l'appareil (voir 6.13) |
 | `src/app/api/tasks/[id]/calendar/route.ts` | Sert ce `.ics` (`Content-Disposition: attachment`) — accès vérifié par `getTask` (voir 6.13) |
 | `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
-| `src/components/Icons.tsx` | Jeu d'icônes SVG inline |
-| `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage par personne |
-| `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statut actifs/catégorie/échéance/partagé-privé/en retard/tags), séparateurs verticaux masqués sur mobile — plus de `FilterTabs.tsx`, retiré le 03/09/2026 ; filtre mémorisé en `sessionStorage` (voir 6.7) |
-| `src/components/HomeDashboard.tsx` | Compteurs de l'écran d'accueil (en retard/aujourd'hui/cette semaine) |
+| `src/components/Icons.tsx` | Jeu d'icônes SVG inline (dont `IconCalendarPlus` — export agenda) |
+| `src/components/Time.tsx` | Enveloppe `<time datetime>` autour d'une date affichée (voir 6.16) |
+| `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, confirmation de suppression |
+| `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statuts/catégorie/intervalle d'échéance `du…au`/visibilité segmentée/en retard/tags), `aria-pressed` sur les pilules, filtre mémorisé en `sessionStorage` (voir 6.7) |
+| `src/components/HomeDashboard.tsx` | Compteurs de l'écran d'accueil (en retard/aujourd'hui/cette semaine) — liens vers un intervalle d'échéance exact (voir 6.6) |
+| `src/components/NotificationsNudge.tsx` | Bannière unique d'invite à activer les notifications, sur l'accueil (voir 6.16) |
 | `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |
 | `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
@@ -1337,9 +1463,14 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
 | `src/app/admin/page.tsx` | Statistiques par utilisateur, réservé au rôle admin (voir 6.9) |
-| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail (voir 6.10) |
+| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |
 | `src/components/PendingOverlay.tsx` | Gel d'écran global + indicateur de traitement en cours (voir 6.11) |
-| `src/components/CommentThread.tsx` | Fil de commentaires + suppression (auteur ou créateur de la tâche — voir 6.5) |
+| `src/components/Toast.tsx` | Toasts en bas d'écran + `setFlash()` (message qui survit à un redirect serveur) — voir 6.16 |
+| `src/components/ConfirmDialog.tsx` | Boîte de confirmation à la marque (remplace `window.confirm()`) — voir 6.16 |
+| `src/components/useUndoableDelete.ts` | Hook « supprimer + Annuler » (commentaires, items de checklist) — voir 6.16 |
+| `src/components/BottomNav.tsx` | Barre d'onglets en bas d'écran, mobile uniquement (voir 6.16) |
+| `src/components/CommentThread.tsx` | Fil de commentaires + suppression annulable (auteur ou créateur de la tâche — voir 6.5, 6.16) |
+| `src/app/error.tsx` / `not-found.tsx` / `loading.tsx` | Pages système à la marque (voir 6.16) |
 | `supabase/recreate_full_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
 | `supabase/migrations/` | Évolutions additives appliquées sur la base réelle |
 | `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée, à ne pas rejouer (voir 8.1) |

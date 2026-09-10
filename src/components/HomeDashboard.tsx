@@ -93,8 +93,9 @@ export function HomeDashboard({
 
   // Tâches partagées avec moi en **lecture seule** (audit UX UX-12) :
   // exclues des compteurs et de la portée par défaut de la liste, donc
-  // quasi invisibles autrement. On ne garde que les tâches ouvertes ; le
-  // composant filtre ensuite celles déjà consultées (drapeau local).
+  // quasi invisibles autrement. Liste pérenne — on garde toutes les
+  // tâches ouvertes (à faire / en cours), y compris en retard ; seules
+  // les terminées / archivées sont écartées.
   const sharedForInfo = useMemo(
     () =>
       tasks
@@ -106,6 +107,7 @@ export function HomeDashboard({
           id: t.id,
           title: t.title,
           dueAt: t.due_at,
+          overdue: isOverdue(t.due_at, t.status),
           by: (t.assignees ?? []).find((a) => a.id === t.created_by)?.name ?? null,
         })),
     [tasks, profile.id]

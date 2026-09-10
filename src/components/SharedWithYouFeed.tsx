@@ -1,37 +1,33 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { readSeenTaskIds } from "@/lib/seen-tasks";
 import { Time } from "./Time";
-import { IconArrowLeft, IconUser } from "./Icons";
+import { IconAlertTriangle, IconArrowLeft, IconUser } from "./Icons";
 
-type SharedTask = { id: string; title: string; dueAt: string | null; by: string | null };
+type SharedTask = {
+  id: string;
+  title: string;
+  dueAt: string | null;
+  by: string | null;
+  overdue: boolean;
+};
 
-// Fil « Partagées avec toi » de l'accueil (audit UX UX-12) : les tâches
-// où l'utilisateur est en **lecture seule** (donc absentes des compteurs
-// et de la portée par défaut de la liste) qu'il n'a pas encore ouvertes
-// sur cet appareil. On n'en montre que **les 3 plus proches en échéance**
-// (celles sans échéance en dernier), avec un lien « Voir tout » qui ouvre
-// la liste filtrée sur les tâches en lecture seule — pour ne pas empiler
-// une longue liste sur l'accueil. Se vide au fur et à mesure qu'on les
-// consulte (MarkTaskSeen sur l'écran de détail). Rien affiché s'il n'y a
-// rien.
+// Fil « Partagées avec toi » de l'accueil (audit UX UX-12) : liste
+// **pérenne** des tâches ouvertes (à faire / en cours) où l'utilisateur
+// est en lecture seule — absentes des compteurs et de la portée par
+// défaut de la liste, donc invisibles autrement. Y restent tant qu'elles
+// sont ouvertes (les tâches terminées / archivées sont filtrées en amont
+// dans HomeDashboard). On n'affiche que **les 3 plus urgentes** (en
+// retard d'abord, puis par échéance croissante, sans échéance en
+// dernier), avec un lien « Voir tout » vers la liste filtrée. Rien
+// affiché s'il n'y en a aucune.
 export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
-  // Rendu après montage seulement : localStorage n'existe pas côté serveur,
-  // le lire au premier rendu créerait un écart d'hydratation.
-  const [seen, setSeen] = useState<Set<string> | null>(null);
-  useEffect(() => setSeen(readSeenTaskIds()), []);
+  if (tasks.length === 0) return null;
 
-  if (!seen) return null;
-  const unseen = tasks.filter((t) => !seen.has(t.id));
-  if (unseen.length === 0) return null;
-
-  // Tri par échéance croissante ; les tâches sans échéance en dernier.
-  const sorted = [...unseen].sort((a, b) => {
+  const rank = (t: SharedTask) => (t.overdue ? 0 : t.dueAt ? 1 : 2);
+  const sorted = [...tasks].sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
     if (a.dueAt && b.dueAt) return a.dueAt < b.dueAt ? -1 : 1;
-    if (a.dueAt) return -1;
-    if (b.dueAt) return 1;
     return 0;
   });
   const shown = sorted.slice(0, 3);
@@ -42,10 +38,10 @@ export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
         <h2 className="flex items-center gap-2 text-[13.5px] font-bold text-ink-muted">
           Partagées avec toi
           <span className="rounded-full bg-ink-muted px-1.5 text-[11px] font-bold leading-[18px] text-white">
-            {unseen.length}
+            {tasks.length}
           </span>
         </h2>
-        {unseen.length > shown.length ? (
+        {tasks.length > shown.length ? (
           <Link
             href="/tasks?readOnly=1"
             className="flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-ink"
@@ -70,7 +66,11 @@ export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
                 {t.by ? `Partagée par ${t.by} · lecture seule` : "Lecture seule"}
               </span>
             </span>
-            {t.dueAt ? (
+            {t.overdue ? (
+              <span className="flex flex-shrink-0 items-center gap-1 pt-0.5 text-[11.5px] font-bold text-red-600">
+                <IconAlertTriangle className="h-3 w-3" /> En retard
+              </span>
+            ) : t.dueAt ? (
               <Time iso={t.dueAt} className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted" />
             ) : null}
           </Link>

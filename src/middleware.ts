@@ -33,7 +33,13 @@ export async function middleware(request: NextRequest) {
 
   if (!authenticated && !isAuthRoute) {
     const url = request.nextUrl.clone();
+    // Conserve la destination demandée pour y revenir après connexion
+    // (audit UX UX-6) — utile quand on ouvre un lien profond, p. ex.
+    // depuis une notification push qui pointe vers /tasks/<id>.
+    const target = request.nextUrl.pathname + request.nextUrl.search;
     url.pathname = "/login";
+    url.search = "";
+    if (target && target !== "/") url.searchParams.set("next", target);
     return NextResponse.redirect(url);
   }
 

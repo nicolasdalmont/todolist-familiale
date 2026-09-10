@@ -6,7 +6,7 @@ import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/acti
 import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOverlay";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { setFlash } from "@/components/Toast";
-import { toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
+import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
 import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
 import { IconPlus } from "./Icons";
@@ -141,6 +141,27 @@ export function TaskForm({
           onChange={(e) => setDueAt(e.target.value)}
           className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
         />
+        {/* Raccourcis (audit UX UX-8) : posent une heure raisonnable plutôt
+            que 00:00, qui rendrait une tâche « pour aujourd'hui » aussitôt
+            en retard. */}
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {(
+            [
+              { key: "today", label: "Ce soir" },
+              { key: "tomorrow", label: "Demain matin" },
+              { key: "weekend", label: "Ce week-end" },
+            ] as const
+          ).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setDueAt(dueDatePreset(p.key))}
+              className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-muted hover:border-brand/50 hover:text-ink"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4">
@@ -182,6 +203,14 @@ export function TaskForm({
         <p className="mt-1 text-xs text-ink-muted">
           La tâche sera régénérée automatiquement à sa clôture si elle est récurrente.
         </p>
+        {/* audit UX UX-9 : sans échéance, computeNextOccurrence() ne peut
+            pas calculer la date suivante — la répétition ne se déclenche
+            jamais. On prévient plutôt que d'échouer en silence. */}
+        {recurrenceType !== "none" && !dueAt ? (
+          <p className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700">
+            Ajoute une échéance : sans elle, la répétition ne pourra pas se déclencher.
+          </p>
+        ) : null}
       </div>
 
       {recurrenceType === "custom" && (

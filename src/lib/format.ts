@@ -163,6 +163,34 @@ export function dateKeyFromDate(d: Date): string {
   }).format(d);
 }
 
+// Raccourcis d'échéance du formulaire de tâche (audit UX UX-8) : renvoie
+// une valeur "YYYY-MM-DDTHH:mm" (heure de Paris) pour un <input
+// type="datetime-local">, à partir du jour civil courant à Paris. Évite
+// qu'une tâche « pour aujourd'hui » saisie sans heure hérite de 00:00 et
+// soit déjà « en retard ».
+export function dueDatePreset(preset: "today" | "tomorrow" | "weekend"): string {
+  const [y, m, d] = dateKeyFromDate(new Date()).split("-").map(Number);
+  const noon = new Date(Date.UTC(y, m - 1, d, 12));
+
+  let hour = 18;
+  if (preset === "tomorrow") {
+    noon.setUTCDate(noon.getUTCDate() + 1);
+    hour = 8;
+  } else if (preset === "weekend") {
+    // Prochain samedi (aujourd'hui si on est déjà samedi).
+    noon.setUTCDate(noon.getUTCDate() + ((6 - noon.getUTCDay() + 7) % 7));
+    hour = 10;
+  }
+
+  const key = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(noon);
+  return `${key}T${String(hour).padStart(2, "0")}:00`;
+}
+
 // Renvoie une date dont le jour civil (à Paris) est le dimanche de la
 // semaine en cours — aujourd'hui inclus si on est déjà dimanche. Seule la
 // clé de date (dateKeyFromDate) de la valeur renvoyée a du sens ; l'heure

@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfiles } from "@/lib/queries";
 import { LoginForm } from "@/components/LoginForm";
+import { safeNextPath } from "@/lib/nav";
 
 // Cette page ne lit ni cookie ni en-tête : sans cette directive, Next.js la
 // considère éligible à un rendu statique et fige la liste des profils (donc
@@ -14,9 +15,9 @@ export const dynamic = "force-dynamic";
 // Page serveur : la liste des membres de la famille est lue via la clé
 // service_role (aucune session n'existe encore à ce stade), afin de les
 // afficher sur l'écran de connexion.
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
   const supabase = createAdminClient();
   const profiles = await getProfiles(supabase);
 
-  return <LoginForm profiles={profiles} />;
+  return <LoginForm profiles={profiles} nextPath={safeNextPath(searchParams.next)} />;
 }

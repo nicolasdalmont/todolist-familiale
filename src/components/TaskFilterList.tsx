@@ -22,6 +22,7 @@ interface PersistedFilters {
   scope: "mine" | "all";
   statuses: TaskStatus[];
   category: string | null;
+  dueFrom: string;
   dueAtMost: string;
   visibility: Visibility | null;
   overdueOnly: boolean;
@@ -97,6 +98,7 @@ export function TaskFilterList({
   tasks,
   allTags,
   currentUserId,
+  initialDueFrom,
   initialDueAtMost,
   initialOverdueOnly,
 }: {
@@ -111,9 +113,12 @@ export function TaskFilterList({
   // exactement ce qu'il comptait. Décocher le bouton ajoute les tâches où
   // l'utilisateur est seulement en lecture seule.
   currentUserId: string;
-  // Pré-remplit le filtre d'échéance, passé en "?dueAtMost=YYYY-MM-DD" par
-  // les tuiles du tableau de bord (voir HomeDashboard.tsx) — ex. "toutes
-  // les tâches ouvertes dont l'échéance est aujourd'hui au plus tard".
+  // Bornent le filtre d'échéance, passés en "?dueFrom=YYYY-MM-DD" et/ou
+  // "?dueAtMost=YYYY-MM-DD" par les tuiles du tableau de bord (voir
+  // HomeDashboard.tsx). Les deux bornes ensemble = un intervalle exact
+  // ("dues aujourd'hui", "dues d'ici dimanche") pour que la liste montre
+  // exactement ce que la tuile a compté (audit UX INC-1).
+  initialDueFrom?: string;
   initialDueAtMost?: string;
   // Pré-active le filtre "en retard uniquement", passé en "?overdue=1" par
   // la tuile "En retard" du tableau de bord (voir HomeDashboard.tsx).
@@ -126,7 +131,8 @@ export function TaskFilterList({
   // filtre précédemment mémorisé (catégorie, tags, etc.) : le clic sur une
   // tuile est une intention explicite ("montre-moi exactement ça"), pas la
   // reprise d'une session de filtrage antérieure.
-  const cameFromTile = Boolean(initialOverdueOnly) || Boolean(initialDueAtMost);
+  const cameFromTile =
+    Boolean(initialOverdueOnly) || Boolean(initialDueAtMost) || Boolean(initialDueFrom);
 
   // États initialisés à leurs valeurs par défaut habituelles (identiques à
   // ce que rend le serveur, pas de sessionStorage ici) : seuls
@@ -152,6 +158,7 @@ export function TaskFilterList({
   // bouton à bascule "tous les statuts".
   const [statuses, setStatuses] = useState<Set<TaskStatus>>(new Set(DEFAULT_STATUSES));
   const [category, setCategory] = useState<string | null>(null);
+  const [dueFrom, setDueFrom] = useState(initialDueFrom ?? "");
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
@@ -170,6 +177,7 @@ export function TaskFilterList({
     if (persisted.scope) setScope(persisted.scope);
     if (persisted.statuses) setStatuses(new Set(persisted.statuses));
     if (persisted.category !== undefined) setCategory(persisted.category);
+    if (persisted.dueFrom !== undefined) setDueFrom(persisted.dueFrom);
     if (persisted.dueAtMost !== undefined) setDueAtMost(persisted.dueAtMost);
     if (persisted.visibility !== undefined) setVisibility(persisted.visibility);
     if (persisted.overdueOnly !== undefined) setOverdueOnly(persisted.overdueOnly);
@@ -187,13 +195,14 @@ export function TaskFilterList({
       scope,
       statuses: Array.from(statuses),
       category,
+      dueFrom,
       dueAtMost,
       visibility,
       overdueOnly,
       selectedTags: Array.from(selectedTags),
       query,
     });
-  }, [scope, statuses, category, dueAtMost, visibility, overdueOnly, selectedTags, query]);
+  }, [scope, statuses, category, dueFrom, dueAtMost, visibility, overdueOnly, selectedTags, query]);
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 
@@ -227,12 +236,14 @@ export function TaskFilterList({
         const hasAny = Array.from(selectedTags).some((name) => taskTagNames.has(name));
         if (!hasAny) return false;
       }
-      if (dueAtMost) {
-        // "Au plus tard à cette date" : exclut les tâches sans échéance
-        // (rien à comparer) et celles dont l'échéance dépasse la date
-        // choisie. Comparaison de chaînes "YYYY-MM-DD" = comparaison
+      if (dueFrom || dueAtMost) {
+        // Intervalle d'échéance : exclut les tâches sans échéance (rien à
+        // comparer). Comparaison de chaînes "YYYY-MM-DD" = comparaison
         // chronologique, sans se soucier de l'heure exacte.
-        if (!task.due_at || dateKeyFromIso(task.due_at) > dueAtMost) return false;
+        if (!task.due_at) return false;
+        const key = dateKeyFromIso(task.due_at);
+        if (dueFrom && key < dueFrom) return false;
+        if (dueAtMost && key > dueAtMost) return false;
       }
       // Même définition du retard que la tuile "En retard" du tableau de
       // bord (voir isOverdue() dans src/lib/format.ts) : ni terminée, ni
@@ -244,7 +255,7 @@ export function TaskFilterList({
       }
       return true;
     });
-  }, [tasks, scope, currentUserId, statuses, visibility, category, selectedTags, dueAtMost, overdueOnly, query]);
+  }, [tasks, scope, currentUserId, statuses, visibility, category, selectedTags, dueFrom, dueAtMost, overdueOnly, query]);
 
   // Compare l'ensemble courant des statuts cochés à la valeur par défaut
   // (à faire + en cours), quel que soit l'ordre — un simple `!==` ne
@@ -258,9 +269,12 @@ export function TaskFilterList({
     visibility !== null ||
     category !== null ||
     selectedTags.size > 0 ||
+    dueFrom.length > 0 ||
     dueAtMost.length > 0 ||
     overdueOnly ||
     query.trim().length > 0;
+
+  const frDate = (k: string) => k.split("-").reverse().join("/");
 
   // Résumé texte des critères actifs, affiché sous « Filtres » quand le
   // volet est replié (demande explicite de l'utilisateur) — évite d'avoir
@@ -275,7 +289,14 @@ export function TaskFilterList({
   if (visibility === "shared") filterSummaryParts.push("Partagées");
   if (visibility === "private") filterSummaryParts.push("Privées");
   if (category) filterSummaryParts.push(CATEGORY_LABELS[category as Category]);
-  if (dueAtMost) filterSummaryParts.push(`Échéance ≤ ${dueAtMost.split("-").reverse().join("/")}`);
+  if (dueFrom && dueAtMost)
+    filterSummaryParts.push(
+      dueFrom === dueAtMost
+        ? `Échéance le ${frDate(dueAtMost)}`
+        : `Échéance du ${frDate(dueFrom)} au ${frDate(dueAtMost)}`
+    );
+  else if (dueFrom) filterSummaryParts.push(`Échéance ≥ ${frDate(dueFrom)}`);
+  else if (dueAtMost) filterSummaryParts.push(`Échéance ≤ ${frDate(dueAtMost)}`);
   if (overdueOnly) filterSummaryParts.push("En retard uniquement");
   for (const tag of selectedTags) filterSummaryParts.push(`#${tag}`);
   if (query.trim()) filterSummaryParts.push(`« ${query.trim()} »`);
@@ -384,20 +405,39 @@ export function TaskFilterList({
             <FilterSeparator />
 
             <div className="flex flex-wrap items-center gap-2">
-              <label htmlFor="dueAtMost" className="text-[12.5px] font-semibold text-ink-muted">
-                Échéance au plus tard le
+              <span className="text-[12.5px] font-semibold text-ink-muted">Échéance</span>
+              <label htmlFor="dueFrom" className="sr-only">
+                À partir du
+              </label>
+              <input
+                id="dueFrom"
+                type="date"
+                aria-label="Échéance à partir du"
+                value={dueFrom}
+                max={dueAtMost || undefined}
+                onChange={(e) => setDueFrom(e.target.value)}
+                className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
+              />
+              <span className="text-[12.5px] text-ink-muted">au</span>
+              <label htmlFor="dueAtMost" className="sr-only">
+                Au plus tard le
               </label>
               <input
                 id="dueAtMost"
                 type="date"
+                aria-label="Échéance au plus tard le"
                 value={dueAtMost}
+                min={dueFrom || undefined}
                 onChange={(e) => setDueAtMost(e.target.value)}
                 className="rounded-xl border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
               />
-              {dueAtMost ? (
+              {dueFrom || dueAtMost ? (
                 <button
                   type="button"
-                  onClick={() => setDueAtMost("")}
+                  onClick={() => {
+                    setDueFrom("");
+                    setDueAtMost("");
+                  }}
                   className="text-[12.5px] font-semibold text-brand underline-offset-2 hover:underline"
                 >
                   Effacer

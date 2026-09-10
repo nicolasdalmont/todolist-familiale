@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth";
 import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
 import { parisWallTimeToUtcIso } from "@/lib/timezone";
+import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
 import { DEFAULT_CATEGORY, isCategory } from "@/lib/categories";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
@@ -96,7 +97,8 @@ function parseRecurrence(formData: FormData): Recurrence {
 // passe (password_set = true).
 export async function loginAction(
   userId: string,
-  password: string
+  password: string,
+  next?: string
 ): Promise<{ error?: string }> {
   const supabase = createAdminClient();
   const user = await getUserWithPasswordHash(supabase, userId);
@@ -107,7 +109,7 @@ export async function loginAction(
 
   await setSessionCookie(user.id);
   await recordLogin(user.id);
-  redirect("/");
+  redirect(safeNextPath(next));
 }
 
 // Première connexion (mot de passe temporaire) ou changement volontaire de
@@ -116,7 +118,8 @@ export async function loginAction(
 export async function setPasswordAction(
   userId: string,
   currentPassword: string,
-  newPassword: string
+  newPassword: string,
+  next?: string
 ): Promise<{ error?: string }> {
   if (newPassword.length < 6) {
     return { error: "Le mot de passe doit contenir au moins 6 caractères." };
@@ -142,7 +145,7 @@ export async function setPasswordAction(
 
   await setSessionCookie(userId);
   await recordLogin(userId);
-  redirect("/");
+  redirect(safeNextPath(next));
 }
 
 // Changement de mot de passe par un utilisateur déjà connecté (écran

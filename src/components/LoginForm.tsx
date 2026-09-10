@@ -11,7 +11,7 @@ type Step =
   | { name: "pick" }
   | { name: "auth"; profile: Profile; changingPassword: boolean };
 
-export function LoginForm({ profiles }: { profiles: Profile[] }) {
+export function LoginForm({ profiles, nextPath = "/" }: { profiles: Profile[]; nextPath?: string }) {
   const [isPending, startTransition] = useGlobalTransition();
   const [step, setStep] = useState<Step>({ name: "pick" });
   const [currentPassword, setCurrentPassword] = useState("");
@@ -37,7 +37,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
     setError(null);
 
     startTransition(async () => {
-      const result = await loginAction(profile.id, currentPassword);
+      const result = await loginAction(profile.id, currentPassword, nextPath);
       if (result?.error) setError(result.error);
       // En cas de succès, loginAction redirige côté serveur — aucun code
       // ne s'exécute après l'await dans ce cas.
@@ -54,7 +54,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
     }
 
     startTransition(async () => {
-      const result = await setPasswordAction(profile.id, currentPassword, newPassword);
+      const result = await setPasswordAction(profile.id, currentPassword, newPassword, nextPath);
       if (result?.error) setError(result.error);
     });
   }

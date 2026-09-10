@@ -3,11 +3,14 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 10/09/2026. Lot de ce jour : **suite d'audit UX**
-(6.16) — barre d'onglets mobile, toasts, suppression annulable, pages
+Dernière mise à jour : 10/09/2026. Lot de ce jour : **suite d'audit UX
+complète** (6.16, 24 constats traités) — barre d'onglets mobile, tirer
+pour rafraîchir, toasts, confirmation / suppression annulable, pages
 système à la marque, retour à la destination après connexion (`?next=`),
-raccourcis d'échéance, cohérence des tuiles de l'accueil, accessibilité
-(focus, `aria-label`, `aria-pressed`, `<time>`), zones sûres iOS.
+raccourcis d'échéance, cohérence des tuiles et des deux fils de
+l'accueil, fil « Partagées avec toi », accessibilité (focus,
+`aria-label`, `aria-pressed`, `<time>`), zones sûres iOS, salutation
+selon l'heure.
 
 Lot du 04/09/2026 : **renommage en
 « Checkberry » + nouveau thème rose framboise sur fond blanc** (9),
@@ -456,12 +459,22 @@ dans `getComments`, `src/lib/queries.ts`) : le dernier commentaire posté
 apparaît juste sous le champ de saisie, sans avoir à faire défiler.
 Ajouter un commentaire est accessible à quiconque a `canView` sur la
 tâche (créateur, assigné(e), ou personne en lecture seule) — voir 6.1.
+Le champ de saisie (`CommentForm.tsx`) est un `<textarea>` à hauteur
+automatique (une ligne au départ, grandit jusqu'à ~6 puis défile) ;
+**Ctrl/Cmd+Entrée** envoie, **Entrée** insère un retour à la ligne
+(audit UX UX-13). L'ajout est confirmé par un toast « Commentaire
+ajouté ».
 
 La **carte de tâche** (`TaskCard.tsx`, liste `/tasks`) affiche une icône
 bulle + le nombre de commentaires quand il est > 0. Le compte vient de
 l'agrégat PostgREST `comments(count)` ajouté à `TASK_SELECT`
 (`src/lib/queries.ts`, exposé en `Task.commentCount`) — pas de requête
 supplémentaire.
+
+La suppression est **annulable** (voir 6.16, `useUndoableDelete`) : le
+commentaire disparaît tout de suite, un toast « Commentaire supprimé ·
+Annuler » laisse quelques secondes, et l'appel serveur n'est envoyé qu'à
+l'expiration du délai.
 
 **Suppression d'un commentaire (02/09/2026)** : un commentaire peut être
 supprimé par **son propre auteur**, ou par **le créateur de la tâche**
@@ -486,11 +499,18 @@ contrairement à la suppression d'une tâche entière.
 
 ### 6.6 Écran d'accueil (`/`)
 
-Message de bienvenue ("Bonjour, {Prénom}" + date du jour), trois tuiles
-cliquables (`HomeDashboard.tsx`), puis le fil **« À ton attention »**
-(`AttentionFeed.tsx` — voir 6.15, affiché seulement s'il y a au moins une
-notification) et enfin le fil « Activité du jour » (`ActivityFeed.tsx`) —
-voir 6.12. Les compteurs sont calculés **côté
+Message de bienvenue (« Bonjour / Bonsoir, {Prénom} » selon l'heure de
+Paris — voir 6.16 — + date du jour), trois tuiles cliquables
+(`HomeDashboard.tsx`), puis, dans l'ordre : la bannière d'invite aux
+notifications (`NotificationsNudge`, voir 6.16, conditionnelle), le fil
+**« À ton attention »** (`AttentionFeed.tsx` — voir 6.15, affiché
+seulement s'il y a au moins une notification non lue), le fil
+**« Partagées avec toi »** (`SharedWithYouFeed.tsx` — voir 6.16, tâches en
+lecture seule, affiché seulement s'il y en a) et enfin le fil « Activité
+du jour » (`ActivityFeed.tsx` — voir 6.12, toujours affiché, avec un état
+vide sinon). « À ton attention » et « Activité du jour » sont
+**volontairement disjoints** — voir INC-7 dans 6.12 et 6.16. Les
+compteurs sont calculés **côté
 client** (voir 8.1 sur la raison de ce choix) à partir de la liste de
 tâches déjà filtrée par `getTasks` (donc uniquement les tâches visibles
 par l'utilisateur connecté — voir 6.1), puis restreinte aux tâches dont il
@@ -629,7 +649,7 @@ n'aurait plus de sens dans cette disposition empilée) :
      liste affiche précisément ce que la tuile a compté (auparavant seule
      `?dueAtMost=` était passée, ce qui laissait aussi entrer les tâches
      en retard — corrigé le 10/09/2026, voir 6.16).
-3. **Partagé/Privé │ en retard uniquement** :
+3. **Partagé/Privé │ en retard │ lecture seule** :
    - Partagé/Privé : **contrôle segmenté** (Toutes / Partagées / Privées,
      segments accolés dans un seul cadre plutôt que trois pilules
      séparées, pour signaler qu'ils s'excluent), filtre sur le champ
@@ -637,6 +657,12 @@ n'aurait plus de sens dans cette disposition empilée) :
    - En retard uniquement : bouton à bascule, même définition que la
      tuile "En retard" de l'accueil (`isOverdue()`) — voir 6.6. Pré-activé
      via `?overdue=1`, utilisé par cette tuile.
+   - **Lecture seule uniquement** : bouton à bascule (audit UX UX-12) —
+     ne garde que les tâches où l'utilisateur n'a **pas** le droit de
+     modifier. **Prime sur la portée** quand il est actif (le prédicat
+     ignore alors le bouton « Uniquement mes tâches »). Pré-activé via
+     `?readOnly=1`, utilisé par le lien « Voir tout » du fil « Partagées
+     avec toi » de l'accueil (voir 6.16).
 4. **Tags** — sélection multiple, logique OR (une tâche matche si elle a
    au moins un des tags cochés). Pas de séparateur sur cette ligne, qui ne
    porte qu'un seul groupe de filtres.
@@ -676,11 +702,14 @@ une fermeture, ce qui n'est pas ce qui est demandé.
   créé un désaccord entre le HTML rendu par le serveur (Server Component,
   sans accès à `sessionStorage`) et le premier rendu client, source
   classique d'avertissement d'hydratation React.
-- **Ignorée en arrivant depuis une tuile de l'accueil** (`cameFromTile` —
-  voir portée ci-dessus) : les valeurs de l'URL (`?overdue=1`,
-  `?dueFrom=`, `?dueAtMost=`) priment alors sur tout ce qui aurait pu être
-  mémorisé, un clic sur une tuile étant une intention explicite
-  ("montre-moi exactement ça").
+- **Ignorée en arrivant depuis une tuile / un lien de l'accueil**
+  (`cameFromTile` — voir portée ci-dessus) : les valeurs de l'URL
+  (`?overdue=1`, `?dueFrom=`, `?dueAtMost=`, `?readOnly=1`) priment alors
+  sur tout ce qui aurait pu être mémorisé, un clic sur une tuile étant une
+  intention explicite ("montre-moi exactement ça"). Dans ce cas, un
+  **bandeau « Filtré depuis l'accueil · Réinitialiser »** s'affiche
+  au-dessus du volet (audit UX INC-9) ; « Réinitialiser » remet tous les
+  filtres à leur valeur par défaut.
 - Échec silencieux si `sessionStorage` est indisponible (navigation
   privée, quota) : le filtre ne survit simplement pas à la navigation,
   sans rien bloquer.
@@ -712,6 +741,13 @@ pousse spontanément un onglet déjà chargé à recharger son code JS.
   plan — utile si `public/sw.js` change à nouveau un jour, indépendamment
   de ce mécanisme de version qui, lui, ne dépend pas d'un changement du
   service worker pour se déclencher.
+
+**Rafraîchissement manuel — tirer pour rafraîchir** (`PullToRefresh.tsx`,
+audit UX du 10/09/2026, voir 6.16) : sur mobile, un tirage vers le bas
+depuis le haut de l'écran déclenche `router.refresh()` (relecture des
+Server Components). Utile pour reprendre la main quand on veut forcer une
+mise à jour des *données* sans attendre — le rafraîchissement automatique
+ci-dessus ne porte, lui, que sur le *code*.
 
 ### 6.9 Statistiques admin (`/admin`)
 
@@ -906,13 +942,20 @@ horaire) :
   Courses" plutôt que deux lignes séparées) — évite de noyer le fil en cas
   d'actions répétées rapprochées. Le regroupement ne fusionne jamais deux
   tâches différentes entre elles, même par le même acteur.
+- **Dédoublonnage avec « À ton attention »** (audit UX INC-7,
+  10/09/2026) : `HomeDashboard` transmet à `ActivityFeed` l'ensemble
+  `hiddenKeys` des `${task_id}|${type}` déjà représentés par une
+  notification **non lue** (`task_shared` → `task_created`/`task_updated`,
+  `comment_added` → `comment_added`) ; ces lignes sont masquées du fil
+  d'activité pour ne pas afficher deux fois le même évènement pendant le
+  court instant où la notification n'est pas encore lue.
 
-Exemples de messages générés : "Anne-Françoise a partagé 1 nouvelle tâche
-avec vous : Réserver le gîte", "Virgile a coché un élément de la checklist
-de la tâche Courses de la semaine", "Nicolas a changé le statut de la
-tâche Impôts en « Terminée »". Si le fil est vide pour la journée, un
-message neutre ("Aucune activité partagée aujourd'hui.") s'affiche à la
-place plutôt que de faire disparaître la section.
+Exemples de messages générés (formulations alignées sur celles des
+notifications, voir 6.15) : « Anne-Françoise t'a partagé « Réserver le
+gîte » », « Virgile a coché un élément de la checklist de la tâche
+Courses de la semaine », « Nicolas a mis « Impôts » en « Terminée » ». Si
+le fil est vide pour la journée, un état vide (`EmptyState`, voir 6.16)
+s'affiche à la place plutôt que de faire disparaître la section.
 
 ### 6.13 Ajouter une tâche à son agenda (04/09/2026)
 
@@ -1050,24 +1093,27 @@ filtré par `canView`) à deux moments :
   fait tourner l'endpoint (rare) ; en cas d'échec, l'abonnement mort sera
   simplement purgé par `sendPushToUser()` au prochain envoi.
 
-**Événements couverts** :
+**Événements couverts** — resserrés le 10/09/2026 (audit UX INC-7) à ce
+qui est **adressé** à l'utilisateur : un changement de statut ou la
+modification d'une tâche déjà accessible ne crée plus de notification (ni
+push, ni pastille), ça n'apparaît plus que dans « Activité du jour » (voir
+6.12).
 
 | Type | Déclencheur | Destinataires |
 |---|---|---|
 | `task_shared` | `createTaskAction` (partage) / `updateTaskAction` (personne nouvellement ajoutée) | les personnes ajoutées |
-| `task_updated` | `updateTaskAction` sur une tâche partagée | participants **déjà présents** avant la modif, sauf l'auteur (les nouveaux reçoivent `task_shared`) |
 | `task_deleted` | `deleteTaskAction` sur une tâche partagée | créateur + assigné(e)s, sauf l'auteur — notif sans lien (`task_id = null`, la tâche n'existe plus) |
 | `comment_added` | `addCommentAction` sur une tâche partagée | participants sauf l'auteur |
-| `status_changed` | `setStatusAction` sur une tâche partagée | participants sauf l'auteur |
 | `due_soon` | `/api/cron/reminders` (Vercel Cron, 1×/jour) — tâche `todo`/`in_progress` dont l'échéance tombe aujourd'hui (jour civil de Paris) | créateur + assigné(e)s, **y compris sur une tâche privée** |
+
+Les types `task_updated` et `status_changed` restent définis (des
+notifications antérieures non lues peuvent encore en porter) mais ne sont
+plus **émis**. `notifyTaskParticipants()` n'est donc plus appelé que par
+`addCommentAction`.
 
 *Création d'une tâche* : couverte par `task_shared` (« X t'a partagé
 … »), envoyé à chaque personne avec qui la tâche est partagée dès sa
 création — pas de type `task_created` distinct.
-
-Un changement de statut fait depuis le **formulaire de modification**
-(`updateTaskAction`) n'émet pas de `status_changed` — seul le bouton de
-statut de l'écran de détail (`setStatusAction`, le chemin courant) le fait.
 
 **Rappel d'échéance** (`src/app/api/cron/reminders/route.ts`, 04/09/2026) :
 route déclenchée une fois par jour par **Vercel Cron** (`vercel.json`,
@@ -1100,9 +1146,9 @@ notifications. Chaque action fait `revalidatePath("/")`.
 
 ### 6.16 Suite d'audit UX (10/09/2026)
 
-Un audit UX de l'ensemble de l'application a donné lieu à une série de
-correctifs regroupés ici. Les priorités **hautes et moyennes** ont été
-livrées ; les basses sont en attente. Les modifications les plus visibles :
+Un audit UX de l'ensemble de l'application (24 constats) a donné lieu à
+une série de correctifs regroupés ici — **tous livrés**. Les
+modifications les plus visibles :
 
 **Navigation**
 
@@ -1112,6 +1158,17 @@ livrées ; les basses sont en attente. Les modifications les plus visibles :
   Masquée à partir de `sm` (le desktop garde le bandeau supérieur + le
   bouton flottant, lui devenu `sm:` uniquement). Se retire d'elle-même
   sur `/login`.
+- **Tirer pour rafraîchir** (`PullToRefresh.tsx`, montée dans
+  `layout.tsx`) : sur pointeur grossier, un tirage vers le bas depuis le
+  haut de l'écran fait descendre un indicateur circulaire ; au-delà d'un
+  seuil, `router.refresh()` relit les Server Components — une transition
+  React (`useTransition`) garde l'indicateur affiché jusqu'à ce que le
+  nouvel écran soit rendu. Le contenu n'est **pas** translaté (le faire
+  casserait le positionnement des éléments `fixed` : bouton +, barre
+  d'onglets). `overscroll-behavior-y: contain` (`globals.css`) neutralise
+  le pull-to-refresh natif du navigateur mobile pour éviter le double
+  déclenchement ; sans effet dans une PWA installée, qui n'a pas de geste
+  natif.
 - **Bandeau supérieur épuré sur mobile** : les liens « Tâches » et
   « Admin » passent en `sm:block` (doublon avec la barre du bas). « Espace
   admin » réapparaît alors sur `/compte` pour les administrateurs (`sm:hidden`).
@@ -1175,6 +1232,54 @@ livrées ; les basses sont en attente. Les modifications les plus visibles :
   (au-dessus de « À ton attention »), affichée seulement si le push est
   réellement activable ici et pas déjà en place. Rejet mémorisé
   (`localStorage`, `checkberry:notif-nudge-dismissed`).
+
+**Fils de l'accueil**
+
+- **Deux fils rendus disjoints** (INC-7) : « À ton attention » ne notifie
+  plus (donc plus de push ni de pastille) que ce qui est **adressé** à
+  l'utilisateur — `task_shared`, `task_deleted`, `comment_added`,
+  `due_soon`. Un changement de statut ou la modification d'une tâche déjà
+  accessible ne crée plus de notification : c'est de l'ambiance, ça
+  n'apparaît que dans « Activité du jour » (via `logActivity`, inchangé).
+  Filet de sécurité : `HomeDashboard` construit l'ensemble
+  `${task_id}|${type}` des évènements déjà couverts par une notification
+  non lue et `ActivityFeed` masque ces lignes — pas de doublon visible
+  pendant le court instant où la notification n'est pas encore lue. Les
+  formulations des deux fils sont alignées.
+- **Fil « Partagées avec toi »** (`SharedWithYouFeed.tsx`, UX-12) : liste
+  **pérenne** des tâches ouvertes (à faire / en cours) où l'utilisateur
+  est en **lecture seule** — absentes des compteurs et de la portée par
+  défaut de la liste, donc invisibles autrement. Affiche les **3 plus
+  urgentes** (en retard d'abord, puis par échéance croissante, sans
+  échéance en dernier) + un lien « Voir tout » vers `/tasks?readOnly=1`
+  (voir 6.7). Une tâche n'en sort que lorsqu'elle est terminée / archivée.
+- **Salutation selon l'heure** de Paris (UX-14) : « Bonsoir » de 18 h à
+  5 h, « Bonjour » le reste de la journée.
+
+**Cohérence visuelle**
+
+- **Boutons « Ajouter »** harmonisés (INC-2) : plein identique pour
+  l'ajout principal d'un bloc (commentaire, item de checklist), contour
+  pour l'ajout secondaire dans un champ composite (nouveau tag).
+- **État vide unifié** (`EmptyState.tsx`, INC-4) : un seul traitement
+  (encadré pointillé, texte centré estompé) pour les sections qui restent
+  affichées même vides — liste de tâches, commentaires, checklist,
+  activité du jour. Les fils de type boîte de réception (« À ton
+  attention », « Partagées avec toi ») continuent, eux, à disparaître
+  quand ils sont vides.
+- **Tâche archivée** (INC-8) : même traitement atténué qu'une tâche
+  terminée dans la liste — titre grisé barré + carte à 60 % d'opacité.
+- **Bandeau « Filtré depuis l'accueil · Réinitialiser »** (INC-9) :
+  affiché sur `/tasks` quand on arrive via une tuile ou un lien
+  (`cameFromTile`), pour expliquer d'où vient le filtrage courant ;
+  « Réinitialiser » remet tous les filtres à leur valeur par défaut.
+
+**Saisie**
+
+- **Champ commentaire** (`CommentForm.tsx`, UX-13) : `<textarea>` à
+  hauteur automatique (1 → ~6 lignes puis défilement), envoi par
+  `Ctrl/Cmd+Entrée` (Entrée insère un retour à la ligne), plus de
+  `required` natif (dépareillé avec les erreurs inline de l'appli).
 
 **Icône**
 
@@ -1351,8 +1456,9 @@ Palette définie dans `tailwind.config.ts` :
 `src/app/globals.css` ajoute, en plus des `@tailwind`, quelques
 utilitaires transverses : anneau `:focus-visible` global (accent
 `brand`), marges de sécurité iOS (`pb-safe` / `pt-safe` / `bottom-safe`,
-`env(safe-area-inset-*)`) et `.tap-target` (zone tactile ≥ 44 px autour
-d'une petite icône). Les pages utilisent `min-h-dvh` (et non
+`env(safe-area-inset-*)`), `.tap-target` (zone tactile ≥ 44 px autour
+d'une petite icône) et `overscroll-behavior-y: contain` sur `body` (voir
+« tirer pour rafraîchir », 6.8). Les pages utilisent `min-h-dvh` (et non
 `min-h-screen`) pour composer avec les barres d'outils mobiles
 rétractables. Voir 6.16.
 
@@ -1445,12 +1551,14 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/Time.tsx` | Enveloppe `<time datetime>` autour d'une date affichée (voir 6.16) |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, confirmation de suppression |
 | `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statuts/catégorie/intervalle d'échéance `du…au`/visibilité segmentée/en retard/tags), `aria-pressed` sur les pilules, filtre mémorisé en `sessionStorage` (voir 6.7) |
-| `src/components/HomeDashboard.tsx` | Compteurs de l'écran d'accueil (en retard/aujourd'hui/cette semaine) — liens vers un intervalle d'échéance exact (voir 6.6) |
+| `src/components/HomeDashboard.tsx` | Salutation + compteurs de l'accueil (en retard/aujourd'hui/cette semaine, liens vers un intervalle exact) ; calcule le dédoublonnage des fils et la liste « Partagées avec toi » (voir 6.6, 6.16) |
 | `src/components/NotificationsNudge.tsx` | Bannière unique d'invite à activer les notifications, sur l'accueil (voir 6.16) |
-| `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'écran d'accueil (voir 6.12) |
+| `src/components/SharedWithYouFeed.tsx` | Fil « Partagées avec toi » de l'accueil — tâches en lecture seule (voir 6.16) |
+| `src/components/ActivityFeed.tsx` | Fil "Activité du jour" de l'accueil — dédoublonné avec « À ton attention » (voir 6.12) |
+| `src/components/EmptyState.tsx` | État vide unifié des sections qui restent affichées même vides (voir 6.16) |
 | `src/components/LoginForm.tsx` | Écran de connexion / première connexion |
 | `src/app/compte/page.tsx` + `src/components/AccountPasswordForm.tsx` | Écran « Mon compte » : changement de mot de passe connecté (voir 6.14) |
-| `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications + déclenchement du push (voir 6.15) |
+| `src/lib/notifications.ts` | `notifyUser()` / `notifyTaskParticipants()` — écriture des notifications + déclenchement du push ; ne couvre plus que `task_shared` / `task_deleted` / `comment_added` (voir 6.15) |
 | `src/lib/push.ts` | `sendPushToUser()` — envoi Web Push (clés VAPID), purge des abonnements morts (voir 6.15) |
 | `src/lib/push-client.ts` | Utilitaires navigateur : abonnement/désabonnement, détection support et iOS non installé (voir 6.15) |
 | `src/components/AttentionFeed.tsx` | Fil « À ton attention » sous les compteurs de l'accueil (voir 6.15) |
@@ -1461,6 +1569,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
+| `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
 | `src/app/admin/page.tsx` | Statistiques par utilisateur, réservé au rôle admin (voir 6.9) |
 | `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |
@@ -1470,6 +1579,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/useUndoableDelete.ts` | Hook « supprimer + Annuler » (commentaires, items de checklist) — voir 6.16 |
 | `src/components/BottomNav.tsx` | Barre d'onglets en bas d'écran, mobile uniquement (voir 6.16) |
 | `src/components/CommentThread.tsx` | Fil de commentaires + suppression annulable (auteur ou créateur de la tâche — voir 6.5, 6.16) |
+| `src/components/CommentForm.tsx` | Saisie d'un commentaire — `<textarea>` auto, envoi Ctrl/Cmd+Entrée (voir 6.5) |
 | `src/app/error.tsx` / `not-found.tsx` / `loading.tsx` | Pages système à la marque (voir 6.16) |
 | `supabase/recreate_full_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
 | `supabase/migrations/` | Évolutions additives appliquées sur la base réelle |

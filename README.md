@@ -117,15 +117,19 @@ pas par RLS.
   prochaine occurrence avec les mêmes assignations.
 - Visibilité privée par défaut, partage explicite par personne avec un
   rôle (assigné / lecture seule) — filtré côté application.
-- Notifications « À ton attention » sur l'écran d'accueil + notifications
-  push web (opt-in par appareil, écran « Mon compte ») + rappel d'échéance
-  quotidien (Vercel Cron). Voir la doc technique §6.15.
+- Écran d'accueil : deux fils distincts — « À ton attention » (ce qui te
+  concerne et attend peut-être une action, notifié) et « Activité du
+  jour » (ce que fait la famille) — plus « Partagées avec toi » (les
+  tâches où tu es en lecture seule). Notifications push web (opt-in par
+  appareil, écran « Mon compte ») + rappel d'échéance quotidien (Vercel
+  Cron). Voir la doc technique §6.15 et §6.16.
 - Export d'une tâche datée vers le calendrier de l'appareil (fichier
   `.ics`). Voir §6.13.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
-- Sur mobile, navigation par une barre d'onglets en bas d'écran
-  (Accueil · Tâches · Créer · Compte) ; sur desktop, par le bandeau
-  supérieur. Suite d'améliorations UX du 10/09/2026 : voir §6.16.
+- Sur mobile : navigation par une barre d'onglets en bas d'écran
+  (Accueil · Tâches · Créer · Compte) et « tirer pour rafraîchir » ; sur
+  desktop, navigation par le bandeau supérieur. Suite d'améliorations UX
+  du 10/09/2026 (24 constats) : voir §6.16.
 
 ## Ce qui n'est pas encore implémenté
 

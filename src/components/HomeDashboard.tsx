@@ -9,6 +9,7 @@ import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
 import { NotificationsNudge } from "./NotificationsNudge";
+import { SharedWithYouFeed } from "./SharedWithYouFeed";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
 // Calcule les trois compteurs "En retard" / "Aujourd'hui" / "Cette semaine"
@@ -73,6 +74,41 @@ export function HomeDashboard({
 
     return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
   }, [tasks, profile.id]);
+
+  // Évènements déjà couverts par une notification non lue de « À ton
+  // attention » : on ne les re-montre pas dans « Activité du jour »
+  // (audit UX INC-7). `${task_id}|${type d'activité correspondant}`.
+  const hiddenActivityKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const n of notifications) {
+      if (!n.task_id) continue;
+      if (n.type === "comment_added") keys.add(`${n.task_id}|comment_added`);
+      if (n.type === "task_shared") {
+        keys.add(`${n.task_id}|task_created`);
+        keys.add(`${n.task_id}|task_updated`);
+      }
+    }
+    return keys;
+  }, [notifications]);
+
+  // Tâches partagées avec moi en **lecture seule** (audit UX UX-12) :
+  // exclues des compteurs et de la portée par défaut de la liste, donc
+  // quasi invisibles autrement. On ne garde que les tâches ouvertes ; le
+  // composant filtre ensuite celles déjà consultées (drapeau local).
+  const sharedForInfo = useMemo(
+    () =>
+      tasks
+        .filter(
+          (t) =>
+            !canEdit(t, profile.id) && (t.status === "todo" || t.status === "in_progress")
+        )
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          by: (t.assignees ?? []).find((a) => a.id === t.created_by)?.name ?? null,
+        })),
+    [tasks, profile.id]
+  );
 
   // Pose la pastille sur l'icône de l'appli (App Badging API — voir aussi
   // le handler "push" de public/sw.js, qui la met à jour de son côté à
@@ -167,7 +203,9 @@ export function HomeDashboard({
 
       <AttentionFeed notifications={notifications} />
 
-      <ActivityFeed activities={activity} currentUserId={profile.id} />
+      <SharedWithYouFeed tasks={sharedForInfo} />
+
+      <ActivityFeed activities={activity} currentUserId={profile.id} hiddenKeys={hiddenActivityKeys} />
 
       <Link
         href="/tasks"

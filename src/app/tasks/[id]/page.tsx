@@ -9,6 +9,7 @@ import { OverdueBadge, StatusBadge, VisibilityBadge } from "@/components/Badge";
 import { StatusButtons } from "@/components/StatusButtons";
 import { ChecklistSection } from "@/components/ChecklistSection";
 import { CommentThread } from "@/components/CommentThread";
+import { MarkTaskSeen } from "@/components/MarkTaskSeen";
 import { Time } from "@/components/Time";
 import { IconArrowLeft, IconCalendar, IconCalendarPlus, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { isOverdue, recurrenceLabel } from "@/lib/format";
@@ -41,6 +42,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
 
   return (
     <div className="min-h-dvh bg-paper">
+      <MarkTaskSeen taskId={task.id} />
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-24 pt-1 sm:pb-16">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">

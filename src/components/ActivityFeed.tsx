@@ -55,16 +55,22 @@ function messageFor(group: ActivityGroup): string {
   const plural = count > 1;
 
   switch (type) {
+    // Formulations alignées sur celles des notifications « À ton attention »
+    // (src/lib/actions.ts) pour les types qui peuvent apparaître dans les
+    // deux fils pendant le court instant où la notification n'est pas
+    // encore lue (audit UX INC-7).
     case "task_created":
-      return `${name} a partagé ${plural ? `${count} nouvelles tâches` : "1 nouvelle tâche"} avec vous : ${taskTitle}`;
+      return plural
+        ? `${name} t'a partagé ${count} tâches`
+        : `${name} t'a partagé « ${taskTitle} »`;
     case "task_updated":
-      return `${name} a modifié la tâche${plural ? ` (${count} fois)` : ""} : ${taskTitle}`;
+      return `${name} a modifié « ${taskTitle} »${plural ? ` (${count} fois)` : ""}`;
     case "status_changed":
-      return `${name} a changé le statut de la tâche ${taskTitle}${latestDetail ? ` en « ${latestDetail} »` : ""}`;
+      return `${name} a mis « ${taskTitle} » en « ${latestDetail ?? "?"} »`;
     case "comment_added":
       return plural
-        ? `${name} a ajouté ${count} commentaires à la tâche ${taskTitle}`
-        : `${name} a commenté la tâche ${taskTitle}`;
+        ? `${name} a ajouté ${count} commentaires à « ${taskTitle} »`
+        : `${name} a commenté « ${taskTitle} »`;
     case "comment_deleted":
       return plural
         ? `${name} a supprimé ${count} commentaires de la tâche ${taskTitle}`
@@ -85,15 +91,25 @@ function messageFor(group: ActivityGroup): string {
 export function ActivityFeed({
   activities,
   currentUserId,
+  hiddenKeys,
 }: {
   activities: ActivityLogEntry[];
   currentUserId: string;
+  // `${task_id}|${type}` d'entrées déjà couvertes par une notification non
+  // lue de « À ton attention » — évite d'afficher deux fois le même
+  // évènement (nouveau partage, commentaire) sur l'écran d'accueil
+  // (audit UX INC-7). Calculé dans HomeDashboard.
+  hiddenKeys?: Set<string>;
 }) {
   const groups = useMemo(() => {
     const todayKey = dateKeyFromDate(new Date());
 
     const todays = activities.filter(
-      (a) => a.actor != null && a.actor_id !== currentUserId && dateKeyFromIso(a.created_at) === todayKey
+      (a) =>
+        a.actor != null &&
+        a.actor_id !== currentUserId &&
+        dateKeyFromIso(a.created_at) === todayKey &&
+        !hiddenKeys?.has(`${a.task_id}|${a.type}`)
     );
 
     const map = new Map<string, ActivityGroup>();
@@ -121,7 +137,7 @@ export function ActivityFeed({
     }
 
     return Array.from(map.values()).sort((a, b) => (a.latestCreatedAt < b.latestCreatedAt ? 1 : -1));
-  }, [activities, currentUserId]);
+  }, [activities, currentUserId, hiddenKeys]);
 
   return (
     <div className="flex flex-col gap-2.5">

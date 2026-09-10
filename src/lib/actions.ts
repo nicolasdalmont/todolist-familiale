@@ -308,38 +308,29 @@ export async function updateTaskAction(formData: FormData) {
 
   if (visibility === "shared") {
     await logActivity(supabase, { taskId, actorId: userId, type: "task_updated", taskTitle: title });
-    const who = await actorName(supabase, userId);
+
+    // Seules les personnes **nouvellement** ajoutées par cette modification
+    // reçoivent une notification (« t'a partagé »). La modification d'une
+    // tâche à laquelle on a déjà accès n'est plus notifiée (ni push, ni
+    // pastille) : c'est de l'ambiance, elle apparaît dans « Activité du
+    // jour » via logActivity ci-dessus (audit UX INC-7, 10/09/2026).
     const currentIds = Array.from(shareRoles.keys());
-
-    // Personnes déjà sur la tâche avant cette modification et toujours
-    // présentes après → notification "a modifié". Les personnes
-    // nouvellement ajoutées, elles, reçoivent "t'a partagé" juste en
-    // dessous — pas les deux.
-    const stillOnTask = currentIds.filter((id) => id !== userId && previouslyShared.has(id));
-    await Promise.all(
-      stillOnTask.map((id) =>
-        notifyUser(supabase, {
-          userId: id,
-          type: "task_updated",
-          taskId,
-          title: `${who} a modifié « ${title} »`,
-        })
-      )
-    );
-
     const newlyShared = currentIds.filter(
       (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
     );
-    await Promise.all(
-      newlyShared.map((id) =>
-        notifyUser(supabase, {
-          userId: id,
-          type: "task_shared",
-          taskId,
-          title: `${who} t'a partagé « ${title} »`,
-        })
-      )
-    );
+    if (newlyShared.length > 0) {
+      const who = await actorName(supabase, userId);
+      await Promise.all(
+        newlyShared.map((id) =>
+          notifyUser(supabase, {
+            userId: id,
+            type: "task_shared",
+            taskId,
+            title: `${who} t'a partagé « ${title} »`,
+          })
+        )
+      );
+    }
   }
 
   revalidatePath("/");
@@ -422,6 +413,10 @@ export async function setStatusAction(taskId: string, status: string) {
   if (error) throw new Error(error.message);
 
   if (task.visibility === "shared") {
+    // Un changement de statut n'est plus notifié (ni push, ni pastille) :
+    // qu'un proche fasse avancer une tâche partagée est de l'ambiance, pas
+    // une sollicitation — ça reste visible dans « Activité du jour » via
+    // logActivity (audit UX INC-7, 10/09/2026).
     const statusLabel = STATUS_LABELS[status as TaskStatus] ?? status;
     await logActivity(supabase, {
       taskId,
@@ -429,13 +424,6 @@ export async function setStatusAction(taskId: string, status: string) {
       type: "status_changed",
       taskTitle: task.title,
       detail: statusLabel,
-    });
-    const who = await actorName(supabase, userId);
-    await notifyTaskParticipants(supabase, {
-      taskId,
-      excludeUserId: userId,
-      type: "status_changed",
-      title: `${who} a mis « ${task.title} » en « ${statusLabel} »`,
     });
   }
 

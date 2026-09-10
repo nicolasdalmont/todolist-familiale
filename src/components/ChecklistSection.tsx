@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   addChecklistItemAction,
@@ -8,6 +8,7 @@ import {
   toggleChecklistItemAction,
 } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
+import { useUndoableDelete } from "@/components/useUndoableDelete";
 import type { ChecklistItem } from "@/lib/types";
 import { IconCheck, IconChecklist, IconX } from "./Icons";
 
@@ -15,6 +16,13 @@ import { IconCheck, IconChecklist, IconX } from "./Icons";
 // juste au-dessus des commentaires. Contrairement à ceux-ci, ajouter/cocher/
 // supprimer un item exige `editable` (canEdit) — un lecteur voit la
 // checklist mais ne peut pas la modifier (voir src/lib/actions.ts).
+//
+// Cocher un item est optimiste (audit UX UX-4) : la case réagit tout de
+// suite via un état local `overrides`, l'aller-retour serveur se fait en
+// fond sans figer l'écran, et `overrides` est purgé quand la liste
+// rafraîchie arrive du serveur. (useOptimistic n'existe pas dans React
+// 18.3, la version du projet — d'où cette version manuelle.)
+// Supprimer un item passe par le mécanisme « Annuler » (INC-10).
 export function ChecklistSection({
   taskId,
   items,
@@ -25,25 +33,35 @@ export function ChecklistSection({
   editable: boolean;
 }) {
   const router = useRouter();
-  const [isPending, startTransition] = useGlobalTransition();
+  const [isAdding, startAdd] = useGlobalTransition();
+  const [, startToggle] = useTransition();
   const [newLabel, setNewLabel] = useState("");
 
-  // Rien à afficher pour un lecteur si la checklist est vide — pas la peine
-  // d'annoncer une section qu'il ne peut de toute façon pas remplir.
-  if (items.length === 0 && !editable) return null;
+  // Surcharges optimistes de l'état « coché » : id → done visé. Purgées dès
+  // que de nouveaux `items` arrivent du serveur (après router.refresh()).
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  useEffect(() => setOverrides({}), [items]);
+  const optimisticItems = items.map((i) =>
+    i.id in overrides ? { ...i, done: overrides[i.id] } : i
+  );
 
-  const done = items.filter((i) => i.done).length;
+  const performDelete = useCallback(
+    (id: string) => deleteChecklistItemAction(taskId, id),
+    [taskId]
+  );
+  const { pending: pendingDelete, remove } = useUndoableDelete({
+    perform: performDelete,
+    message: "Élément supprimé",
+  });
+
+  const shown = optimisticItems.filter((i) => !pendingDelete.has(i.id));
+  const done = shown.filter((i) => i.done).length;
 
   function handleToggle(item: ChecklistItem) {
-    startTransition(async () => {
-      await toggleChecklistItemAction(taskId, item.id, !item.done);
-      router.refresh();
-    });
-  }
-
-  function handleDelete(itemId: string) {
-    startTransition(async () => {
-      await deleteChecklistItemAction(taskId, itemId);
+    const next = !item.done;
+    setOverrides((o) => ({ ...o, [item.id]: next }));
+    startToggle(async () => {
+      await toggleChecklistItemAction(taskId, item.id, next);
       router.refresh();
     });
   }
@@ -57,42 +75,47 @@ export function ChecklistSection({
     formData.set("taskId", taskId);
     formData.set("label", label);
 
-    startTransition(async () => {
+    startAdd(async () => {
       await addChecklistItemAction(formData);
       setNewLabel("");
       router.refresh();
     });
   }
 
+  // Rien à afficher pour un lecteur si la checklist est vide — pas la peine
+  // d'annoncer une section qu'il ne peut de toute façon pas remplir.
+  if (shown.length === 0 && !editable) return null;
+
   return (
     <div className="mb-4 rounded-2xl border border-line bg-surface p-[18px] shadow-sm">
       <div className="flex items-center gap-1.5 text-sm font-bold">
         <IconChecklist className="h-4 w-4 text-ink-muted" />
         Checklist
-        {items.length > 0 ? (
+        {shown.length > 0 ? (
           <span className="ml-auto text-[12.5px] font-semibold text-ink-muted">
-            {done}/{items.length}
+            {done}/{shown.length}
           </span>
         ) : null}
       </div>
 
-      {items.length > 0 ? (
+      {shown.length > 0 ? (
         <>
           <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-sand">
             <div
               className="h-full rounded-full bg-brand transition-[width]"
-              style={{ width: `${(done / items.length) * 100}%` }}
+              style={{ width: `${(done / shown.length) * 100}%` }}
             />
           </div>
 
           <ul className="mt-3 flex flex-col gap-1.5">
-            {items.map((item) => (
+            {shown.map((item) => (
               <li key={item.id} className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  disabled={!editable || isPending}
+                  disabled={!editable}
                   onClick={() => handleToggle(item)}
-                  aria-label={item.done ? "Marquer comme à faire" : "Marquer comme fait"}
+                  aria-pressed={item.done}
+                  aria-label={item.done ? `« ${item.label} » : marquer à faire` : `« ${item.label} » : marquer fait`}
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 disabled:opacity-70 ${
                     item.done ? "border-brand bg-brand text-white" : "border-line text-transparent"
                   }`}
@@ -105,10 +128,9 @@ export function ChecklistSection({
                 {editable ? (
                   <button
                     type="button"
-                    disabled={isPending}
-                    onClick={() => handleDelete(item.id)}
+                    onClick={() => remove(item.id)}
                     aria-label={`Supprimer « ${item.label} »`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
                   >
                     <IconX className="h-3.5 w-3.5" />
                   </button>
@@ -132,7 +154,7 @@ export function ChecklistSection({
           />
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isAdding}
             className="rounded-xl bg-brand px-4 text-[13.5px] font-bold text-white disabled:opacity-50"
           >
             Ajouter

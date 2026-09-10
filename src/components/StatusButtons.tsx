@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { setStatusAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
+import { useToast } from "@/components/Toast";
 import { STATUS_LABELS } from "@/lib/format";
 import type { TaskStatus } from "@/lib/types";
 import { IconCheck } from "./Icons";
@@ -21,6 +22,7 @@ const ACTIVE_STYLES: Record<TaskStatus, string> = {
 
 export function StatusButtons({ taskId, current }: { taskId: string; current: TaskStatus }) {
   const router = useRouter();
+  const toast = useToast();
   const [isPending, startTransition] = useGlobalTransition();
 
   function handleClick(status: TaskStatus) {
@@ -28,6 +30,7 @@ export function StatusButtons({ taskId, current }: { taskId: string; current: Ta
     startTransition(async () => {
       await setStatusAction(taskId, status);
       router.refresh();
+      toast.show({ message: `Statut : ${STATUS_LABELS[status]}`, tone: "success" });
     });
   }
 

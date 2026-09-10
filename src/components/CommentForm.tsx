@@ -4,11 +4,13 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { addCommentAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
+import { useToast } from "@/components/Toast";
 
 export function CommentForm({ taskId }: { taskId: string }) {
   const [value, setValue] = useState("");
   const [isPending, startTransition] = useGlobalTransition();
   const router = useRouter();
+  const toast = useToast();
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -23,6 +25,7 @@ export function CommentForm({ taskId }: { taskId: string }) {
       await addCommentAction(formData);
       setValue("");
       router.refresh();
+      toast.show({ message: "Commentaire ajouté", tone: "success" });
     });
   }
 

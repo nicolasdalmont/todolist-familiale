@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 import type { Comment } from "@/lib/types";
 import { deleteCommentAction } from "@/lib/actions";
-import { useGlobalTransition } from "@/components/PendingOverlay";
 import { Avatar } from "./Avatar";
 import { CommentForm } from "./CommentForm";
 import { Time } from "./Time";
+import { useUndoableDelete } from "./useUndoableDelete";
 import { IconChat, IconX } from "./Icons";
 
 // canModerate = l'utilisateur courant est le créateur de la tâche (voir
@@ -25,15 +25,10 @@ export function CommentThread({
   currentUserId: string;
   canModerate: boolean;
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useGlobalTransition();
+  const perform = useCallback((id: string) => deleteCommentAction(taskId, id), [taskId]);
+  const { pending, remove } = useUndoableDelete({ perform, message: "Commentaire supprimé" });
 
-  function handleDelete(commentId: string) {
-    startTransition(async () => {
-      await deleteCommentAction(taskId, commentId);
-      router.refresh();
-    });
-  }
+  const visible = comments.filter((c) => !pending.has(c.id));
 
   return (
     <div>
@@ -44,13 +39,13 @@ export function CommentThread({
 
       <CommentForm taskId={taskId} />
 
-      {comments.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line py-10 text-center text-sm text-ink-muted">
           Aucun commentaire pour l&apos;instant.
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {comments.map((c) => {
+          {visible.map((c) => {
             const canDelete = c.author_id === currentUserId || canModerate;
             return (
               <div key={c.id} className="flex items-start gap-2.5">
@@ -64,10 +59,9 @@ export function CommentThread({
                     {canDelete ? (
                       <button
                         type="button"
-                        disabled={isPending}
-                        onClick={() => handleDelete(c.id)}
+                        onClick={() => remove(c.id)}
                         aria-label="Supprimer ce commentaire"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
                       >
                         <IconX className="h-3.5 w-3.5" />
                       </button>

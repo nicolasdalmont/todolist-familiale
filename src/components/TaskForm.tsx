@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
 import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOverlay";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { setFlash } from "@/components/Toast";
 import { toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
 import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
@@ -32,6 +34,7 @@ export function TaskForm({
 }) {
   const router = useRouter();
   const [, startTransition] = useGlobalTransition();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState(task?.recurrence?.type ?? "none");
   const [category, setCategory] = useState(task?.category ?? DEFAULT_CATEGORY);
   // Champ contrôlé pour pouvoir le vider via le bouton "Retirer" : l'effacer
@@ -78,7 +81,11 @@ export function TaskForm({
   }
 
   return (
-    <form action={action} className="pb-6">
+    <form
+      action={action}
+      onSubmit={() => setFlash(mode === "edit" ? "Tâche enregistrée" : "Tâche créée")}
+      className="pb-6"
+    >
       <FormPendingBridge />
       {mode === "edit" && task ? <input type="hidden" name="taskId" value={task.id} /> : null}
       <input type="hidden" name="category" value={category} />
@@ -314,21 +321,34 @@ export function TaskForm({
         {mode === "edit" && task ? (
           <button
             type="button"
-            onClick={() => {
-              if (!confirm("Supprimer définitivement cette tâche ?")) return;
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.set("taskId", task.id);
-                await deleteTaskAction(formData);
-                router.push("/tasks");
-              });
-            }}
+            onClick={() => setConfirmDelete(true)}
             className="w-full rounded-xl bg-red-50 py-3 text-[14.5px] font-bold text-red-600"
           >
             Supprimer la tâche
           </button>
         ) : null}
       </div>
+
+      {mode === "edit" && task ? (
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Supprimer cette tâche ?"
+          body="Cette action est définitive : commentaires et checklist seront supprimés avec elle."
+          confirmLabel="Supprimer"
+          destructive
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            startTransition(async () => {
+              const formData = new FormData();
+              formData.set("taskId", task.id);
+              await deleteTaskAction(formData);
+              setFlash("Tâche supprimée");
+              router.push("/tasks");
+            });
+          }}
+        />
+      ) : null}
     </form>
   );
 }

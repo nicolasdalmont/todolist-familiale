@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { AppUpdateWatcher } from "@/components/AppUpdateWatcher";
 import { PendingOverlayProvider } from "@/components/PendingOverlay";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="font-sans antialiased">
-        <PendingOverlayProvider>{children}</PendingOverlayProvider>
+        <ToastProvider>
+          <PendingOverlayProvider>{children}</PendingOverlayProvider>
+        </ToastProvider>
         <ServiceWorkerRegister />
         <AppUpdateWatcher />
       </body>

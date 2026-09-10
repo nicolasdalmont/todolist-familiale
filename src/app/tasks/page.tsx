@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: { dueFrom?: string; dueAtMost?: string; overdue?: string };
+  searchParams: { dueFrom?: string; dueAtMost?: string; overdue?: string; readOnly?: string };
 }) {
   const profile = await getCurrentUser();
   if (!profile) redirect("/login");
@@ -43,6 +43,7 @@ export default async function TasksPage({
           initialDueFrom={searchParams.dueFrom}
           initialDueAtMost={searchParams.dueAtMost}
           initialOverdueOnly={searchParams.overdue === "1"}
+          initialReadOnly={searchParams.readOnly === "1"}
         />
       </main>
       <Link

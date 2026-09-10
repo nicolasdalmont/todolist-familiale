@@ -3,17 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { readSeenTaskIds } from "@/lib/seen-tasks";
-import { IconUser } from "./Icons";
+import { Time } from "./Time";
+import { IconArrowLeft, IconUser } from "./Icons";
 
-type SharedTask = { id: string; title: string; by: string | null };
+type SharedTask = { id: string; title: string; dueAt: string | null; by: string | null };
 
 // Fil « Partagées avec toi » de l'accueil (audit UX UX-12) : les tâches
 // où l'utilisateur est en **lecture seule** (donc absentes des compteurs
 // et de la portée par défaut de la liste) qu'il n'a pas encore ouvertes
-// sur cet appareil. Se vide au fur et à mesure qu'il les consulte
-// (MarkTaskSeen sur l'écran de détail). Rien affiché s'il n'y a rien —
-// contrairement à « Activité du jour », cette section n'existe que quand
-// elle a du contenu.
+// sur cet appareil. On n'en montre que **les 3 plus proches en échéance**
+// (celles sans échéance en dernier), avec un lien « Voir tout » qui ouvre
+// la liste filtrée sur les tâches en lecture seule — pour ne pas empiler
+// une longue liste sur l'accueil. Se vide au fur et à mesure qu'on les
+// consulte (MarkTaskSeen sur l'écran de détail). Rien affiché s'il n'y a
+// rien.
 export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
   // Rendu après montage seulement : localStorage n'existe pas côté serveur,
   // le lire au premier rendu créerait un écart d'hydratation.
@@ -24,17 +27,33 @@ export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
   const unseen = tasks.filter((t) => !seen.has(t.id));
   if (unseen.length === 0) return null;
 
-  const shown = unseen.slice(0, 5);
-  const rest = unseen.length - shown.length;
+  // Tri par échéance croissante ; les tâches sans échéance en dernier.
+  const sorted = [...unseen].sort((a, b) => {
+    if (a.dueAt && b.dueAt) return a.dueAt < b.dueAt ? -1 : 1;
+    if (a.dueAt) return -1;
+    if (b.dueAt) return 1;
+    return 0;
+  });
+  const shown = sorted.slice(0, 3);
 
   return (
     <div className="flex flex-col gap-2.5">
-      <h2 className="flex items-center gap-2 text-[13.5px] font-bold text-ink-muted">
-        Partagées avec toi
-        <span className="rounded-full bg-ink-muted px-1.5 text-[11px] font-bold leading-[18px] text-white">
-          {unseen.length}
-        </span>
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-[13.5px] font-bold text-ink-muted">
+          Partagées avec toi
+          <span className="rounded-full bg-ink-muted px-1.5 text-[11px] font-bold leading-[18px] text-white">
+            {unseen.length}
+          </span>
+        </h2>
+        {unseen.length > shown.length ? (
+          <Link
+            href="/tasks?readOnly=1"
+            className="flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-ink"
+          >
+            Voir tout <IconArrowLeft className="h-3 w-3 rotate-180" />
+          </Link>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-2">
         {shown.map((t) => (
           <Link
@@ -51,13 +70,11 @@ export function SharedWithYouFeed({ tasks }: { tasks: SharedTask[] }) {
                 {t.by ? `Partagée par ${t.by} · lecture seule` : "Lecture seule"}
               </span>
             </span>
+            {t.dueAt ? (
+              <Time iso={t.dueAt} className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted" />
+            ) : null}
           </Link>
         ))}
-        {rest > 0 ? (
-          <p className="px-1 text-[12px] text-ink-muted">
-            et {rest} autre{rest > 1 ? "s" : ""}…
-          </p>
-        ) : null}
       </div>
     </div>
   );

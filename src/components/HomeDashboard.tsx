@@ -105,6 +105,7 @@ export function HomeDashboard({
         .map((t) => ({
           id: t.id,
           title: t.title,
+          dueAt: t.due_at,
           by: (t.assignees ?? []).find((a) => a.id === t.created_by)?.name ?? null,
         })),
     [tasks, profile.id]

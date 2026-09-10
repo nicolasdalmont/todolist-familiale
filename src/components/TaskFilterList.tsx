@@ -6,7 +6,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
-import { IconAlertTriangle, IconCheck, IconChevronDown, IconSearch } from "./Icons";
+import { IconAlertTriangle, IconCheck, IconChevronDown, IconSearch, IconUser } from "./Icons";
 
 // Mémorisation du filtre (04/09/2026) : ouvrir puis fermer une tâche
 // démonte et remonte ce composant (route différente, /tasks/[id]) — sans
@@ -26,6 +26,7 @@ interface PersistedFilters {
   dueAtMost: string;
   visibility: Visibility | null;
   overdueOnly: boolean;
+  readOnlyOnly: boolean;
   selectedTags: string[];
   query: string;
 }
@@ -101,6 +102,7 @@ export function TaskFilterList({
   initialDueFrom,
   initialDueAtMost,
   initialOverdueOnly,
+  initialReadOnly,
 }: {
   tasks: Task[];
   allTags: Tag[];
@@ -123,6 +125,12 @@ export function TaskFilterList({
   // Pré-active le filtre "en retard uniquement", passé en "?overdue=1" par
   // la tuile "En retard" du tableau de bord (voir HomeDashboard.tsx).
   initialOverdueOnly?: boolean;
+  // Pré-active le filtre "lecture seule uniquement", passé en "?readOnly=1"
+  // par le lien « Voir tout » du fil « Partagées avec toi » de l'accueil
+  // (SharedWithYouFeed.tsx, audit UX UX-12) : ne garde que les tâches où
+  // l'utilisateur n'a PAS le droit de modifier. Quand il est actif, il
+  // prime sur la portée "mes tâches / toutes".
+  initialReadOnly?: boolean;
 }) {
   // Arrivée depuis une tuile de l'accueil : ces tuiles comptent les tâches
   // dont on est responsable (canEdit, voir HomeDashboard.tsx) — exactement
@@ -132,7 +140,10 @@ export function TaskFilterList({
   // tuile est une intention explicite ("montre-moi exactement ça"), pas la
   // reprise d'une session de filtrage antérieure.
   const cameFromTile =
-    Boolean(initialOverdueOnly) || Boolean(initialDueAtMost) || Boolean(initialDueFrom);
+    Boolean(initialOverdueOnly) ||
+    Boolean(initialDueAtMost) ||
+    Boolean(initialDueFrom) ||
+    Boolean(initialReadOnly);
 
   // États initialisés à leurs valeurs par défaut habituelles (identiques à
   // ce que rend le serveur, pas de sessionStorage ici) : seuls
@@ -162,6 +173,7 @@ export function TaskFilterList({
   const [dueAtMost, setDueAtMost] = useState(initialDueAtMost ?? "");
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [overdueOnly, setOverdueOnly] = useState(initialOverdueOnly ?? false);
+  const [readOnlyOnly, setReadOnlyOnly] = useState(initialReadOnly ?? false);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   // Restaure, une fois le rendu initial passé (donc uniquement côté
@@ -181,6 +193,7 @@ export function TaskFilterList({
     if (persisted.dueAtMost !== undefined) setDueAtMost(persisted.dueAtMost);
     if (persisted.visibility !== undefined) setVisibility(persisted.visibility);
     if (persisted.overdueOnly !== undefined) setOverdueOnly(persisted.overdueOnly);
+    if (persisted.readOnlyOnly !== undefined) setReadOnlyOnly(persisted.readOnlyOnly);
     if (persisted.selectedTags) setSelectedTags(new Set(persisted.selectedTags));
     // Volontairement exécuté une seule fois, au montage — cameFromTile ne
     // change pas pendant la vie du composant (dérivé des props initiales).
@@ -199,10 +212,11 @@ export function TaskFilterList({
       dueAtMost,
       visibility,
       overdueOnly,
+      readOnlyOnly,
       selectedTags: Array.from(selectedTags),
       query,
     });
-  }, [scope, statuses, category, dueFrom, dueAtMost, visibility, overdueOnly, selectedTags, query]);
+  }, [scope, statuses, category, dueFrom, dueAtMost, visibility, overdueOnly, readOnlyOnly, selectedTags, query]);
 
   const tagNames = useMemo(() => allTags.map((t) => t.name).sort((a, b) => a.localeCompare(b)), [allTags]);
 
@@ -227,7 +241,14 @@ export function TaskFilterList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tasks.filter((task) => {
-      if (scope === "mine" && !canEdit(task, currentUserId)) return false;
+      // "Lecture seule uniquement" prime sur la portée : quand il est
+      // actif, on ne garde que les tâches non modifiables, quelle que soit
+      // la valeur du bouton "Uniquement mes tâches".
+      if (readOnlyOnly) {
+        if (canEdit(task, currentUserId)) return false;
+      } else if (scope === "mine" && !canEdit(task, currentUserId)) {
+        return false;
+      }
       if (!statuses.has(task.status)) return false;
       if (visibility && task.visibility !== visibility) return false;
       if (category && task.category !== category) return false;
@@ -255,7 +276,7 @@ export function TaskFilterList({
       }
       return true;
     });
-  }, [tasks, scope, currentUserId, statuses, visibility, category, selectedTags, dueFrom, dueAtMost, overdueOnly, query]);
+  }, [tasks, scope, currentUserId, statuses, visibility, category, selectedTags, dueFrom, dueAtMost, overdueOnly, readOnlyOnly, query]);
 
   // Compare l'ensemble courant des statuts cochés à la valeur par défaut
   // (à faire + en cours), quel que soit l'ordre — un simple `!==` ne
@@ -272,6 +293,7 @@ export function TaskFilterList({
     dueFrom.length > 0 ||
     dueAtMost.length > 0 ||
     overdueOnly ||
+    readOnlyOnly ||
     query.trim().length > 0;
 
   const frDate = (k: string) => k.split("-").reverse().join("/");
@@ -285,7 +307,8 @@ export function TaskFilterList({
   if (checkedStatuses.length === 0) filterSummaryParts.push("Aucun statut");
   else if (checkedStatuses.length === STATUS_ORDER.length) filterSummaryParts.push("Tous les statuts");
   else filterSummaryParts.push(...checkedStatuses.map((s) => STATUS_LABELS[s]));
-  if (scope === "all") filterSummaryParts.push("Y compris lecture seule");
+  if (readOnlyOnly) filterSummaryParts.push("Lecture seule uniquement");
+  else if (scope === "all") filterSummaryParts.push("Y compris lecture seule");
   if (visibility === "shared") filterSummaryParts.push("Partagées");
   if (visibility === "private") filterSummaryParts.push("Privées");
   if (category) filterSummaryParts.push(CATEGORY_LABELS[category as Category]);
@@ -446,8 +469,8 @@ export function TaskFilterList({
             </div>
           </div>
 
-          {/* Ligne 3 : partagé/privé │ en retard uniquement. Même principe
-              d'empilement sur mobile que les lignes 1 et 2. */}
+          {/* Ligne 3 : partagé/privé │ en retard │ lecture seule. Même
+              principe d'empilement sur mobile que les lignes 1 et 2. */}
           <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
             {/* Visibilité : choix unique — contrôle segmenté (un seul bloc,
                 segments accolés) plutôt que des pilules séparées, pour qu'on
@@ -487,6 +510,19 @@ export function TaskFilterList({
               }`}
             >
               <IconAlertTriangle className="h-3.5 w-3.5" /> En retard uniquement
+            </button>
+            {/* audit UX UX-12 : ne montrer que les tâches où l'on n'a pas
+                le droit de modifier. Prime sur la portée quand il est
+                actif (voir le prédicat). */}
+            <button
+              type="button"
+              aria-pressed={readOnlyOnly}
+              onClick={() => setReadOnlyOnly((prev) => !prev)}
+              className={`flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                readOnlyOnly ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+              }`}
+            >
+              <IconUser className="h-3.5 w-3.5" /> Lecture seule uniquement
             </button>
           </div>
 

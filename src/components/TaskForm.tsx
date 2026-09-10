@@ -9,7 +9,6 @@ import { setFlash } from "@/components/Toast";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_CATEGORY } from "@/lib/categories";
 import type { Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
-import { IconPlus } from "./Icons";
 
 // Les trois niveaux d'accès proposés pour chaque membre de la famille
 // (hors créateur, qui a toujours accès complet — voir src/lib/access.ts).
@@ -256,7 +255,7 @@ export function TaskForm({
             </label>
           ))}
         </div>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex items-start gap-2">
           <input
             type="text"
             value={newTag}
@@ -268,14 +267,17 @@ export function TaskForm({
               }
             }}
             placeholder="Nouveau tag..."
-            className="flex-1 rounded-xl border border-line px-3 py-2 text-[13.5px] outline-none focus:border-brand"
+            className="flex-1 rounded-xl border border-line px-3 py-2.5 text-[13.5px] outline-none focus:border-brand"
           />
+          {/* Ajout secondaire dans un champ composite → variante « contour »
+              (audit UX INC-2) ; les ajouts principaux (commentaire,
+              checklist) sont eux en bouton plein. */}
           <button
             type="button"
             onClick={addNewTag}
-            className="flex items-center gap-1 rounded-xl border border-line bg-surface px-3 text-[12.5px] font-bold text-ink-muted"
+            className="shrink-0 rounded-xl border border-line bg-surface px-4 py-2.5 text-[13px] font-bold text-ink-muted"
           >
-            <IconPlus className="h-3.5 w-3.5" /> Ajouter
+            Ajouter
           </button>
         </div>
       </div>

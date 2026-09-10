@@ -6,6 +6,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
+import { EmptyState } from "./EmptyState";
 import { IconAlertTriangle, IconCheck, IconChevronDown, IconSearch, IconUser } from "./Icons";
 
 // Mémorisation du filtre (04/09/2026) : ouvrir puis fermer une tâche
@@ -325,6 +326,22 @@ export function TaskFilterList({
   if (query.trim()) filterSummaryParts.push(`« ${query.trim()} »`);
   const filterSummary = filterSummaryParts.join(", ");
 
+  // Remet tous les filtres à leur valeur par défaut (audit UX INC-9) —
+  // utilisé par le bandeau « Filtré depuis l'accueil ».
+  function resetFilters() {
+    setScope("mine");
+    setStatuses(new Set(DEFAULT_STATUSES));
+    setCategory(null);
+    setDueFrom("");
+    setDueAtMost("");
+    setVisibility(null);
+    setOverdueOnly(false);
+    setReadOnlyOnly(false);
+    setSelectedTags(new Set());
+    setQuery("");
+    setFiltersOpen(false);
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative">
@@ -337,6 +354,23 @@ export function TaskFilterList({
           className="w-full rounded-xl border border-line bg-surface py-2.5 pl-9 pr-3 text-[14px] outline-none focus:border-brand"
         />
       </div>
+
+      {/* Arrivée depuis une tuile / un lien de l'accueil : le filtrage
+          courant vient de là, pas d'une session de filtrage de
+          l'utilisateur — on l'explique et on offre un retour à zéro
+          (audit UX INC-9). */}
+      {cameFromTile && hasActiveFilters ? (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-brand/30 bg-brand-soft/40 px-3 py-2 text-[12px]">
+          <span className="font-semibold text-ink">Filtré depuis l&apos;accueil</span>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="shrink-0 font-bold text-brand underline-offset-2 hover:underline"
+          >
+            Réinitialiser
+          </button>
+        </div>
+      ) : null}
 
       {/* Volet dépliable "Filtres" : replié par défaut (voir l'état
           `filtersOpen` plus haut) pour laisser un écran plus court par
@@ -553,7 +587,7 @@ export function TaskFilterList({
 
       <div className="flex flex-col gap-2.5">
         {filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-ink-muted">
+          <EmptyState>
             {hasActiveFilters ? (
               "Aucune tâche ne correspond à ces critères."
             ) : (
@@ -563,7 +597,7 @@ export function TaskFilterList({
                 Appuie sur + pour en créer une.
               </>
             )}
-          </div>
+          </EmptyState>
         ) : (
           filtered.map((task) => <TaskCard key={task.id} task={task} />)
         )}

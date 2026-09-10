@@ -10,6 +10,7 @@ import {
 import { useGlobalTransition } from "@/components/PendingOverlay";
 import { useUndoableDelete } from "@/components/useUndoableDelete";
 import type { ChecklistItem } from "@/lib/types";
+import { EmptyState } from "./EmptyState";
 import { IconCheck, IconChecklist, IconX } from "./Icons";
 
 // Affichée sur l'écran de détail d'une tâche (src/app/tasks/[id]/page.tsx),
@@ -140,22 +141,22 @@ export function ChecklistSection({
           </ul>
         </>
       ) : (
-        <div className="mt-2.5 text-[13px] text-ink-muted">Aucun item pour l&apos;instant.</div>
+        <EmptyState className="mt-2.5">Aucun item pour l&apos;instant.</EmptyState>
       )}
 
       {editable ? (
-        <form onSubmit={handleAdd} className="mt-3 flex gap-2">
+        <form onSubmit={handleAdd} className="mt-3 flex items-start gap-2">
           <input
             type="text"
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
             placeholder="Ajouter un item..."
-            className="flex-1 rounded-xl border border-line px-3 py-2 text-[13.5px] outline-none focus:border-brand"
+            className="flex-1 rounded-xl border border-line px-3 py-2.5 text-[13.5px] outline-none focus:border-brand"
           />
           <button
             type="submit"
             disabled={isAdding}
-            className="rounded-xl bg-brand px-4 text-[13.5px] font-bold text-white disabled:opacity-50"
+            className="shrink-0 rounded-xl bg-brand px-4 py-2.5 text-[13.5px] font-bold text-white disabled:opacity-50"
           >
             Ajouter
           </button>

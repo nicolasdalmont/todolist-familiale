@@ -24,7 +24,9 @@ export function TaskCard({ task }: { task: Task }) {
   return (
     <Link
       href={`/tasks/${task.id}`}
-      className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
+      className={`flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50 ${
+        task.status === "archived" ? "opacity-60" : ""
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         {/* min-w-0 : laisse le titre s'enrouler sur plusieurs lignes pour
@@ -33,7 +35,11 @@ export function TaskCard({ task }: { task: Task }) {
             Badge.tsx) — corrigé le 04/09/2026, signalé sur mobile avec un
             titre long. */}
         <span
-          className={`min-w-0 text-[15px] font-bold leading-snug ${task.status === "done" ? "text-ink-muted line-through" : "text-ink"}`}
+          className={`min-w-0 text-[15px] font-bold leading-snug ${
+            task.status === "done" || task.status === "archived"
+              ? "text-ink-muted line-through"
+              : "text-ink"
+          }`}
         >
           {task.title}
         </span>

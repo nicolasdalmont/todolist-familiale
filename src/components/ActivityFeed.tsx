@@ -6,6 +6,7 @@ import type { ActivityLogEntry, ActivityType } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso } from "@/lib/format";
 import { Avatar } from "./Avatar";
 import { Time } from "./Time";
+import { EmptyState } from "./EmptyState";
 import { IconCheck, IconChat, IconChecklist, IconPencil, IconPlus } from "./Icons";
 
 // Fil "Activité du jour" affiché sous les compteurs de l'écran d'accueil
@@ -144,9 +145,7 @@ export function ActivityFeed({
       <h2 className="text-[13.5px] font-bold text-ink-muted">Activité du jour</h2>
 
       {groups.length === 0 ? (
-        <p className="rounded-2xl border border-line bg-surface px-4 py-3 text-[13px] text-ink-muted">
-          Aucune activité partagée aujourd&apos;hui.
-        </p>
+        <EmptyState>Aucune activité partagée aujourd&apos;hui.</EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
           {groups.map((group) => {

@@ -27,7 +27,7 @@ export function HomeDashboard({
   activity: ActivityLogEntry[];
   notifications: NotificationItem[];
 }) {
-  const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel } = useMemo(() => {
+  const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
     const now = new Date();
     const todayKey = dateKeyFromDate(now);
     const sunday = upcomingSunday(now);
@@ -72,7 +72,22 @@ export function HomeDashboard({
       timeZone: APP_TIMEZONE,
     });
 
-    return { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel: capitalize(todayLabel) };
+    // Salutation selon l'heure de Paris (audit UX UX-14) : « Bonsoir » à
+    // partir de 18 h et jusqu'à 5 h, « Bonjour » le reste de la journée.
+    const parisHour = Number(
+      new Intl.DateTimeFormat("fr-FR", { timeZone: APP_TIMEZONE, hour: "2-digit", hour12: false }).format(now)
+    );
+    const greeting = parisHour >= 18 || parisHour < 5 ? "Bonsoir" : "Bonjour";
+
+    return {
+      todayCount,
+      weekCount,
+      overdueCount,
+      todayKey,
+      sundayKey,
+      todayLabel: capitalize(todayLabel),
+      greeting,
+    };
   }, [tasks, profile.id]);
 
   // Évènements déjà couverts par une notification non lue de « À ton
@@ -137,7 +152,9 @@ export function HomeDashboard({
   return (
     <div className="flex flex-col gap-5 pt-2">
       <div>
-        <h1 className="text-[22px] font-extrabold text-ink">Bonjour, {profile.name}</h1>
+        <h1 className="text-[22px] font-extrabold text-ink">
+          {greeting}, {profile.name}
+        </h1>
         <p className="text-[13.5px] text-ink-muted">{todayLabel}</p>
       </div>
 

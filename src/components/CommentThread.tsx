@@ -6,6 +6,7 @@ import { deleteCommentAction } from "@/lib/actions";
 import { Avatar } from "./Avatar";
 import { CommentForm } from "./CommentForm";
 import { Time } from "./Time";
+import { EmptyState } from "./EmptyState";
 import { useUndoableDelete } from "./useUndoableDelete";
 import { IconChat, IconX } from "./Icons";
 
@@ -40,9 +41,7 @@ export function CommentThread({
       <CommentForm taskId={taskId} />
 
       {visible.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line py-10 text-center text-sm text-ink-muted">
-          Aucun commentaire pour l&apos;instant.
-        </div>
+        <EmptyState>Aucun commentaire pour l&apos;instant.</EmptyState>
       ) : (
         <div className="flex flex-col gap-3">
           {visible.map((c) => {

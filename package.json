@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@supabase/supabase-js": "2.45.4",
     "jose": "6.2.3",
     "next": "14.2.35",
@@ -21,6 +22,7 @@
     "@types/react-dom": "18.3.0",
     "@types/web-push": "^3.6.4",
     "autoprefixer": "10.4.20",
+    "pg": "^8.23.0",
     "postcss": "8.4.41",
     "sharp": "^0.35.4",
     "tailwindcss": "3.4.10",

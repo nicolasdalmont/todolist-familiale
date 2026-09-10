@@ -138,13 +138,14 @@ export function TaskForm({
 
       <div className="mb-4">
         <label className="mb-1.5 block text-[13px] font-bold">Catégorie</label>
-        <div className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label="Catégorie" className="flex flex-wrap gap-1.5">
           {CATEGORY_ORDER.map((c) => {
             const Icon = CATEGORY_ICONS[c];
             return (
               <button
                 key={c}
                 type="button"
+                aria-pressed={category === c}
                 onClick={() => setCategory(c)}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
                   category === c ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"

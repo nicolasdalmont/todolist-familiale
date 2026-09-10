@@ -5,14 +5,18 @@ import { setStatusAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
 import { STATUS_LABELS } from "@/lib/format";
 import type { TaskStatus } from "@/lib/types";
+import { IconCheck } from "./Icons";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
 
+// Statut courant : fond plein coloré + coche (affordance non uniquement
+// chromatique). Les autres : bouton clair cliquable bien lisible — pas un
+// simple texte grisé, pour qu'on voie qu'ils sont actionnables.
 const ACTIVE_STYLES: Record<TaskStatus, string> = {
-  todo: "border-transparent bg-sand text-ink-muted",
-  in_progress: "border-transparent bg-brand-soft text-brand-dark",
-  done: "border-transparent bg-emerald-50 text-emerald-700",
-  archived: "border-transparent bg-stone-200 text-stone-500",
+  todo: "border-transparent bg-ink text-white",
+  in_progress: "border-transparent bg-brand text-white",
+  done: "border-transparent bg-emerald-600 text-white",
+  archived: "border-transparent bg-stone-500 text-white",
 };
 
 export function StatusButtons({ taskId, current }: { taskId: string; current: TaskStatus }) {
@@ -20,6 +24,7 @@ export function StatusButtons({ taskId, current }: { taskId: string; current: Ta
   const [isPending, startTransition] = useGlobalTransition();
 
   function handleClick(status: TaskStatus) {
+    if (status === current) return;
     startTransition(async () => {
       await setStatusAction(taskId, status);
       router.refresh();
@@ -27,20 +32,25 @@ export function StatusButtons({ taskId, current }: { taskId: string; current: Ta
   }
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {STATUSES.map((status) => (
-        <button
-          key={status}
-          type="button"
-          disabled={isPending}
-          onClick={() => handleClick(status)}
-          className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold disabled:opacity-50 ${
-            status === current ? ACTIVE_STYLES[status] : "border-line text-ink-muted"
-          }`}
-        >
-          {STATUS_LABELS[status]}
-        </button>
-      ))}
+    <div role="group" aria-label="Changer le statut de la tâche" className="mt-3 flex flex-wrap gap-2">
+      {STATUSES.map((status) => {
+        const isCurrent = status === current;
+        return (
+          <button
+            key={status}
+            type="button"
+            aria-pressed={isCurrent}
+            disabled={isPending}
+            onClick={() => handleClick(status)}
+            className={`flex items-center gap-1 rounded-full border px-3.5 py-2 text-[12.5px] font-bold disabled:opacity-50 ${
+              isCurrent ? ACTIVE_STYLES[status] : "border-line bg-surface text-ink-muted hover:border-brand/50 hover:text-ink"
+            }`}
+          >
+            {isCurrent ? <IconCheck className="h-3.5 w-3.5" /> : null}
+            {STATUS_LABELS[status]}
+          </button>
+        );
+      })}
     </div>
   );
 }

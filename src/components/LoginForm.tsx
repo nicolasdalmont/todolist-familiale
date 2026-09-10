@@ -61,7 +61,7 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
 
   if (step.name === "pick") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-7 bg-paper p-6">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-7 bg-paper p-6">
         <div className="flex flex-col items-center gap-2.5 text-center">
           <IconBerry className="h-16 w-16" />
           <h1 className="text-xl font-extrabold">checkberry</h1>
@@ -95,10 +95,11 @@ export function LoginForm({ profiles }: { profiles: Profile[] }) {
   const { profile, changingPassword } = step;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-paper p-6">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-paper p-6">
       <button
         type="button"
         onClick={backToGrid}
+        aria-label="Revenir au choix du profil"
         className="fixed left-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
       >
         <IconArrowLeft className="h-4 w-4" />

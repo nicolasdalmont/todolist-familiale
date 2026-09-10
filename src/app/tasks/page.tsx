@@ -33,7 +33,7 @@ export default async function TasksPage({
   const [tasks, allTags] = await Promise.all([getTasks(supabase, profile.id), getTags(supabase)]);
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
         <TaskFilterList
@@ -46,8 +46,9 @@ export default async function TasksPage({
       </main>
       <Link
         href="/tasks/new"
-        className="fixed bottom-7 right-5 flex h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40"
+        className="fixed bottom-safe right-5 flex h-[58px] w-[58px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40"
         title="Nouvelle tâche"
+        aria-label="Nouvelle tâche"
       >
         <IconPlus className="h-6 w-6" />
       </Link>

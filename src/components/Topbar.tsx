@@ -6,7 +6,7 @@ import { IconBerry } from "./Icons";
 
 export function Topbar({ user }: { user: Profile }) {
   return (
-    <header className="sticky top-0 z-20 flex h-[60px] items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur">
+    <header className="pt-safe sticky top-0 z-20 flex min-h-[60px] items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur">
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-[17px] font-extrabold">
           <IconBerry className="h-[30px] w-[30px]" />
@@ -25,7 +25,12 @@ export function Topbar({ user }: { user: Profile }) {
         ) : null}
       </div>
       <div className="flex items-center gap-2.5">
-        <Link href="/compte" title="Mon compte" className="rounded-full hover:opacity-80">
+        <Link
+          href="/compte"
+          title="Mon compte"
+          aria-label="Mon compte"
+          className="tap-target flex rounded-full hover:opacity-80"
+        >
           <Avatar profile={user} />
         </Link>
         <LogoutButton />

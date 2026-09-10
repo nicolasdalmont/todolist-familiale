@@ -11,7 +11,8 @@ export function LogoutButton() {
       <button
         type="submit"
         title="Se déconnecter"
-        className="rounded-lg p-1.5 text-ink-muted hover:bg-sand hover:text-ink"
+        aria-label="Se déconnecter"
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
       >
         <IconPower className="h-[18px] w-[18px]" />
       </button>

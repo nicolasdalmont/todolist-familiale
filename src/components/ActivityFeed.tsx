@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import type { ActivityLogEntry, ActivityType } from "@/lib/types";
-import { dateKeyFromDate, dateKeyFromIso, relativeTime } from "@/lib/format";
+import { dateKeyFromDate, dateKeyFromIso } from "@/lib/format";
 import { Avatar } from "./Avatar";
+import { Time } from "./Time";
 import { IconCheck, IconChat, IconChecklist, IconPencil, IconPlus } from "./Icons";
 
 // Fil "Activité du jour" affiché sous les compteurs de l'écran d'accueil
@@ -145,9 +146,11 @@ export function ActivityFeed({
                   <Icon className="h-3.5 w-3.5" />
                 </span>
                 <span className="flex-1 text-[13px] leading-snug text-ink">{messageFor(group)}</span>
-                <span className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted">
-                  {relativeTime(group.latestCreatedAt)}
-                </span>
+                <Time
+                  iso={group.latestCreatedAt}
+                  relative
+                  className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted"
+                />
               </Link>
             );
           })}

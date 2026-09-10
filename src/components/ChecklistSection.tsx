@@ -107,8 +107,8 @@ export function ChecklistSection({
                     type="button"
                     disabled={isPending}
                     onClick={() => handleDelete(item.id)}
-                    aria-label="Supprimer cet item"
-                    className="rounded-lg p-1 text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
+                    aria-label={`Supprimer « ${item.label} »`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
                   >
                     <IconX className="h-3.5 w-3.5" />
                   </button>

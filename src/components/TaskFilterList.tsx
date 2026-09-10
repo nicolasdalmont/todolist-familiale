@@ -6,7 +6,7 @@ import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/categories";
 import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
-import { IconAlertTriangle, IconChevronDown, IconSearch } from "./Icons";
+import { IconAlertTriangle, IconCheck, IconChevronDown, IconSearch } from "./Icons";
 
 // Mémorisation du filtre (04/09/2026) : ouvrir puis fermer une tâche
 // démonte et remonte ce composant (route différente, /tasks/[id]) — sans
@@ -340,19 +340,27 @@ export function TaskFilterList({
               Uniquement mes tâches
             </button>
             <FilterSeparator />
-            <div className="flex flex-wrap gap-1.5">
-              {STATUS_ORDER.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => toggleStatus(status)}
-                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                    statuses.has(status) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-                  }`}
-                >
-                  {STATUS_LABELS[status]}
-                </button>
-              ))}
+            {/* Statuts : sélection multiple — coche visible sur les valeurs
+                actives (affordance non uniquement chromatique, cf. audit
+                UX INC-5). */}
+            <div role="group" aria-label="Filtrer par statut" className="flex flex-wrap gap-1.5">
+              {STATUS_ORDER.map((status) => {
+                const on = statuses.has(status);
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleStatus(status)}
+                    className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+                      on ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                    }`}
+                  >
+                    {on ? <IconCheck className="h-3 w-3" /> : null}
+                    {STATUS_LABELS[status]}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -401,20 +409,28 @@ export function TaskFilterList({
           {/* Ligne 3 : partagé/privé │ en retard uniquement. Même principe
               d'empilement sur mobile que les lignes 1 et 2. */}
           <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="flex flex-wrap gap-1.5">
+            {/* Visibilité : choix unique — contrôle segmenté (un seul bloc,
+                segments accolés) plutôt que des pilules séparées, pour qu'on
+                voie qu'ils s'excluent (cf. audit UX INC-5). */}
+            <div
+              role="group"
+              aria-label="Filtrer par visibilité"
+              className="flex self-start overflow-hidden rounded-full border border-line text-[12.5px] font-semibold"
+            >
               {(
                 [
                   { value: null, label: "Toutes" },
                   { value: "shared" as Visibility, label: "Partagées" },
                   { value: "private" as Visibility, label: "Privées" },
                 ] as const
-              ).map((opt) => (
+              ).map((opt, i) => (
                 <button
                   key={opt.label}
                   type="button"
+                  aria-pressed={visibility === opt.value}
                   onClick={() => setVisibility(opt.value)}
-                  className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
-                    visibility === opt.value ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                  className={`px-3 py-1.5 ${i > 0 ? "border-l border-line" : ""} ${
+                    visibility === opt.value ? "bg-brand text-white" : "bg-surface text-ink-muted"
                   }`}
                 >
                   {opt.label}
@@ -424,6 +440,7 @@ export function TaskFilterList({
             <FilterSeparator />
             <button
               type="button"
+              aria-pressed={overdueOnly}
               onClick={() => setOverdueOnly((prev) => !prev)}
               className={`flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
                 overdueOnly ? "border-red-300 bg-red-50 text-red-600" : "border-line bg-surface text-ink-muted"
@@ -436,19 +453,23 @@ export function TaskFilterList({
           {/* Ligne 4 : tags (sélection multiple) — un seul groupe, pas de
               séparateur ni de traitement particulier sur mobile. */}
           {tagNames.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {tagNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => toggleTag(name)}
-                  className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${
-                    selectedTags.has(name) ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
-                  }`}
-                >
-                  #{name}
-                </button>
-              ))}
+            <div role="group" aria-label="Filtrer par tag" className="flex flex-wrap gap-1.5">
+              {tagNames.map((name) => {
+                const on = selectedTags.has(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleTag(name)}
+                    className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[12px] font-semibold ${
+                      on ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+                    }`}
+                  >
+                    {on ? <IconCheck className="h-3 w-3" /> : null}#{name}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>

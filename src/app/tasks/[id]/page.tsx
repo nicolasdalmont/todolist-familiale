@@ -9,8 +9,9 @@ import { OverdueBadge, StatusBadge, VisibilityBadge } from "@/components/Badge";
 import { StatusButtons } from "@/components/StatusButtons";
 import { ChecklistSection } from "@/components/ChecklistSection";
 import { CommentThread } from "@/components/CommentThread";
-import { IconArrowLeft, IconCalendar, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
-import { formatDate, isOverdue, recurrenceLabel } from "@/lib/format";
+import { Time } from "@/components/Time";
+import { IconArrowLeft, IconCalendar, IconCalendarPlus, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
+import { isOverdue, recurrenceLabel } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
 import { canEdit } from "@/lib/access";
 
@@ -39,32 +40,35 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
   const viewers = (task.assignees ?? []).filter((a) => a.role === "viewer");
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-16 pt-1">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">
           <Link
             href="/tasks"
+            aria-label="Retour à la liste des tâches"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
           >
             <IconArrowLeft className="h-4 w-4" />
           </Link>
           <h2 className="text-lg font-extrabold">Détail de la tâche</h2>
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ml-auto flex items-center gap-1">
             {task.due_at ? (
               <a
                 href={`/api/tasks/${task.id}/calendar`}
-                className="rounded-lg p-1.5 hover:bg-sand"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
                 title="Ajouter à mon agenda"
+                aria-label="Ajouter cette tâche à mon agenda"
               >
-                <IconCalendar className="h-[18px] w-[18px]" />
+                <IconCalendarPlus className="h-[19px] w-[19px]" />
               </a>
             ) : null}
             {editable ? (
               <Link
                 href={`/tasks/${task.id}/edit`}
-                className="rounded-lg p-1.5 hover:bg-sand"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
                 title="Modifier"
+                aria-label="Modifier la tâche"
               >
                 <IconPencil className="h-[18px] w-[18px]" />
               </Link>
@@ -88,7 +92,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
             <CategoryIcon className="h-4 w-4" /> Catégorie : <strong className="ml-1 text-ink">{CATEGORY_LABELS[task.category]}</strong>
           </div>
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
-            <IconCalendar className="h-4 w-4" /> Échéance : <strong className="ml-1 text-ink">{formatDate(task.due_at)}</strong>
+            <IconCalendar className="h-4 w-4" /> Échéance : <strong className="ml-1 text-ink"><Time iso={task.due_at} /></strong>
           </div>
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
             <IconRepeat className="h-4 w-4" /> Récurrence : {recurrenceLabel(task.recurrence)}

@@ -14,12 +14,13 @@ export default async function AccountPage() {
   if (!profile) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-16 pt-1">
         <div className="mb-4 mt-1.5 flex items-center gap-2.5">
           <Link
             href="/"
+            aria-label="Retour à l'accueil"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
           >
             <IconArrowLeft className="h-4 w-4" />

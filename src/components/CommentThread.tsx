@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import type { Comment } from "@/lib/types";
-import { relativeTime } from "@/lib/format";
 import { deleteCommentAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
 import { Avatar } from "./Avatar";
 import { CommentForm } from "./CommentForm";
+import { Time } from "./Time";
 import { IconChat, IconX } from "./Icons";
 
 // canModerate = l'utilisateur courant est le créateur de la tâche (voir
@@ -59,7 +59,7 @@ export function CommentThread({
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[12.5px] font-bold">{c.author?.name ?? "?"}</span>
-                      <span className="ml-1.5 text-[11px] text-ink-muted">{relativeTime(c.created_at)}</span>
+                      <Time iso={c.created_at} relative className="ml-1.5 text-[11px] text-ink-muted" />
                     </div>
                     {canDelete ? (
                       <button
@@ -67,7 +67,7 @@ export function CommentThread({
                         disabled={isPending}
                         onClick={() => handleDelete(c.id)}
                         aria-label="Supprimer ce commentaire"
-                        className="shrink-0 rounded-lg p-1 text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink disabled:opacity-50"
                       >
                         <IconX className="h-3.5 w-3.5" />
                       </button>

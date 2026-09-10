@@ -55,6 +55,24 @@ export function IconCalendar({ className = "" }: IconProps) {
   );
 }
 
+// Export d'une tâche vers l'agenda de l'appareil (fichier .ics) — glyphe
+// distinct de IconCalendar (qui, lui, signale une date d'échéance) : un
+// calendrier avec un « + », pour ne pas afficher deux fois la même icône
+// avec deux sens différents sur l'écran de détail (voir audit UX INC-3).
+export function IconCalendarPlus({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M20.5 12.5V9a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 9v9A2.5 2.5 0 0 0 6 20.5h6.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path d="M3.5 10.5h17M8 4v3.5M16 4v3.5M18 15.5v5M15.5 18h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconRepeat({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">

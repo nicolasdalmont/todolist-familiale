@@ -4,9 +4,9 @@ import { useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { NotificationItem, NotificationType } from "@/lib/types";
-import { relativeTime } from "@/lib/format";
 import { markNotificationReadAction, markNotificationsReadAction } from "@/lib/actions";
 import { useGlobalTransition } from "@/components/PendingOverlay";
+import { Time } from "./Time";
 import { IconCalendar, IconChat, IconCheck, IconPencil, IconUsers, IconX } from "./Icons";
 
 // Fil « À ton attention » affiché sous les compteurs de l'écran d'accueil
@@ -86,9 +86,7 @@ export function AttentionFeed({ notifications }: { notifications: NotificationIt
                   </span>
                 ) : null}
               </span>
-              <span className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted">
-                {relativeTime(n.created_at)}
-              </span>
+              <Time iso={n.created_at} relative className="flex-shrink-0 pt-0.5 text-[11.5px] text-ink-muted" />
             </>
           );
 
@@ -116,7 +114,7 @@ export function AttentionFeed({ notifications }: { notifications: NotificationIt
                 disabled={isDismissing}
                 aria-label="Marquer comme lu"
                 title="Marquer comme lu"
-                className="flex-shrink-0 rounded-lg p-1 text-ink-muted transition hover:bg-sand hover:text-ink disabled:opacity-50"
+                className="tap-target flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-sand hover:text-ink disabled:opacity-50"
               >
                 <IconCheck className="h-4 w-4" />
               </button>

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Task } from "@/lib/types";
-import { formatDate, isOverdue } from "@/lib/format";
+import { isOverdue } from "@/lib/format";
 import { CATEGORY_ICONS, CATEGORY_LABELS } from "@/lib/categories";
 import { Avatar } from "./Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "./Badge";
+import { Time } from "./Time";
 import { IconCalendar, IconChat, IconRepeat } from "./Icons";
 
 export function TaskCard({ task }: { task: Task }) {
@@ -46,7 +47,7 @@ export function TaskCard({ task }: { task: Task }) {
           <OverdueBadge />
         ) : (
           <span className="flex items-center gap-1">
-            <IconCalendar className="h-3.5 w-3.5" /> {formatDate(task.due_at)}
+            <IconCalendar className="h-3.5 w-3.5" /> <Time iso={task.due_at} />
           </span>
         )}
         <VisibilityBadge visibility={task.visibility} />

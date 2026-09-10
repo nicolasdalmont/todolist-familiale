@@ -10,27 +10,61 @@ export function initials(name: string): string {
     .toUpperCase();
 }
 
+// Année affichée seulement si elle diffère de l'année civile courante (à
+// Paris) — sinon « 12 sept. » suffit ; « 12 sept. 2027 » lève l'ambiguïté
+// pour une échéance lointaine ou une activité de l'an dernier (audit UX
+// INC-6).
+function sameYearAsNow(d: Date): boolean {
+  const y = (x: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIMEZONE, year: "numeric" }).format(x);
+  return y(d) === y(new Date());
+}
+
 export function formatDate(iso: string | null): string {
   if (!iso) return "Sans échéance";
   const d = new Date(iso);
   // timeZone explicite : ces fonctions tournent aussi côté serveur (Vercel,
   // UTC) — voir src/lib/timezone.ts.
   return (
-    d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", timeZone: APP_TIMEZONE }) +
+    d.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      ...(sameYearAsNow(d) ? {} : { year: "numeric" }),
+      timeZone: APP_TIMEZONE,
+    }) +
     " · " +
     d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: APP_TIMEZONE })
   );
 }
 
+// Date seule (sans l'heure), même règle d'année que formatDate — utilisée
+// par relativeTime au-delà d'une semaine.
+export function formatDateOnly(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    ...(sameYearAsNow(d) ? {} : { year: "numeric" }),
+    timeZone: APP_TIMEZONE,
+  });
+}
+
+// « à l'instant / n min / n h / hier / il y a n j » jusqu'à une semaine,
+// puis une date absolue — au-delà, « 47 j » ne veut plus rien dire pour
+// personne (audit UX INC-6). Passé/futur : on ne gère ici que le passé
+// (commentaires, activité, notifications sont toujours dans le passé).
 export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = 60 * 1000;
   const hour = 60 * min;
   const day = 24 * hour;
+  if (diff < 0) return formatDateOnly(iso);
   if (diff < min) return "à l'instant";
   if (diff < hour) return Math.floor(diff / min) + " min";
   if (diff < day) return Math.floor(diff / hour) + " h";
-  return Math.floor(diff / day) + " j";
+  const days = Math.floor(diff / day);
+  if (days === 1) return "hier";
+  if (days < 7) return `il y a ${days} j`;
+  return formatDateOnly(iso);
 }
 
 export function isOverdue(dueAt: string | null, status: TaskStatus): boolean {

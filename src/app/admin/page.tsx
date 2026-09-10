@@ -5,7 +5,7 @@ import { getUserStats } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
 import { IconBarChart } from "@/components/Icons";
-import { formatDate, relativeTime } from "@/lib/format";
+import { Time } from "@/components/Time";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function AdminStatsPage() {
   const stats = await getUserStats(supabase);
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-16 pt-1">
         <div className="mb-4 mt-1.5 flex items-center gap-2">
@@ -42,9 +42,9 @@ export default async function AdminStatsPage() {
                 <div className="text-right text-[11.5px] leading-tight text-ink-muted">
                   <div className="text-[10px] uppercase tracking-wide">Dernière activité</div>
                   <div className="font-semibold text-ink">
-                    {u.lastSeenAt ? relativeTime(u.lastSeenAt) : "Jamais vu"}
+                    {u.lastSeenAt ? <Time iso={u.lastSeenAt} relative /> : "Jamais vu"}
                   </div>
-                  {u.lastSeenAt ? <div>{formatDate(u.lastSeenAt)}</div> : null}
+                  {u.lastSeenAt ? <Time iso={u.lastSeenAt} className="block" /> : null}
                 </div>
               </div>
 

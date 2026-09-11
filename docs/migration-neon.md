@@ -327,49 +327,64 @@ Branche `migration-neon`. `main` reste sur Supabase.
 
 ## 6. Phase 2 — Réécriture de la couche data (le gros du travail)
 
-Sur `migration-neon`. Fichier par fichier, dans cet ordre (du plus autonome
-au plus dépendant) :
+**Statut : VALIDÉE (11/09/2026).** Sur `migration-neon`, fichier par fichier,
+dans l'ordre prévu, un commit par étape :
 
-1. [ ] **`src/lib/db.ts`** (fait en Phase 1).
-2. [ ] **`src/lib/auth.ts`** — `getUserWithPasswordHash`, `getCurrentUser`,
+1. [x] **`src/lib/db.ts`** (fait en Phase 1).
+2. [x] **`src/lib/auth.ts`** — `getUserWithPasswordHash` (déplacé dans
+   `queries.ts`, appelé sans le paramètre `supabase`), `getCurrentUser`,
    `recordLogin` / `touchLastSeen`. Simples `select` / `update`.
-3. [ ] **`src/lib/access.ts`** — `getTaskAccess` (une requête `tasks` + une
-   `task_assignees`, ou une jointure).
-4. [ ] **`src/lib/push.ts`** — `push_subscriptions` : `insert on conflict
-   (endpoint) do update`, `delete where endpoint = ...`, purge sur 404/410.
-5. [ ] **`src/lib/notifications.ts`** — `notifyUser` / `notifyTaskParticipants`
+3. [x] **`src/lib/access.ts`** — `getTaskAccess` (une requête `tasks` + une
+   `task_assignees`).
+4. [x] **`src/lib/push.ts`** — `push_subscriptions` : purge sur 404/410 via
+   `delete`. (`insert on conflict (endpoint) do update` vit dans la route
+   `/api/push/subscribe`, voir 11.)
+5. [x] **`src/lib/notifications.ts`** — `notifyUser` / `notifyTaskParticipants`
    (`insert`), `actorName` (`select`).
-6. [ ] **`src/lib/queries.ts`** — le plus gros. Les 3 requêtes imbriquées
-   (voir 2.4). `getTasks`, `getTask`, `getComments`, `getRecentActivity`,
+6. [x] **`src/lib/queries.ts`** — le plus gros. `TASK_SELECT` réécrit en
+   approche **N+1 bornée** (`attachRelations`, voir 2.4) plutôt qu'un
+   `jsonb_agg` dense : une requête par relation (assignés, tags, checklist,
+   comptage commentaires), filtrée par `task_id = any(...)`, assemblage en
+   mémoire. `getTasks`, `getTask`, `getComments`, `getRecentActivity`,
    `getMyNotifications`, `getBadgeCount`, `getProfiles`, `getProfile`,
    `getMembers`, `getUserStats`, `getCategories`, `getAppSettings`, `getTags`,
-   `upsertTagIds`.
-7. [ ] **`src/lib/actions.ts`** — CRUD tâches (`createTaskAction`,
+   `upsertTagIds`, `getUserWithPasswordHash`.
+7. [x] **`src/lib/actions.ts`** — CRUD tâches (`createTaskAction`,
    `updateTaskAction`, `deleteTaskAction`, `setStatusAction`), commentaires,
    checklist, `markNotification(s)ReadAction`, `resolveCategorySlug`,
-   `syncTaskTags`, `logActivity`. Beaucoup d'appels mais tous simples
-   (`insert` / `update` / `delete` avec `where`).
-8. [ ] **`src/lib/admin-actions.ts`** — CRUD membres. Gérer `err.code === "23505"`.
-9. [ ] **`src/lib/category-actions.ts`** — CRUD catégories. Garde « table
-   absente » → `42P01`.
-10. [ ] **`src/lib/settings-actions.ts`** — `update app_settings`.
-11. [ ] **Pages & route handlers** : retirer `createAdminClient()` et le
-    passage de `supabase` aux fonctions data. `src/app/page.tsx`,
-    `tasks/page.tsx`, `tasks/new/page.tsx`, `tasks/[id]/page.tsx`,
-    `tasks/[id]/edit/page.tsx`, `admin/page.tsx`, `login/page.tsx`,
-    `compte/page.tsx` ; `api/cron/reminders/route.ts`,
-    `api/tasks/[id]/calendar/route.ts`, `api/push/subscribe/route.ts`.
-12. [ ] **Supprimer** `src/lib/supabase/admin.ts` et la dépendance
-    `@supabase/supabase-js` (en Phase 6 seulement si on garde un flag ;
-    sinon dès maintenant sur la branche).
-13. [ ] `npx tsc --noEmit` + `npm run build` verts.
-14. [ ] Filet : garder le fil de commentaires trié DESC, la fenêtre 48 h de
-    `getRecentActivity`, la tolérance « table absente » de `getCategories` /
-    `getAppSettings` (utile aussi sur Neon si `neon_schema.sql` incomplet).
+   `syncTaskTags`, `logActivity`. Les inserts multi-lignes (partage d'une
+   tâche, régénération d'occurrence récurrente) passent par
+   `unnest(tableau1, tableau2) as t(a, b)` plutôt qu'un insert par ligne.
+8. [x] **`src/lib/admin-actions.ts`** — CRUD membres. `err.code === "23505"`
+   conservé tel quel (identique en SQLSTATE brut). Mises à jour partielles
+   (`updateMemberAction`) via `set col = coalesce($1, col)` plutôt qu'un
+   objet patch construit dynamiquement.
+9. [x] **`src/lib/category-actions.ts`** — CRUD catégories. Garde « table
+   absente » → `42P01` (remplace `PGRST205`).
+10. [x] **`src/lib/settings-actions.ts`** — `update app_settings`.
+11. [x] **Pages & route handlers** : `createAdminClient()` et le paramètre
+    `supabase` retirés partout. `src/app/page.tsx`, `tasks/page.tsx`,
+    `tasks/new/page.tsx`, `tasks/[id]/page.tsx`, `tasks/[id]/edit/page.tsx`,
+    `admin/page.tsx`, `login/page.tsx` (`compte/page.tsx` n'en avait pas
+    besoin) ; `api/cron/reminders/route.ts` (requête `tasks` réécrite en
+    SQL direct), `api/tasks/[id]/calendar/route.ts`,
+    `api/push/subscribe/route.ts` (`upsert(..., {onConflict})` devenu
+    `insert ... on conflict (endpoint) do update`).
+12. [x] **Supprimé** `src/lib/supabase/admin.ts` et la dépendance
+    `@supabase/supabase-js` — fait dès cette phase (pas de flag `BACKEND`
+    sur ce projet, voir §3.2).
+13. [x] `npx tsc --noEmit` + `npm run build` verts (vérifié après chaque
+    étape et à la fin).
+14. [x] Filet conservé : fil de commentaires trié DESC, fenêtre 48 h de
+    `getRecentActivity`, tolérance « table absente » (`try/catch` sur
+    `42P01`) de `getCategories` / `getAppSettings` / `getRecentActivity` /
+    `getMyNotifications` / `sendPushToUser` / `resolveCategorySlug`.
 
-**Contrôle de non-régression** : pour chaque fonction data, comparer le
-résultat Supabase vs Neon sur les mêmes données (script de diff, ou recette
-manuelle en Phase 4).
+**Contrôle de non-régression** : pas encore fait — nécessite des données en
+base (Phase 3) pour comparer Supabase vs Neon fonction par fonction. La
+vérification de cette phase s'est limitée à la compilation (`tsc` + build) ;
+la recette fonctionnelle réelle est prévue en Phase 4 (Preview Vercel sur
+Neon de test).
 
 ---
 

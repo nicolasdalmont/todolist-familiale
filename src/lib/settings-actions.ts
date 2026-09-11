@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
 
 // Réglages d'instance, réservés au rôle admin (onglet « Réglages » de
@@ -10,16 +11,16 @@ import { requireAdmin } from "@/lib/admin-guard";
 type Result = { error?: string; ok?: boolean };
 
 export async function setReminderEnabledAction(enabled: boolean): Promise<Result> {
-  const { supabase } = await requireAdmin();
+  await requireAdmin();
 
-  const { error } = await supabase
-    .from("app_settings")
-    .update({ reminder_enabled: Boolean(enabled), updated_at: new Date().toISOString() })
-    .eq("id", 1);
-  if (error?.code === "PGRST205" || error?.code === "42P01") {
-    return { error: "Applique d'abord la migration 010_app_settings.sql dans Supabase." };
+  try {
+    await sql`update app_settings set reminder_enabled = ${Boolean(enabled)}, updated_at = now() where id = 1`;
+  } catch (e) {
+    if ((e as { code?: string } | null)?.code === "42P01") {
+      return { error: "Applique d'abord la migration 010_app_settings.sql dans Supabase." };
+    }
+    return { error: "Impossible d'enregistrer le réglage. Réessaie." };
   }
-  if (error) return { error: "Impossible d'enregistrer le réglage. Réessaie." };
 
   revalidatePath("/admin");
   return { ok: true };

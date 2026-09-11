@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getUserWithPasswordHash, upsertTagIds } from "@/lib/queries";
-import { computeVisibility, getTaskAccess } from "@/lib/access";
+import { computeVisibility } from "@/lib/access";
 import {
   clearSessionCookie,
   getSessionUserId,
@@ -18,7 +18,79 @@ import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
 import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
-import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
+import type { ActivityType, Recurrence, ShareRole, TaskStatus, Visibility } from "@/lib/types";
+
+// Vérifie les droits d'un utilisateur sur une tâche par son id, sans avoir
+// à recharger toute la tâche avec ses jointures — utilisé par les Server
+// Actions ci-dessous (modifier/supprimer/changer le statut/commenter) qui
+// n'ont pas déjà la tâche en mémoire. Renvoie exists:false si la tâche
+// n'existe plus.
+//
+// Renvoie aussi `title`/`visibility` : pratique pour ne pas avoir à
+// recharger la tâche juste pour journaliser une activité (voir
+// logActivity ci-dessous). `visibility` sert notamment à ne journaliser
+// une action que si la tâche est effectivement partagée (au moins une
+// autre personne que le créateur y a accès), pas sur une tâche privée où
+// personne d'autre ne pourrait de toute façon voir l'activité.
+//
+// Vit dans ce fichier ("use server", jamais bundlé côté client) plutôt
+// que dans src/lib/access.ts : ce dernier n'expose que des fonctions
+// pures (canView, canEdit, computeVisibility), importées aussi bien par
+// des Server Components que par des composants client — un import de
+// `sql` (src/lib/db.ts) au niveau du module y casserait le bundle
+// navigateur, `DATABASE_URL` n'étant jamais exposée au client.
+async function getTaskAccess(
+  taskId: string,
+  userId: string
+): Promise<{
+  exists: boolean;
+  createdBy?: string;
+  title?: string;
+  visibility?: Visibility;
+  canView: boolean;
+  canEdit: boolean;
+}> {
+  const taskRows = await sql`
+    select id, created_by, title, visibility from tasks where id = ${taskId}
+  `;
+  const task = taskRows[0] as { id: string; created_by: string; title: string; visibility: Visibility } | undefined;
+  if (!task) return { exists: false, canView: false, canEdit: false };
+
+  if (task.created_by === userId) {
+    return {
+      exists: true,
+      createdBy: task.created_by,
+      title: task.title,
+      visibility: task.visibility,
+      canView: true,
+      canEdit: true,
+    };
+  }
+
+  const shareRows = await sql`
+    select role from task_assignees where task_id = ${taskId} and user_id = ${userId}
+  `;
+  const share = shareRows[0] as { role: "editor" | "viewer" } | undefined;
+
+  if (!share) {
+    return {
+      exists: true,
+      createdBy: task.created_by,
+      title: task.title,
+      visibility: task.visibility,
+      canView: false,
+      canEdit: false,
+    };
+  }
+  return {
+    exists: true,
+    createdBy: task.created_by,
+    title: task.title,
+    visibility: task.visibility,
+    canView: true,
+    canEdit: share.role === "editor",
+  };
+}
 
 async function syncTaskTags(taskId: string, tagNames: string[]) {
   const tagIds = await upsertTagIds(tagNames);

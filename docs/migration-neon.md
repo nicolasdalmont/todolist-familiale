@@ -486,24 +486,49 @@ client doit rester exempt d'import *valeur* de `src/lib/db.ts`.
 
 ## 9. Phase 5 — Bascule en production
 
-- [ ] `git tag pre-neon-migration <sha>` sur le dernier commit « ère
-  Supabase » de `main` ; noter l'ID du déploiement Vercel de prod actuel.
-- [ ] Fixer les critères go/no-go (§ 3.5).
-- [ ] Annoncer dans le groupe : « appli indisponible ~20 min le [créneau
-  creux] ». Choisir un moment sans usage.
-- [ ] Geler les écritures (prévenir ; bannière maintenance optionnelle).
-- [ ] **Rejouer la Phase 3** vers le projet Neon **de production**, données
-  les plus fraîches. Vérifs de volumes + contrôles ponctuels.
-- [ ] Vérifier `DATABASE_URL` en **Production** sur Vercel (pas seulement
-  Preview). Retirer `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` **plus tard**
-  (Phase 6) — les laisser ne gêne pas.
-- [ ] Merger `migration-neon` → `main` → déploiement Vercel auto.
-- [ ] **Test de fumée immédiat** : connexion d'un membre, une lecture, une
-  écriture (créer puis supprimer une tâche de test), une notif, vérifier
-  qu'aucune requête ne part vers `supabase.co` (onglet réseau).
-- [ ] Retirer la bannière, annoncer « c'est reparti ».
-- [ ] **Observation 48 h**, rollback niveau 1 armé. Surveiller les logs Vercel
-  Functions et les métriques Neon.
+**Statut : FAITE (11/09/2026).** Bascule réalisée pendant un créneau creux
+annoncé par l'utilisateur, écritures gelées côté famille.
+
+- [x] `git tag pre-neon-migration <sha>` sur le dernier commit « ère
+  Supabase » de `main` (`39947ef`), poussé sur origin.
+- [x] Critères go/no-go (§ 3.5) inchangés, aucun déclenché.
+- [x] Annonce + gel des écritures faits par l'utilisateur (hors session).
+- [x] **Rejoué la Phase 3** vers `checkberry` (le projet Neon de prod —
+  toujours pas de projet séparé, voir Phase 1). Volumes identiques aux 12
+  tables (4 users, 8 categories, 1 app_settings, 12 tags, 21 tasks, 46
+  task_assignees, 26 task_tags, 6 checklist_items, 12 comments, 26
+  activity_log, 41 notifications, 3 push_subscriptions).
+- [x] `DATABASE_URL` vérifié/recréé en **Production** sur Vercel (pooled,
+  projet checkberry).
+- [x] Merge `migration-neon` → `main` (fast-forward, `29003b7`) → push →
+  déploiement Vercel auto.
+- [x] **Test de fumée** : page de connexion charge les 4 profils réels,
+  aucune requête `supabase.co` observée, connexion + création/suppression
+  de tâche de test confirmées fonctionnelles par l'utilisateur. Notif :
+  **reportée** à un vrai cas d'usage familial (comme en Phase 4 — décision
+  utilisateur, pas un échec).
+- [x] Bannière / annonce « c'est reparti » : à la charge de l'utilisateur.
+- [ ] **Observation 48 h**, rollback niveau 1 (Instant Rollback Vercel) armé.
+  Surveiller les logs Vercel Functions et les métriques Neon. En cours
+  depuis le 11/09/2026.
+
+### Incident rencontré et corrigé pendant cette phase
+
+Au premier essai, `NEON_DIRECT_URL` pointait vers un **autre projet Neon**
+(`ep-square-sunset-a5rf21cd...us-east-2`, base `neondb` vide) au lieu de
+`checkberry` (`ep-blue-tree-b21wmijr...eu-central-1`) — erreur de copier-coller
+dans le dashboard Neon (plusieurs projets dans le compte). `db/migrate.mjs`
+a échoué proprement dès la première requête (`truncate` en un seul
+statement, échoue tout ou rien) : **aucune donnée touchée**, ni côté
+Supabase (source, jamais modifiée) ni côté Neon (cible, truncate non exécuté
+faute de table). Détecté en comparant le host de l'URL fautive à celui,
+connu-bon, du `DATABASE_URL` pooled déjà validé (`grep` sur `.env.local`
+sans exposer le mot de passe). Par prudence, `DATABASE_URL` en Production
+Vercel (marqué secret, illisible après coup) a aussi été **recréé** avec la
+valeur connue-bonne plutôt que de faire confiance à un souvenir. **Leçon** :
+avec plusieurs projets Neon dans un même compte, vérifier le host de chaque
+chaîne de connexion (pas seulement la présence de la variable) avant de
+lancer un script qui vide une cible.
 
 ---
 

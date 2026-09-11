@@ -1,8 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
-// Accès Postgres — remplace le client PostgREST Supabase
-// (src/lib/supabase/admin.ts) après la migration Neon (voir
-// docs/migration-neon.md).
+// Accès Postgres — remplace le client PostgREST Supabase après la
+// migration Neon (voir docs/migration-neon.md).
 //
 // `@neondatabase/serverless` fait un aller-retour HTTP par requête : rien à
 // pooler, compatible runtimes Node et Edge. La chaîne DATABASE_URL (avec

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import type { ActivityLogEntry, NotificationItem, Profile, Task } from "@/lib/types";
+import type { ActivityLogEntry, ChallengeProgress, NotificationItem, Profile, Task, WeeklyChallenge } from "@/lib/types";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
 import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
+import { ChallengeCard } from "./ChallengeCard";
 import { NotificationsNudge } from "./NotificationsNudge";
 import { SharedWithYouFeed } from "./SharedWithYouFeed";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
@@ -21,11 +22,13 @@ export function HomeDashboard({
   tasks,
   activity,
   notifications,
+  challenge,
 }: {
   profile: Profile;
   tasks: Task[];
   activity: ActivityLogEntry[];
   notifications: NotificationItem[];
+  challenge: { challenge: WeeklyChallenge; progress: ChallengeProgress } | null;
 }) {
   const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
     const now = new Date();
@@ -218,6 +221,8 @@ export function HomeDashboard({
           </span>
         </Link>
       </div>
+
+      {challenge ? <ChallengeCard challenge={challenge.challenge} progress={challenge.progress} /> : null}
 
       <NotificationsNudge />
 

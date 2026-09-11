@@ -13,7 +13,7 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@/lib/auth";
-import { computeNextOccurrence, STATUS_LABELS } from "@/lib/format";
+import { computeNextOccurrence, formatDate, STATUS_LABELS } from "@/lib/format";
 import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
@@ -47,13 +47,14 @@ async function getTaskAccess(
   createdBy?: string;
   title?: string;
   visibility?: Visibility;
+  dueAt?: string | null;
   canView: boolean;
   canEdit: boolean;
 }> {
   const taskRows = await sql`
-    select id, created_by, title, visibility from tasks where id = ${taskId}
+    select id, created_by, title, visibility, due_at from tasks where id = ${taskId}
   `;
-  const task = taskRows[0] as { id: string; created_by: string; title: string; visibility: Visibility } | undefined;
+  const task = taskRows[0] as { id: string; created_by: string; title: string; visibility: Visibility; due_at: string | null } | undefined;
   if (!task) return { exists: false, canView: false, canEdit: false };
 
   if (task.created_by === userId) {
@@ -62,6 +63,7 @@ async function getTaskAccess(
       createdBy: task.created_by,
       title: task.title,
       visibility: task.visibility,
+      dueAt: task.due_at,
       canView: true,
       canEdit: true,
     };
@@ -78,6 +80,7 @@ async function getTaskAccess(
       createdBy: task.created_by,
       title: task.title,
       visibility: task.visibility,
+      dueAt: task.due_at,
       canView: false,
       canEdit: false,
     };
@@ -87,6 +90,7 @@ async function getTaskAccess(
     createdBy: task.created_by,
     title: task.title,
     visibility: task.visibility,
+    dueAt: task.due_at,
     canView: true,
     canEdit: share.role === "editor",
   };
@@ -395,6 +399,19 @@ export async function updateTaskAction(formData: FormData) {
 
   if (visibility === "shared") {
     await logActivity({ taskId, actorId: userId, type: "task_updated", taskTitle: title });
+
+    // Défi familial "Sans dernière minute" (src/lib/challenges.ts) : trace
+    // chaque changement d'échéance sur une tâche partagée, en plus du
+    // task_updated générique ci-dessus.
+    if ((access.dueAt ?? null) !== dueAt) {
+      await logActivity({
+        taskId,
+        actorId: userId,
+        type: "due_date_changed",
+        taskTitle: title,
+        detail: `${formatDate(access.dueAt ?? null)} → ${formatDate(dueAt)}`,
+      });
+    }
 
     // Seules les personnes **nouvellement** ajoutées par cette modification
     // reçoivent une notification (« t'a partagé »). La modification d'une

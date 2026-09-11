@@ -7,7 +7,7 @@ import { dateKeyFromDate, dateKeyFromIso } from "@/lib/format";
 import { Avatar } from "./Avatar";
 import { Time } from "./Time";
 import { EmptyState } from "./EmptyState";
-import { IconCheck, IconChat, IconChecklist, IconPencil, IconPlus } from "./Icons";
+import { IconCalendar, IconCheck, IconChat, IconChecklist, IconPencil, IconPlus } from "./Icons";
 
 // Fil "Activité du jour" affiché sous les compteurs de l'écran d'accueil
 // (voir src/components/HomeDashboard.tsx) : les actions faites aujourd'hui
@@ -48,6 +48,7 @@ const TYPE_ICON: Record<ActivityType, typeof IconPlus> = {
   checklist_item_checked: IconChecklist,
   checklist_item_unchecked: IconChecklist,
   checklist_item_removed: IconChecklist,
+  due_date_changed: IconCalendar,
 };
 
 function messageFor(group: ActivityGroup): string {
@@ -84,6 +85,8 @@ function messageFor(group: ActivityGroup): string {
       return `${name} a décoché ${plural ? `${count} éléments` : "un élément"} de la checklist de la tâche ${taskTitle}`;
     case "checklist_item_removed":
       return `${name} a supprimé ${plural ? `${count} éléments` : "un élément"} de la checklist de la tâche ${taskTitle}`;
+    case "due_date_changed":
+      return `${name} a changé l'échéance de « ${taskTitle} »${plural ? ` (${count} fois)` : ""}`;
     default:
       return `${name} a modifié la tâche ${taskTitle}`;
   }

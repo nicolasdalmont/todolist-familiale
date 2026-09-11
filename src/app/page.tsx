@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getMyNotifications, getRecentActivity, getTasks } from "@/lib/queries";
+import { getFamilyWeekActivity, getMyNotifications, getProfiles, getRecentActivity, getSharedTasksSnapshot, getTasks } from "@/lib/queries";
+import { challengeNeedsMembers, evaluateChallenge, getCurrentChallenge } from "@/lib/challenges";
+import { dateKeyFromDate } from "@/lib/format";
+import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { Topbar } from "@/components/Topbar";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { IconPlus } from "@/components/Icons";
@@ -32,11 +35,29 @@ export default async function HomePage() {
     getMyNotifications(profile.id),
   ]);
 
+  // Défi familial de la semaine (src/lib/challenges.ts) — pas de requête
+  // supplémentaire hors des 9 semaines couvertes (activeChallenge === null).
+  const activeChallenge = getCurrentChallenge(dateKeyFromDate(new Date()));
+  const challenge = activeChallenge
+    ? await (async () => {
+        const weekStartIso = parisWallTimeToUtcIso(`${activeChallenge.weekStart}T00:00`);
+        const [familyActivity, sharedTasks, members] = await Promise.all([
+          getFamilyWeekActivity(weekStartIso),
+          getSharedTasksSnapshot(),
+          challengeNeedsMembers(activeChallenge) ? getProfiles() : Promise.resolve([]),
+        ]);
+        return {
+          challenge: activeChallenge,
+          progress: evaluateChallenge(activeChallenge, { activity: familyActivity, sharedTasks, members }),
+        };
+      })()
+    : null;
+
   return (
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-28 pt-1">
-        <HomeDashboard profile={profile} tasks={tasks} activity={activity} notifications={notifications} />
+        <HomeDashboard profile={profile} tasks={tasks} activity={activity} notifications={notifications} challenge={challenge} />
       </main>
       <Link
         href="/tasks/new"

@@ -11,6 +11,7 @@ import type {
   ShareRole,
   Tag,
   Task,
+  TaskStatus,
   UserStats,
 } from "./types";
 import { canEdit, canView } from "./access";
@@ -367,6 +368,64 @@ export async function getRecentActivity(taskIds: string[], sinceIso: string): Pr
     console.error("getRecentActivity:", e instanceof Error ? e.message : e);
     return [];
   }
+}
+
+// Activité de la semaine pour le défi familial (src/lib/challenges.ts) —
+// même requête que getRecentActivity() mais SANS filtre `task_id` : un
+// défi porte sur toute la famille, pas sur les tâches visibles par
+// l'utilisateur qui regarde l'écran. Sûr par construction : logActivity()
+// (src/lib/actions.ts) n'est jamais appelée pour une tâche privée, donc
+// activity_log ne contient déjà que de l'activité partagée.
+export async function getFamilyWeekActivity(sinceIso: string): Promise<ActivityLogEntry[]> {
+  try {
+    const rows = await sql`
+      select al.id as id, al.task_id as task_id, al.task_title as task_title, al.actor_id as actor_id,
+             al.type as type, al.detail as detail, al.created_at as created_at,
+             u.id as actor_user_id, u.name as actor_name, u.color as actor_color
+      from activity_log al
+      left join users u on u.id = al.actor_id
+      where al.created_at >= ${sinceIso}
+      order by al.created_at desc
+    `;
+
+    return (
+      rows as Array<{
+        id: string;
+        task_id: string;
+        task_title: string;
+        actor_id: string;
+        type: ActivityLogEntry["type"];
+        detail: string | null;
+        created_at: string;
+        actor_user_id: string | null;
+        actor_name: string;
+        actor_color: string;
+      }>
+    ).map((row) => ({
+      id: row.id,
+      task_id: row.task_id,
+      task_title: row.task_title,
+      actor_id: row.actor_id,
+      type: row.type,
+      detail: row.detail,
+      created_at: row.created_at,
+      actor: row.actor_user_id ? { id: row.actor_user_id, name: row.actor_name, color: row.actor_color } : null,
+    }));
+  } catch (e) {
+    console.error("getFamilyWeekActivity:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+// Snapshot des tâches partagées pour le défi familial (src/lib/
+// challenges.ts) — utilisé pour les métriques du type "0 tâche partagée en
+// retard", qui portent sur l'état actuel des tâches, pas sur le journal
+// d'activité.
+export async function getSharedTasksSnapshot(): Promise<Array<{ id: string; due_at: string | null; status: TaskStatus }>> {
+  const rows = await sql`
+    select id, due_at, status from tasks where visibility = 'shared'
+  `;
+  return rows as unknown as Array<{ id: string; due_at: string | null; status: TaskStatus }>;
 }
 
 // Fil « À ton attention » de l'écran d'accueil (src/components/

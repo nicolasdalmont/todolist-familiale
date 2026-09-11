@@ -109,7 +109,8 @@ export type ActivityType =
   | "checklist_item_added"
   | "checklist_item_checked"
   | "checklist_item_unchecked"
-  | "checklist_item_removed";
+  | "checklist_item_removed"
+  | "due_date_changed";
 
 // Une ligne du journal d'activité — voir getRecentActivity() dans
 // src/lib/queries.ts. N'est jamais renvoyée que pour des tâches déjà
@@ -184,4 +185,43 @@ export interface UserStats {
   totalShared: number;
   weekPrivate: number;
   weekShared: number;
+}
+
+// Défis familiaux hebdomadaires — voir src/lib/challenges.ts (contenu +
+// moteur d'évaluation) et src/components/ChallengeCard.tsx (affichage sur
+// l'Accueil). Toujours calculés sur les tâches partagées uniquement, pour
+// toute la famille (pas par utilisateur) : ce sont des défis collectifs.
+
+// Une métrique de défi, en union discriminée par `kind`. `direction`
+// précise le sens de la progression : "atLeast" (viser target ou plus,
+// cas le plus courant) ou "atMost" (rester à target ou moins — ex. "0
+// changement d'échéance").
+export type ChallengeMetric =
+  | { kind: "activity_count"; activityType: ActivityType; target: number; direction: "atLeast" | "atMost"; dedupeByTaskId?: boolean; matchDetail?: string }
+  | { kind: "distinct_active_days"; activityType: ActivityType; target: number }
+  | { kind: "zero_overdue_shared" }
+  | { kind: "full_team_daily_completion"; target: number }
+  | { kind: "combo"; metrics: ChallengeMetric[] };
+
+export interface WeeklyChallenge {
+  // Clé "YYYY-MM-DD" (lundi, jour civil à Paris) — voir mondayOfWeek()
+  // dans src/lib/format.ts.
+  weekStart: string;
+  title: string;
+  description: string;
+  metric: ChallengeMetric;
+}
+
+// Résultat de l'évaluation d'une métrique — `current`/`target` sont
+// toujours des compteurs positifs, `success` tient compte de `direction`
+// (ex. current=0, target=0, direction="atMost" → success=true).
+export interface ChallengeProgress {
+  current: number;
+  target: number;
+  direction: "atLeast" | "atMost";
+  success: boolean;
+  label: string;
+  // Sous-progressions, uniquement pour une métrique "combo" (une entrée
+  // par sous-métrique, dans le même ordre).
+  parts?: ChallengeProgress[];
 }

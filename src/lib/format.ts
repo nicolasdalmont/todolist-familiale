@@ -201,3 +201,15 @@ export function upcomingSunday(from: Date): Date {
   noon.setUTCDate(noon.getUTCDate() + ((7 - noon.getUTCDay()) % 7));
   return noon;
 }
+
+// Renvoie une date dont le jour civil (à Paris) est le lundi de la semaine
+// de `from` (aujourd'hui inclus si on est déjà lundi) — même construction
+// que upcomingSunday() ci-dessus (ancrage midi UTC, seule la clé de date a
+// du sens). Sert de borne de semaine pour les défis familiaux
+// (src/lib/challenges.ts).
+export function mondayOfWeek(from: Date): Date {
+  const [y, m, d] = dateKeyFromDate(from).split("-").map(Number);
+  const noon = new Date(Date.UTC(y, m - 1, d, 12));
+  noon.setUTCDate(noon.getUTCDate() - ((noon.getUTCDay() + 6) % 7));
+  return noon;
+}

@@ -1,8 +1,6 @@
 import webpush from "web-push";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { sql } from "./db";
 import { getBadgeCount } from "./queries";
-
-type DB = SupabaseClient<any, "public", any>;
 
 // Envoi des notifications push web (protocole standard, RFC 8291/8292 —
 // aucun service tiers, aucun compte à créer, voir la feuille de route
@@ -45,18 +43,20 @@ function ensureConfigured(): void {
 // côté navigateur/OS, ex. désinstallation de la PWA) plutôt que de
 // continuer à tenter de lui écrire indéfiniment.
 export async function sendPushToUser(
-  supabase: DB,
   userId: string,
   payload: { title: string; body?: string | null; url?: string }
 ): Promise<void> {
-  const { data: subs, error } = await supabase
-    .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
-    .eq("user_id", userId);
-
-  // Table pas encore créée (migration 007 pas encore appliquée), ou
-  // erreur de lecture : dégrade en no-op, comme getRecentActivity().
-  if (error || !subs || subs.length === 0) return;
+  let subs: { id: string; endpoint: string; p256dh: string; auth: string }[];
+  try {
+    subs = (await sql`
+      select id, endpoint, p256dh, auth from push_subscriptions where user_id = ${userId}
+    `) as typeof subs;
+  } catch {
+    // Table pas encore créée, ou erreur de lecture : dégrade en no-op,
+    // comme getRecentActivity().
+    return;
+  }
+  if (subs.length === 0) return;
 
   try {
     ensureConfigured();
@@ -70,7 +70,7 @@ export async function sendPushToUser(
   // lues + tâches en retard, à l'instant de cet envoi. Best-effort — si le
   // calcul échoue, le service worker se rabat sur un indicateur générique
   // (setAppBadge() sans argument) plutôt que de bloquer l'envoi du push.
-  const badgeCount = await getBadgeCount(supabase, userId).catch(() => undefined);
+  const badgeCount = await getBadgeCount(userId).catch(() => undefined);
 
   const message = JSON.stringify({
     title: payload.title,
@@ -89,7 +89,7 @@ export async function sendPushToUser(
       } catch (err) {
         const statusCode = (err as { statusCode?: number } | null)?.statusCode;
         if (statusCode === 404 || statusCode === 410) {
-          await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          await sql`delete from push_subscriptions where id = ${sub.id}`;
         } else {
           console.error("sendPushToUser:", sub.id, err instanceof Error ? err.message : err);
         }

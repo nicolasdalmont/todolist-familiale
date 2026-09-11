@@ -1,8 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { sql } from "./db";
 import type { NotificationType } from "./types";
 import { sendPushToUser } from "./push";
-
-type DB = SupabaseClient<any, "public", any>;
 
 // Point d'entrée unique pour « prévenir quelqu'un » : crée une notification
 // « À ton attention » (fil de l'écran d'accueil, src/components/
@@ -17,30 +15,23 @@ type DB = SupabaseClient<any, "public", any>;
 // logActivity() dans src/lib/actions.ts : une erreur ici (table absente,
 // clés VAPID manquantes, etc.) ne doit jamais faire échouer l'action
 // principale qui la déclenche.
-export async function notifyUser(
-  supabase: DB,
-  params: {
-    userId: string;
-    type: NotificationType;
-    taskId?: string | null;
-    title: string;
-    body?: string | null;
-  }
-): Promise<void> {
+export async function notifyUser(params: {
+  userId: string;
+  type: NotificationType;
+  taskId?: string | null;
+  title: string;
+  body?: string | null;
+}): Promise<void> {
   try {
-    const { error } = await supabase.from("notifications").insert({
-      user_id: params.userId,
-      type: params.type,
-      task_id: params.taskId ?? null,
-      title: params.title,
-      body: params.body ?? null,
-    });
-    if (error) console.error("notifyUser:", error.message);
+    await sql`
+      insert into notifications (user_id, type, task_id, title, body)
+      values (${params.userId}, ${params.type}, ${params.taskId ?? null}, ${params.title}, ${params.body ?? null})
+    `;
   } catch (e) {
-    console.error("notifyUser:", e);
+    console.error("notifyUser:", e instanceof Error ? e.message : e);
   }
 
-  await sendPushToUser(supabase, params.userId, {
+  await sendPushToUser(params.userId, {
     title: params.title,
     body: params.body,
     url: params.taskId ? `/tasks/${params.taskId}` : "/",
@@ -53,31 +44,29 @@ export async function notifyUser(
 // omis pour une notification système sans auteur (ex. rappel d'échéance,
 // voir /api/cron/reminders), qui doit alors atteindre tout le monde y
 // compris le créateur d'une tâche privée.
-export async function notifyTaskParticipants(
-  supabase: DB,
-  params: {
-    taskId: string;
-    excludeUserId?: string;
-    type: NotificationType;
-    title: string;
-    body?: string | null;
-  }
-): Promise<void> {
-  const [{ data: task }, { data: assignees }] = await Promise.all([
-    supabase.from("tasks").select("created_by").eq("id", params.taskId).maybeSingle(),
-    supabase.from("task_assignees").select("user_id").eq("task_id", params.taskId),
+export async function notifyTaskParticipants(params: {
+  taskId: string;
+  excludeUserId?: string;
+  type: NotificationType;
+  title: string;
+  body?: string | null;
+}): Promise<void> {
+  const [taskRows, assigneeRows] = await Promise.all([
+    sql`select created_by from tasks where id = ${params.taskId}`,
+    sql`select user_id from task_assignees where task_id = ${params.taskId}`,
   ]);
+  const task = taskRows[0] as { created_by: string } | undefined;
   if (!task) return;
 
   const recipients = new Set<string>([
     task.created_by,
-    ...(assignees ?? []).map((a) => a.user_id as string),
+    ...(assigneeRows as { user_id: string }[]).map((a) => a.user_id),
   ]);
   if (params.excludeUserId) recipients.delete(params.excludeUserId);
 
   await Promise.all(
     [...recipients].map((userId) =>
-      notifyUser(supabase, {
+      notifyUser({
         userId,
         type: params.type,
         taskId: params.taskId,
@@ -90,7 +79,7 @@ export async function notifyTaskParticipants(
 
 // Prénom d'un utilisateur, pour composer le texte d'une notification
 // (« Virgile a commenté … »). Repli neutre si introuvable.
-export async function actorName(supabase: DB, userId: string): Promise<string> {
-  const { data } = await supabase.from("users").select("name").eq("id", userId).maybeSingle();
-  return data?.name ?? "Quelqu'un";
+export async function actorName(userId: string): Promise<string> {
+  const rows = await sql`select name from users where id = ${userId}`;
+  return (rows[0] as { name: string } | undefined)?.name ?? "Quelqu'un";
 }

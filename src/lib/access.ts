@@ -1,7 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { sql } from "./db";
 import type { Task, Visibility } from "./types";
-
-type DB = SupabaseClient<any, "public", any>;
 
 // Contrôle d'accès aux tâches : chaque tâche est privée par défaut (visible
 // uniquement par son créateur) et n'est visible/éditable par d'autres que
@@ -44,7 +42,6 @@ export function computeVisibility(creatorId: string, shareUserIds: string[]): Vi
 // que le créateur y a accès), pas sur une tâche privée où personne d'autre
 // ne pourrait de toute façon voir l'activité.
 export async function getTaskAccess(
-  supabase: DB,
   taskId: string,
   userId: string
 ): Promise<{
@@ -55,11 +52,10 @@ export async function getTaskAccess(
   canView: boolean;
   canEdit: boolean;
 }> {
-  const { data: task } = await supabase
-    .from("tasks")
-    .select("id, created_by, title, visibility")
-    .eq("id", taskId)
-    .maybeSingle();
+  const taskRows = await sql`
+    select id, created_by, title, visibility from tasks where id = ${taskId}
+  `;
+  const task = taskRows[0] as { id: string; created_by: string; title: string; visibility: Visibility } | undefined;
   if (!task) return { exists: false, canView: false, canEdit: false };
 
   if (task.created_by === userId) {
@@ -73,12 +69,10 @@ export async function getTaskAccess(
     };
   }
 
-  const { data: share } = await supabase
-    .from("task_assignees")
-    .select("role")
-    .eq("task_id", taskId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const shareRows = await sql`
+    select role from task_assignees where task_id = ${taskId} and user_id = ${userId}
+  `;
+  const share = shareRows[0] as { role: "editor" | "viewer" } | undefined;
 
   if (!share) {
     return {

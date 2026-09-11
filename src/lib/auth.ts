@@ -2,15 +2,14 @@ import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
-import { createAdminClient } from "./supabase/admin";
+import { sql } from "./db";
 import type { Profile } from "./types";
 
 // Authentification maison : la table publique "users" stocke un hash de
 // mot de passe (scrypt) pour chaque membre de la famille, et la session est
 // portée par un cookie contenant un JWT signé (bibliothèque "jose", choisie
 // pour sa compatibilité avec le runtime Edge utilisé par le middleware).
-// Il n'y a plus de dépendance à Supabase Auth : Supabase ne sert plus que
-// de base Postgres, interrogée côté serveur via la clé service_role.
+// L'accès à la base se fait en SQL direct via src/lib/db.ts (Neon).
 
 const SESSION_COOKIE = "session";
 const KEY_LENGTH = 64;
@@ -76,12 +75,11 @@ export async function setSessionCookie(userId: string): Promise<void> {
 // elle-même si la mise à jour échoue : ce n'est qu'une statistique, pas
 // une condition d'accès.
 export async function recordLogin(userId: string): Promise<void> {
-  const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("users")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("id", userId);
-  if (error) console.warn("Impossible d'enregistrer la dernière connexion :", error.message);
+  try {
+    await sql`update users set last_login_at = now() where id = ${userId}`;
+  } catch (e) {
+    console.warn("Impossible d'enregistrer la dernière connexion :", e instanceof Error ? e.message : e);
+  }
 }
 
 // Rafraîchit users.last_login_at ("dernière activité" de l'écran /admin) au
@@ -94,19 +92,15 @@ export async function recordLogin(userId: string): Promise<void> {
 // échoue.
 const LAST_SEEN_REFRESH_MS = 15 * 60 * 1000;
 
-async function touchLastSeen(
-  supabase: ReturnType<typeof createAdminClient>,
-  userId: string,
-  currentValue: string | null
-): Promise<void> {
+async function touchLastSeen(userId: string, currentValue: string | null): Promise<void> {
   const last = currentValue ? Date.parse(currentValue) : 0;
   if (Date.now() - last < LAST_SEEN_REFRESH_MS) return;
 
-  const { error } = await supabase
-    .from("users")
-    .update({ last_login_at: new Date().toISOString() })
-    .eq("id", userId);
-  if (error) console.warn("Impossible de rafraîchir la dernière activité :", error.message);
+  try {
+    await sql`update users set last_login_at = now() where id = ${userId}`;
+  } catch (e) {
+    console.warn("Impossible de rafraîchir la dernière activité :", e instanceof Error ? e.message : e);
+  }
 }
 
 export function clearSessionCookie(): void {
@@ -132,19 +126,18 @@ export async function getCurrentUser(): Promise<Profile | null> {
   const userId = await getSessionUserId();
   if (!userId) return null;
 
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("users")
-    .select("id, name, role, color, password_set, created_at, last_login_at")
-    .eq("id", userId)
-    .maybeSingle();
-
+  const rows = await sql`
+    select id, name, role, color, password_set, created_at, last_login_at
+    from users
+    where id = ${userId}
+  `;
+  const data = rows[0] as (Profile & { last_login_at: string | null }) | undefined;
   if (!data) return null;
 
-  await touchLastSeen(supabase, userId, (data.last_login_at as string | null) ?? null);
+  await touchLastSeen(userId, data.last_login_at ?? null);
 
   const { last_login_at: _lastSeen, ...profile } = data;
-  return profile as Profile;
+  return profile;
 }
 
 // À utiliser en tête de chaque page/écran authentifié à la place de

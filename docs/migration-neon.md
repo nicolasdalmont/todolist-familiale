@@ -398,59 +398,89 @@ Supabase et Neon sont du Postgres standard.
   ni un fichier committé.
 - [ ] `node db/migrate.mjs` (Supabase → projet Neon **de test**).
 - [ ] Vérifier les `count(*)` des 12 tables (le script le fait).
-- [ ] Contrôles ponctuels :
-  - [ ] `users` : les 4 profils, `password_hash` **non nul et identique** à la
-    source (⇒ mots de passe existants toujours valides).
-  - [ ] `tasks` : nombre correct, `recurrence` (jsonb) bien transféré sur
-    2-3 lignes, `due_at` cohérents.
-  - [ ] `task_assignees` : rôles `editor`/`viewer` préservés.
-  - [ ] `categories` / `app_settings` : présents (sinon `neon_schema.sql` les
-    a semés — vérifier qu'il n'y a pas de doublon).
-  - [ ] `push_subscriptions` : endpoints + clés `p256dh`/`auth` intacts.
-  - [ ] `activity_log`, `notifications` : `read_at` / `actor_id` cohérents.
-- [ ] Pas de séquences à resynchroniser (tous les `id` en `uuid default
+**Statut : VALIDÉE (11/09/2026).** `node db/migrate.mjs` exécuté Supabase →
+`checkberry` (Neon, pas de projet de test séparé — voir Phase 1). Les 12
+tables matchent (4 users, 20 tasks, 43 task_assignees, 8 categories, 1
+app_settings, 12 tags, 24 task_tags, 6 checklist_items, 10 comments, 22
+activity_log, 37 notifications, 3 push_subscriptions).
+
+- [x] Contrôles ponctuels :
+  - [x] `users` : les 4 profils, `password_hash` **identique octet pour
+    octet** à la source pour chacun.
+  - [x] `tasks` : `recurrence` (jsonb) bien typé et transféré, `due_at`
+    cohérents.
+  - [x] `task_assignees` : rôles `editor`/`viewer` préservés (33/10 des
+    deux côtés).
+  - [x] `categories` / `app_settings` : repris de la source (8 catégories,
+    réglage rappel).
+  - [x] `push_subscriptions` : endpoints + clés `p256dh`/`auth` intacts sur
+    les 3 abonnements.
+  - [ ] `activity_log`, `notifications` : volumes vérifiés (22/37), pas de
+    contrôle détaillé `read_at`/`actor_id` — jugé secondaire vu le reste.
+- [x] Pas de séquences à resynchroniser (tous les `id` en `uuid default
   gen_random_uuid()`).
+
+**Incident de sécurité mineur** : les deux chaînes de connexion directes
+(Supabase et Neon, mot de passe inclus) sont passées en clair dans le chat
+pendant cette phase (l'utilisateur a collé les commandes `export` au lieu
+de les taper directement dans son terminal). Aucune conséquence
+fonctionnelle, mais **les deux mots de passe doivent être régénérés**
+(Supabase : bouton Connect → reset database password ; Neon : Connection
+Details → reset password) dès que la phase en cours n'en a plus besoin.
 
 ---
 
 ## 8. Phase 4 — Recette fonctionnelle (Preview Vercel sur Neon de test)
 
-Brancher le Preview sur le projet Neon **de test** (copie des données via
-Phase 3). Parcours à valider avec 1-2 membres réels :
+**Statut : globalement validée (11/09/2026)**, sur le Preview Vercel de la
+branche `migration-neon` branché sur `checkberry` (pas de projet Neon de
+test séparé, cf. Phase 1). Parcours de base validé par l'utilisateur ; le
+détail exhaustif de la checklist n'a pas été coché item par item, et les
+notifications/push sont explicitement reportées à la bascule prod (pas
+testables facilement en Preview — abonnements liés à une origine).
 
-- [ ] **Connexion** : choix de profil, **connexion avec un mot de passe
-  existant** (validation cruciale du `password_hash`), première connexion
-  (mot de passe temporaire → définitif), changement de mot de passe connecté.
-- [ ] **Accueil** : compteurs (en retard / aujourd'hui / semaine), salutation,
-  fil « À ton attention », « Activité du jour », « Partagées avec toi »,
-  invite notifications, pastille App Badge.
-- [ ] **Tâches** : liste, recherche, tous les filtres (statuts, catégorie,
-  intervalle d'échéance, visibilité, en retard, lecture seule, tags), résumé
-  de filtre, bandeau « Filtré depuis l'accueil », mémorisation session.
-- [ ] **Tâche** : création (partage par personne + rôle, tags à la volée,
-  catégorie, récurrence, raccourcis d'échéance), détail, changement de
-  statut (+ régénération d'occurrence récurrente), checklist (coche optimiste,
-  suppression annulable), commentaires (ajout, suppression annulable,
-  modération créateur), export `.ics`, modification, suppression (confirmation).
-- [ ] **Admin** : onglet Membres (créer avec mot de passe temporaire,
-  renommer, changer de rôle, réinitialiser, supprimer + cascade), onglet
-  Catégories (créer, renommer, icône, réordonner, supprimer + réaffectation),
-  onglet Réglages (interrupteur rappel), onglet Activité (stats).
-- [ ] **Notifications** : partage d'une tâche → notif + push reçus par le
-  destinataire ; commentaire → notif ; suppression → notif sans lien ;
-  dédoublonnage avec « Activité ». Opt-in depuis « Mon compte », push réel
-  sur un appareil.
-- [ ] **Rappel d'échéance** : déclencher `/api/cron/reminders` à la main
-  (avec `CRON_SECRET`), vérifier l'envoi et le garde-fou anti-doublon.
-- [ ] **Session périmée** : supprimer un membre connecté → il retombe sur
-  `/login` sans boucle (`/api/session/end`).
-- [ ] **PWA** : install, `manifest.webmanifest`, tirer pour rafraîchir,
-  barre d'onglets, zones sûres iOS.
-- [ ] **Rafraîchissement auto** (`/api/version`) : inchangé, revérifier.
-- [ ] **Latence** : acceptable même avec cold start Neon.
-- [ ] **Répéter à blanc le rollback données** : `node db/migrate.mjs
-  --rollback` (Neon de test → projet Supabase **jetable**), vérifier les
-  volumes. *Un rollback jamais testé n'est pas un rollback.*
+- [x] **Connexion** : validée — a nécessité un aller-retour (voir « Bug
+  détecté » ci-dessous) avant de fonctionner.
+- [x] **Accueil**, **Tâches**, **Tâche** (détail/actions), **Admin** :
+  parcours de base validés par l'utilisateur (« le reste est ok »).
+- [ ] **Notifications** : **reporté à la bascule prod** — décision
+  utilisateur, pas un échec constaté.
+- [ ] **Rappel d'échéance** (`/api/cron/reminders`) : pas testé.
+- [ ] **Session périmée** : pas testé.
+- [ ] **PWA** : pas testé en détail.
+- [ ] **Rafraîchissement auto** (`/api/version`) : pas testé.
+- [x] **Latence** : pas de souci remonté.
+- [ ] **Répéter à blanc le rollback données** : pas fait — nécessite un
+  projet Supabase jetable, pas encore créé. À faire avant la Phase 5 si on
+  veut un filet niveau 3 testé (le niveau 1, Instant Rollback Vercel,
+  reste disponible sans préparation).
+
+### Bug détecté et corrigé pendant cette phase
+
+`src/lib/access.ts` importait `sql` (src/lib/db.ts) au niveau du module
+pour `getTaskAccess()`, alors que les fonctions pures du même fichier
+(`canView`/`canEdit`/`computeVisibility`) sont importées par des
+composants **client** (`TaskFilterList.tsx`, `HomeDashboard.tsx`). Next.js
+embarquait donc le client Neon dans le bundle navigateur, où
+`DATABASE_URL` n'existe jamais → erreur `"DATABASE_URL manquante..."` au
+premier rendu de ces pages, masquée par l'error boundary générique
+(`src/app/error.tsx`) et invisible dans les logs serveur (l'erreur se
+produit côté navigateur — il a fallu regarder la console, pas les Runtime
+Logs Vercel). Corrigé en déplaçant `getTaskAccess()` dans
+`src/lib/actions.ts` ("use server", seule appelante) — voir commit
+`209df78`. Leçon pour la suite de la réécriture (pages/composants non
+encore audités en profondeur) : tout module importé par un composant
+client doit rester exempt d'import *valeur* de `src/lib/db.ts`.
+
+### Autres points rencontrés (hors bug applicatif)
+
+- Un déploiement Vercel ne prend en compte un changement de variable
+  d'environnement qu'après un **nouveau déploiement** — le bouton
+  « Redeploy » réutilise le commit d'origine, il faut redéployer depuis la
+  branche à jour pour à la fois avoir le dernier code ET les dernières
+  variables.
+- Preview protégé par le SSO Vercel (Deployment Protection) : normal en
+  navigation privée / pour un visiteur non authentifié à l'équipe Vercel.
 
 ---
 

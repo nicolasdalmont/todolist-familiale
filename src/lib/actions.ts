@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { getUserWithPasswordHash, upsertTagIds } from "@/lib/queries";
 import { computeVisibility, getTaskAccess } from "@/lib/access";
 import {
@@ -20,13 +20,11 @@ import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notificatio
 import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus } from "@/lib/types";
 
-async function syncTaskTags(supabase: ReturnType<typeof createAdminClient>, taskId: string, tagNames: string[]) {
-  const tagIds = await upsertTagIds(supabase, tagNames);
-  await supabase.from("task_tags").delete().eq("task_id", taskId);
+async function syncTaskTags(taskId: string, tagNames: string[]) {
+  const tagIds = await upsertTagIds(tagNames);
+  await sql`delete from task_tags where task_id = ${taskId}`;
   if (tagIds.length) {
-    const rows = tagIds.map((tagId) => ({ task_id: taskId, tag_id: tagId }));
-    const { error } = await supabase.from("task_tags").insert(rows);
-    if (error) throw new Error(error.message);
+    await sql`insert into task_tags (task_id, tag_id) select ${taskId}, unnest(${tagIds}::uuid[])`;
   }
 }
 
@@ -47,6 +45,19 @@ function parseShareRoles(formData: FormData, creatorId: string): Map<string, Sha
   return roles;
 }
 
+// Insère les lignes task_assignees d'une tâche en un aller-retour : le
+// couple (id, role) parallèle est reconstitué côté Postgres via
+// unnest(tableau1, tableau2), qui produit une ligne par paire — plus
+// simple qu'un insert multi-lignes construit à la main.
+async function insertAssignees(taskId: string, shareRoles: Map<string, ShareRole>) {
+  const ids = Array.from(shareRoles.keys());
+  const roles = Array.from(shareRoles.values());
+  await sql`
+    insert into task_assignees (task_id, user_id, role)
+    select ${taskId}, u, r from unnest(${ids}::uuid[], ${roles}::text[]) as t(u, r)
+  `;
+}
+
 // --- Journal d'activité --------------------------------------------------
 //
 // Alimente le fil "Activité du jour" de l'écran d'accueil
@@ -57,25 +68,23 @@ function parseShareRoles(formData: FormData, creatorId: string): Map<string, Sha
 // pourrait de toute façon voir cette activité, inutile de l'écrire.
 //
 // Écriture volontairement non bloquante : si la table `activity_log`
-// n'existe pas encore (supabase/migrations/005_activity_log.sql pas encore
-// appliquée) ou pour toute autre erreur d'écriture, on logue côté serveur
-// et on continue plutôt que de faire échouer l'action principale (créer une
-// tâche, commenter, etc.), qui elle doit toujours réussir.
-async function logActivity(
-  supabase: ReturnType<typeof createAdminClient>,
-  params: { taskId: string; actorId: string; type: ActivityType; taskTitle: string; detail?: string | null }
-) {
+// n'existe pas encore ou pour toute autre erreur d'écriture, on logue côté
+// serveur et on continue plutôt que de faire échouer l'action principale
+// (créer une tâche, commenter, etc.), qui elle doit toujours réussir.
+async function logActivity(params: {
+  taskId: string;
+  actorId: string;
+  type: ActivityType;
+  taskTitle: string;
+  detail?: string | null;
+}) {
   try {
-    const { error } = await supabase.from("activity_log").insert({
-      task_id: params.taskId,
-      actor_id: params.actorId,
-      type: params.type,
-      task_title: params.taskTitle,
-      detail: params.detail ?? null,
-    });
-    if (error) console.error("logActivity:", error.message);
+    await sql`
+      insert into activity_log (task_id, actor_id, type, task_title, detail)
+      values (${params.taskId}, ${params.actorId}, ${params.type}, ${params.taskTitle}, ${params.detail ?? null})
+    `;
   } catch (e) {
-    console.error("logActivity:", e);
+    console.error("logActivity:", e instanceof Error ? e.message : e);
   }
 }
 
@@ -83,21 +92,17 @@ async function logActivity(
 // (migration 009) — repli sur « autre » si absent (formulaire d'une autre
 // session, valeur trafiquée…). La FK ON DELETE RESTRICT ferait de toute
 // façon échouer un slug inconnu, mais on préfère un repli silencieux.
-async function resolveCategorySlug(
-  supabase: ReturnType<typeof createAdminClient>,
-  raw: string
-): Promise<string> {
+async function resolveCategorySlug(raw: string): Promise<string> {
   const slug = raw.trim();
   if (!slug) return FALLBACK_CATEGORY_SLUG;
-  const { data, error } = await supabase
-    .from("categories")
-    .select("slug")
-    .eq("slug", slug)
-    .maybeSingle();
-  // Table absente (migration 009 pas encore jouée) : on fait confiance à
-  // la valeur soumise, déjà validée côté client contre DEFAULT_CATEGORIES.
-  if (error) return slug;
-  return data ? slug : FALLBACK_CATEGORY_SLUG;
+  try {
+    const rows = await sql`select slug from categories where slug = ${slug}`;
+    return rows[0] ? slug : FALLBACK_CATEGORY_SLUG;
+  } catch {
+    // Table absente (migration 009 pas encore jouée) : on fait confiance à
+    // la valeur soumise, déjà validée côté client contre DEFAULT_CATEGORIES.
+    return slug;
+  }
 }
 
 function parseRecurrence(formData: FormData): Recurrence {
@@ -121,8 +126,7 @@ export async function loginAction(
   password: string,
   next?: string
 ): Promise<{ error?: string }> {
-  const supabase = createAdminClient();
-  const user = await getUserWithPasswordHash(supabase, userId);
+  const user = await getUserWithPasswordHash(userId);
 
   if (!user || !verifyPassword(password, user.password_hash)) {
     return { error: "Mot de passe incorrect." };
@@ -146,8 +150,7 @@ export async function setPasswordAction(
     return { error: "Le mot de passe doit contenir au moins 6 caractères." };
   }
 
-  const supabase = createAdminClient();
-  const user = await getUserWithPasswordHash(supabase, userId);
+  const user = await getUserWithPasswordHash(userId);
 
   if (!user || !verifyPassword(currentPassword, user.password_hash)) {
     return {
@@ -157,12 +160,11 @@ export async function setPasswordAction(
     };
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ password_hash: hashPassword(newPassword), password_set: true })
-    .eq("id", userId);
-
-  if (error) return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+  try {
+    await sql`update users set password_hash = ${hashPassword(newPassword)}, password_set = true where id = ${userId}`;
+  } catch {
+    return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+  }
 
   await setSessionCookie(userId);
   await recordLogin(userId);
@@ -185,17 +187,16 @@ export async function changePasswordAction(
     return { error: "Le mot de passe doit contenir au moins 6 caractères." };
   }
 
-  const supabase = createAdminClient();
-  const user = await getUserWithPasswordHash(supabase, userId);
+  const user = await getUserWithPasswordHash(userId);
   if (!user || !verifyPassword(currentPassword, user.password_hash)) {
     return { error: "Mot de passe actuel incorrect." };
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ password_hash: hashPassword(newPassword), password_set: true })
-    .eq("id", userId);
-  if (error) return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+  try {
+    await sql`update users set password_hash = ${hashPassword(newPassword)}, password_set = true where id = ${userId}`;
+  } catch {
+    return { error: "Impossible d'enregistrer le nouveau mot de passe. Réessaie." };
+  }
 
   return { ok: true };
 }
@@ -211,8 +212,6 @@ export async function createTaskAction(formData: FormData) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
-
   const title = String(formData.get("title") || "").trim();
   if (!title) return;
 
@@ -221,48 +220,40 @@ export async function createTaskAction(formData: FormData) {
   const dueAt = dueAtRaw ? parisWallTimeToUtcIso(dueAtRaw) : null;
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");
-  const category = await resolveCategorySlug(supabase, categoryRaw);
+  const category = await resolveCategorySlug(categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
 
   const shareRoles = parseShareRoles(formData, userId);
   const visibility = computeVisibility(userId, Array.from(shareRoles.keys()));
 
-  const { data: task, error } = await supabase
-    .from("tasks")
-    .insert({
-      title,
-      description,
-      due_at: dueAt,
-      visibility,
-      recurrence,
-      category,
-      created_by: userId,
-    })
-    .select()
-    .single();
-
-  if (error || !task) {
-    throw new Error(error?.message || "Impossible de créer la tâche.");
+  let task: { id: string } | undefined;
+  try {
+    const rows = await sql`
+      insert into tasks (title, description, due_at, visibility, recurrence, category, created_by)
+      values (${title}, ${description}, ${dueAt}, ${visibility}, ${JSON.stringify(recurrence)}, ${category}, ${userId})
+      returning *
+    `;
+    task = rows[0] as { id: string } | undefined;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible de créer la tâche.");
   }
+  if (!task) throw new Error("Impossible de créer la tâche.");
 
-  const rows = Array.from(shareRoles.entries()).map(([id, role]) => ({ task_id: task.id, user_id: id, role }));
-  const { error: assignError } = await supabase.from("task_assignees").insert(rows);
-  if (assignError) throw new Error(assignError.message);
-
-  await syncTaskTags(supabase, task.id, tagNames);
+  await insertAssignees(task.id, shareRoles);
+  await syncTaskTags(task.id, tagNames);
 
   if (visibility === "shared") {
-    await logActivity(supabase, { taskId: task.id, actorId: userId, type: "task_created", taskTitle: title });
+    await logActivity({ taskId: task.id, actorId: userId, type: "task_created", taskTitle: title });
     // Notifier chaque personne avec qui la tâche est partagée (hors créateur).
-    const who = await actorName(supabase, userId);
+    const who = await actorName(userId);
     await Promise.all(
       Array.from(shareRoles.keys())
         .filter((id) => id !== userId)
         .map((id) =>
-          notifyUser(supabase, {
+          notifyUser({
             userId: id,
             type: "task_shared",
-            taskId: task.id,
+            taskId: task!.id,
             title: `${who} t'a partagé « ${title} »`,
           })
         )
@@ -278,11 +269,10 @@ export async function updateTaskAction(formData: FormData) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   if (!taskId) return;
 
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists) return;
   if (!access.canEdit) {
     throw new Error("Tu n'as pas le droit de modifier cette tâche.");
@@ -298,7 +288,7 @@ export async function updateTaskAction(formData: FormData) {
   const status = String(formData.get("status") || "todo");
   const recurrence = parseRecurrence(formData);
   const categoryRaw = String(formData.get("category") || "");
-  const category = await resolveCategorySlug(supabase, categoryRaw);
+  const category = await resolveCategorySlug(categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
 
   // Le créateur original garde toujours l'accès complet, même si la
@@ -306,29 +296,33 @@ export async function updateTaskAction(formData: FormData) {
   const shareRoles = parseShareRoles(formData, creatorId);
   const visibility = computeVisibility(creatorId, Array.from(shareRoles.keys()));
 
-  const { error } = await supabase
-    .from("tasks")
-    .update({ title, description, due_at: dueAt, visibility, status, recurrence, category })
-    .eq("id", taskId);
-  if (error) throw new Error(error.message);
+  try {
+    await sql`
+      update tasks
+      set title = ${title}, description = ${description}, due_at = ${dueAt},
+          visibility = ${visibility}, status = ${status}, recurrence = ${JSON.stringify(recurrence)}, category = ${category}
+      where id = ${taskId}
+    `;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour la tâche.");
+  }
 
   // Partage effectif avant modification, pour ne notifier que les personnes
   // réellement ajoutées par cette modification (pas celles déjà présentes).
-  const { data: prevAssignees } = await supabase
-    .from("task_assignees")
-    .select("user_id")
-    .eq("task_id", taskId);
-  const previouslyShared = new Set((prevAssignees ?? []).map((a) => a.user_id as string));
+  const prevAssigneeRows = await sql`select user_id from task_assignees where task_id = ${taskId}`;
+  const previouslyShared = new Set((prevAssigneeRows as { user_id: string }[]).map((a) => a.user_id));
 
-  await supabase.from("task_assignees").delete().eq("task_id", taskId);
-  const rows = Array.from(shareRoles.entries()).map(([id, role]) => ({ task_id: taskId, user_id: id, role }));
-  const { error: assignError } = await supabase.from("task_assignees").insert(rows);
-  if (assignError) throw new Error(assignError.message);
+  await sql`delete from task_assignees where task_id = ${taskId}`;
+  try {
+    await insertAssignees(taskId, shareRoles);
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible d'enregistrer le partage.");
+  }
 
-  await syncTaskTags(supabase, taskId, tagNames);
+  await syncTaskTags(taskId, tagNames);
 
   if (visibility === "shared") {
-    await logActivity(supabase, { taskId, actorId: userId, type: "task_updated", taskTitle: title });
+    await logActivity({ taskId, actorId: userId, type: "task_updated", taskTitle: title });
 
     // Seules les personnes **nouvellement** ajoutées par cette modification
     // reçoivent une notification (« t'a partagé »). La modification d'une
@@ -340,10 +334,10 @@ export async function updateTaskAction(formData: FormData) {
       (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
     );
     if (newlyShared.length > 0) {
-      const who = await actorName(supabase, userId);
+      const who = await actorName(userId);
       await Promise.all(
         newlyShared.map((id) =>
-          notifyUser(supabase, {
+          notifyUser({
             userId: id,
             type: "task_shared",
             taskId,
@@ -364,11 +358,10 @@ export async function deleteTaskAction(formData: FormData) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   if (!taskId) return;
 
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists) return;
   if (!access.canEdit) {
     throw new Error("Tu n'as pas le droit de supprimer cette tâche.");
@@ -382,22 +375,19 @@ export async function deleteTaskAction(formData: FormData) {
   const taskTitle = access.title ?? "une tâche";
   let recipients: string[] = [];
   if (access.visibility === "shared") {
-    const { data: assignees } = await supabase
-      .from("task_assignees")
-      .select("user_id")
-      .eq("task_id", taskId);
+    const assigneeRows = await sql`select user_id from task_assignees where task_id = ${taskId}`;
     recipients = Array.from(
-      new Set([access.createdBy!, ...(assignees ?? []).map((a) => a.user_id as string)])
+      new Set([access.createdBy!, ...(assigneeRows as { user_id: string }[]).map((a) => a.user_id)])
     ).filter((id) => id !== userId);
   }
 
-  await supabase.from("tasks").delete().eq("id", taskId);
+  await sql`delete from tasks where id = ${taskId}`;
 
   if (recipients.length > 0) {
-    const who = await actorName(supabase, userId);
+    const who = await actorName(userId);
     await Promise.all(
       recipients.map((id) =>
-        notifyUser(supabase, {
+        notifyUser({
           userId: id,
           type: "task_deleted",
           taskId: null,
@@ -419,19 +409,32 @@ export async function setStatusAction(taskId: string, status: string) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
-
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists) return;
   if (!access.canEdit) {
     throw new Error("Tu n'as pas le droit de modifier le statut de cette tâche.");
   }
 
-  const { data: task } = await supabase.from("tasks").select("*").eq("id", taskId).single();
+  const taskRows = await sql`select * from tasks where id = ${taskId}`;
+  const task = taskRows[0] as
+    | {
+        id: string;
+        title: string;
+        description: string;
+        due_at: string | null;
+        recurrence: Recurrence;
+        visibility: "shared" | "private";
+        category: string;
+        created_by: string;
+      }
+    | undefined;
   if (!task) return;
 
-  const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
-  if (error) throw new Error(error.message);
+  try {
+    await sql`update tasks set status = ${status} where id = ${taskId}`;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour le statut.");
+  }
 
   if (task.visibility === "shared") {
     // Un changement de statut n'est plus notifié (ni push, ni pastille) :
@@ -439,7 +442,7 @@ export async function setStatusAction(taskId: string, status: string) {
     // une sollicitation — ça reste visible dans « Activité du jour » via
     // logActivity (audit UX INC-7, 10/09/2026).
     const statusLabel = STATUS_LABELS[status as TaskStatus] ?? status;
-    await logActivity(supabase, {
+    await logActivity({
       taskId,
       actorId: userId,
       type: "status_changed",
@@ -451,44 +454,43 @@ export async function setStatusAction(taskId: string, status: string) {
   if (status === "done" && task.recurrence && task.recurrence.type !== "none") {
     const next = computeNextOccurrence(task.due_at, task.recurrence);
     if (next) {
-      const { data: newTask } = await supabase
-        .from("tasks")
-        .insert({
-          title: task.title,
-          description: task.description,
-          due_at: next,
-          recurrence: task.recurrence,
-          visibility: task.visibility,
-          category: task.category,
-          created_by: task.created_by,
-          status: "todo",
-        })
-        .select()
-        .single();
+      const newRows = await sql`
+        insert into tasks (title, description, due_at, recurrence, visibility, category, created_by, status)
+        values (${task.title}, ${task.description}, ${next}, ${JSON.stringify(task.recurrence)}, ${task.visibility}, ${task.category}, ${task.created_by}, 'todo')
+        returning *
+      `;
+      const newTask = newRows[0] as { id: string } | undefined;
 
       if (newTask) {
-        const [{ data: assignees }, { data: taskTags }, { data: checklistItems }] = await Promise.all([
-          supabase.from("task_assignees").select("user_id, role").eq("task_id", taskId),
-          supabase.from("task_tags").select("tag_id").eq("task_id", taskId),
-          supabase.from("checklist_items").select("label").eq("task_id", taskId),
+        const [assignees, taskTags, checklistItems] = await Promise.all([
+          sql`select user_id, role from task_assignees where task_id = ${taskId}`,
+          sql`select tag_id from task_tags where task_id = ${taskId}`,
+          sql`select label from checklist_items where task_id = ${taskId}`,
         ]);
-        if (assignees?.length) {
-          await supabase
-            .from("task_assignees")
-            .insert(assignees.map((a) => ({ task_id: newTask.id, user_id: a.user_id, role: a.role })));
+        const assigneeRows = assignees as { user_id: string; role: string }[];
+        if (assigneeRows.length) {
+          const ids = assigneeRows.map((a) => a.user_id);
+          const roles = assigneeRows.map((a) => a.role);
+          await sql`
+            insert into task_assignees (task_id, user_id, role)
+            select ${newTask.id}, u, r from unnest(${ids}::uuid[], ${roles}::text[]) as t(u, r)
+          `;
         }
-        if (taskTags?.length) {
-          await supabase
-            .from("task_tags")
-            .insert(taskTags.map((t) => ({ task_id: newTask.id, tag_id: t.tag_id })));
+        const tagRows = taskTags as { tag_id: string }[];
+        if (tagRows.length) {
+          const tagIds = tagRows.map((t) => t.tag_id);
+          await sql`insert into task_tags (task_id, tag_id) select ${newTask.id}, unnest(${tagIds}::uuid[])`;
         }
         // La checklist repart décochée sur la nouvelle occurrence — recopier
         // l'état "coché" de la tâche qui vient de se terminer n'aurait pas
         // de sens pour une tâche récurrente (ex. liste de courses).
-        if (checklistItems?.length) {
-          await supabase
-            .from("checklist_items")
-            .insert(checklistItems.map((c) => ({ task_id: newTask.id, label: c.label, done: false })));
+        const checklistRows = checklistItems as { label: string }[];
+        if (checklistRows.length) {
+          const labels = checklistRows.map((c) => c.label);
+          await sql`
+            insert into checklist_items (task_id, label, done)
+            select ${newTask.id}, u, false from unnest(${labels}::text[]) as u
+          `;
         }
       }
     }
@@ -503,23 +505,25 @@ export async function addCommentAction(formData: FormData) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   const body = String(formData.get("body") || "").trim();
   if (!taskId || !body) return;
 
   // Un lecteur ("viewer") peut commenter, pas seulement un éditeur — voir
   // src/lib/access.ts.
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists || !access.canView) return;
 
-  const { error } = await supabase.from("comments").insert({ task_id: taskId, author_id: userId, body });
-  if (error) throw new Error(error.message);
+  try {
+    await sql`insert into comments (task_id, author_id, body) values (${taskId}, ${userId}, ${body})`;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible d'ajouter le commentaire.");
+  }
 
   if (access.visibility === "shared") {
-    await logActivity(supabase, { taskId, actorId: userId, type: "comment_added", taskTitle: access.title ?? "" });
-    const who = await actorName(supabase, userId);
-    await notifyTaskParticipants(supabase, {
+    await logActivity({ taskId, actorId: userId, type: "comment_added", taskTitle: access.title ?? "" });
+    const who = await actorName(userId);
+    await notifyTaskParticipants({
       taskId,
       excludeUserId: userId,
       type: "comment_added",
@@ -543,25 +547,19 @@ export async function deleteCommentAction(taskId: string, commentId: string) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
-
-  const { data: comment } = await supabase
-    .from("comments")
-    .select("id, task_id, author_id")
-    .eq("id", commentId)
-    .maybeSingle();
+  const commentRows = await sql`select id, task_id, author_id from comments where id = ${commentId}`;
+  const comment = commentRows[0] as { id: string; task_id: string; author_id: string } | undefined;
   if (!comment || comment.task_id !== taskId) return;
 
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists) return;
   const canDelete = comment.author_id === userId || access.createdBy === userId;
   if (!canDelete) return;
 
-  const { error } = await supabase.from("comments").delete().eq("id", commentId);
-  if (error) throw new Error(error.message);
+  await sql`delete from comments where id = ${commentId}`;
 
   if (access.visibility === "shared") {
-    await logActivity(supabase, { taskId, actorId: userId, type: "comment_deleted", taskTitle: access.title ?? "" });
+    await logActivity({ taskId, actorId: userId, type: "comment_deleted", taskTitle: access.title ?? "" });
   }
 
   revalidatePath(`/tasks/${taskId}`);
@@ -580,19 +578,21 @@ export async function addChecklistItemAction(formData: FormData) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
   const taskId = String(formData.get("taskId"));
   const label = String(formData.get("label") || "").trim();
   if (!taskId || !label) return;
 
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists || !access.canEdit) return;
 
-  const { error } = await supabase.from("checklist_items").insert({ task_id: taskId, label });
-  if (error) throw new Error(error.message);
+  try {
+    await sql`insert into checklist_items (task_id, label) values (${taskId}, ${label})`;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible d'ajouter l'item.");
+  }
 
   if (access.visibility === "shared") {
-    await logActivity(supabase, {
+    await logActivity({
       taskId,
       actorId: userId,
       type: "checklist_item_added",
@@ -610,26 +610,27 @@ export async function toggleChecklistItemAction(taskId: string, itemId: string, 
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists || !access.canEdit) return;
 
-  // Le filtre .eq("task_id", taskId) est une ceinture-bretelles : garantit
-  // qu'un itemId ne peut agir que sur la tâche pour laquelle l'accès vient
-  // d'être vérifié, même si itemId provenait d'ailleurs. .select().single()
+  // Le filtre task_id = ... est une ceinture-bretelles : garantit qu'un
+  // itemId ne peut agir que sur la tâche pour laquelle l'accès vient
+  // d'être vérifié, même si itemId provenait d'ailleurs. `returning label`
   // récupère le libellé de l'item pour le journal d'activité, sans requête
   // supplémentaire.
-  const { data: updated, error } = await supabase
-    .from("checklist_items")
-    .update({ done })
-    .eq("id", itemId)
-    .eq("task_id", taskId)
-    .select("label")
-    .single();
-  if (error) throw new Error(error.message);
+  let updated: { label: string } | undefined;
+  try {
+    const rows = await sql`
+      update checklist_items set done = ${done} where id = ${itemId} and task_id = ${taskId}
+      returning label
+    `;
+    updated = rows[0] as { label: string } | undefined;
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour l'item.");
+  }
 
   if (access.visibility === "shared") {
-    await logActivity(supabase, {
+    await logActivity({
       taskId,
       actorId: userId,
       type: done ? "checklist_item_checked" : "checklist_item_unchecked",
@@ -647,24 +648,18 @@ export async function deleteChecklistItemAction(taskId: string, itemId: string) 
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  const supabase = createAdminClient();
-  const access = await getTaskAccess(supabase, taskId, userId);
+  const access = await getTaskAccess(taskId, userId);
   if (!access.exists || !access.canEdit) return;
 
   // Le libellé est récupéré avant suppression : il n'existera plus pour le
   // journal d'activité une fois la ligne supprimée.
-  const { data: item } = await supabase
-    .from("checklist_items")
-    .select("label")
-    .eq("id", itemId)
-    .eq("task_id", taskId)
-    .maybeSingle();
+  const itemRows = await sql`select label from checklist_items where id = ${itemId} and task_id = ${taskId}`;
+  const item = itemRows[0] as { label: string } | undefined;
 
-  const { error } = await supabase.from("checklist_items").delete().eq("id", itemId).eq("task_id", taskId);
-  if (error) throw new Error(error.message);
+  await sql`delete from checklist_items where id = ${itemId} and task_id = ${taskId}`;
 
   if (access.visibility === "shared") {
-    await logActivity(supabase, {
+    await logActivity({
       taskId,
       actorId: userId,
       type: "checklist_item_removed",
@@ -690,14 +685,14 @@ export async function markNotificationReadAction(notificationId: string) {
   const userId = await getSessionUserId();
   if (!userId || !notificationId) return;
 
-  const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId)
-    .eq("user_id", userId)
-    .is("read_at", null);
-  if (error) console.error("markNotificationReadAction:", error.message);
+  try {
+    await sql`
+      update notifications set read_at = now()
+      where id = ${notificationId} and user_id = ${userId} and read_at is null
+    `;
+  } catch (e) {
+    console.error("markNotificationReadAction:", e instanceof Error ? e.message : e);
+  }
 
   revalidatePath("/");
 }
@@ -709,13 +704,11 @@ export async function markNotificationsReadAction() {
   const userId = await getSessionUserId();
   if (!userId) return;
 
-  const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .is("read_at", null);
-  if (error) console.error("markNotificationsReadAction:", error.message);
+  try {
+    await sql`update notifications set read_at = now() where user_id = ${userId} and read_at is null`;
+  } catch (e) {
+    console.error("markNotificationsReadAction:", e instanceof Error ? e.message : e);
+  }
 
   revalidatePath("/");
 }

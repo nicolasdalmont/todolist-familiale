@@ -1,5 +1,4 @@
 import { getSessionUserId } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getTask } from "@/lib/queries";
 import { buildTaskICS } from "@/lib/calendar";
 
@@ -19,8 +18,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const userId = await getSessionUserId();
   if (!userId) return new Response("Non authentifié", { status: 401 });
 
-  const supabase = createAdminClient();
-  const task = await getTask(supabase, params.id, userId);
+  const task = await getTask(params.id, userId);
   if (!task) return new Response("Tâche introuvable", { status: 404 });
 
   const url = new URL(request.url);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUserId } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 
 // Enregistre / désenregistre l'abonnement push web de l'appareil courant
 // (table push_subscriptions, migration 007_push_subscriptions.sql). Route
@@ -32,19 +32,18 @@ export async function POST(request: Request) {
   if (!endpoint || !p256dh || !auth) {
     return NextResponse.json({ error: "invalid subscription" }, { status: 400 });
   }
+  const userAgent = typeof body?.userAgent === "string" ? body.userAgent.slice(0, 300) : null;
 
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint,
-      p256dh,
-      auth,
-      user_agent: typeof body?.userAgent === "string" ? body.userAgent.slice(0, 300) : null,
-    },
-    { onConflict: "endpoint" }
-  );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    await sql`
+      insert into push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+      values (${userId}, ${endpoint}, ${p256dh}, ${auth}, ${userAgent})
+      on conflict (endpoint) do update
+      set user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, user_agent = excluded.user_agent
+    `;
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "unknown error" }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
@@ -57,11 +56,10 @@ export async function DELETE(request: Request) {
   const endpoint = body?.endpoint;
   if (!endpoint) return NextResponse.json({ error: "missing endpoint" }, { status: 400 });
 
-  const supabase = createAdminClient();
   // Filtré aussi par user_id : un utilisateur ne peut supprimer que ses
   // propres abonnements, même s'il connaissait l'endpoint de quelqu'un
   // d'autre.
-  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).eq("user_id", userId);
+  await sql`delete from push_subscriptions where endpoint = ${endpoint} and user_id = ${userId}`;
 
   return NextResponse.json({ ok: true });
 }

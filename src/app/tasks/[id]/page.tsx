@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getComments, getProfile, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
@@ -20,17 +19,16 @@ export const dynamic = "force-dynamic";
 export default async function TaskDetailPage({ params }: { params: { id: string } }) {
   const profile = await requireUser();
 
-  const supabase = createAdminClient();
   // getTask renvoie null si la tâche n'existe pas OU si profile.id n'y a
   // pas accès (privée à quelqu'un d'autre, ou partagée sans lui) — dans
   // les deux cas on se comporte comme si elle n'existait pas.
-  const task = await getTask(supabase, params.id, profile.id);
+  const task = await getTask(params.id, profile.id);
   if (!task) notFound();
 
   const [creator, comments, categories] = await Promise.all([
-    getProfile(supabase, task.created_by),
-    getComments(supabase, task.id),
-    getCategories(supabase),
+    getProfile(task.created_by),
+    getComments(task.id),
+    getCategories(),
   ]);
 
   const overdue = isOverdue(task.due_at, task.status);

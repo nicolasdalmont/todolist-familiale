@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getAppSettings, getCategories, getMembers, getUserStats } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { AdminScreen } from "@/components/AdminScreen";
@@ -19,12 +18,11 @@ export default async function AdminPage() {
   const profile = await requireUser();
   if (profile.role !== "admin") notFound();
 
-  const supabase = createAdminClient();
   const [members, categories, settings, stats] = await Promise.all([
-    getMembers(supabase),
-    getCategories(supabase),
-    getAppSettings(supabase),
-    getUserStats(supabase),
+    getMembers(),
+    getCategories(),
+    getAppSettings(),
+    getUserStats(),
   ]);
 
   return (

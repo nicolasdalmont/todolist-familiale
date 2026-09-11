@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { getAppSettings } from "@/lib/queries";
 import { notifyTaskParticipants } from "@/lib/notifications";
 import { dateKeyFromDate, dateKeyFromIso, formatDate } from "@/lib/format";
@@ -33,43 +33,42 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const supabase = createAdminClient();
-
-  const settings = await getAppSettings(supabase);
+  const settings = await getAppSettings();
   if (!settings.reminderEnabled) {
     return NextResponse.json({ ok: true, skipped: "reminder disabled" });
   }
 
   const todayKey = dateKeyFromDate(new Date());
 
-  const { data: tasks, error } = await supabase
-    .from("tasks")
-    .select("id, title, due_at")
-    .not("due_at", "is", null)
-    .in("status", ["todo", "in_progress"]);
-  if (error) {
-    console.error("cron/reminders:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let tasks: { id: string; title: string; due_at: string }[];
+  try {
+    tasks = (await sql`
+      select id, title, due_at from tasks
+      where due_at is not null and status in ('todo', 'in_progress')
+    `) as { id: string; title: string; due_at: string }[];
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("cron/reminders:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const dueToday = (tasks ?? []).filter((t) => dateKeyFromIso(t.due_at as string) === todayKey);
+  const dueToday = tasks.filter((t) => dateKeyFromIso(t.due_at) === todayKey);
   const recentCutoff = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
 
   let notified = 0;
   for (const task of dueToday) {
-    const { count: alreadySent } = await supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("task_id", task.id)
-      .eq("type", "due_soon")
-      .gte("created_at", recentCutoff);
-    if (alreadySent && alreadySent > 0) continue;
+    const alreadySentRows = await sql`
+      select count(*)::int as n from notifications
+      where task_id = ${task.id} and type = 'due_soon' and created_at >= ${recentCutoff}
+    `;
+    const alreadySent = (alreadySentRows[0] as { n: number } | undefined)?.n ?? 0;
+    if (alreadySent > 0) continue;
 
-    await notifyTaskParticipants(supabase, {
+    await notifyTaskParticipants({
       taskId: task.id,
       type: "due_soon",
       title: `« ${task.title} » échoit aujourd'hui`,
-      body: `Échéance : ${formatDate(task.due_at as string)}`,
+      body: `Échéance : ${formatDate(task.due_at)}`,
     });
     notified++;
   }

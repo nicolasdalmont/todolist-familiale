@@ -1,4 +1,3 @@
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getProfiles } from "@/lib/queries";
 import { LoginForm } from "@/components/LoginForm";
 import { safeNextPath } from "@/lib/nav";
@@ -12,12 +11,11 @@ import { safeNextPath } from "@/lib/nav";
 // chaque affichage de l'écran de connexion.
 export const dynamic = "force-dynamic";
 
-// Page serveur : la liste des membres de la famille est lue via la clé
-// service_role (aucune session n'existe encore à ce stade), afin de les
-// afficher sur l'écran de connexion.
+// Page serveur : la liste des membres de la famille est lue directement en
+// base (aucune session n'existe encore à ce stade), afin de les afficher
+// sur l'écran de connexion.
 export default async function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
-  const supabase = createAdminClient();
-  const profiles = await getProfiles(supabase);
+  const profiles = await getProfiles();
 
   return <LoginForm profiles={profiles} nextPath={safeNextPath(searchParams.next)} />;
 }

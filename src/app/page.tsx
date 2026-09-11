@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyNotifications, getRecentActivity, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { IconPlus } from "@/components/Icons";
 
-// Voir la note dans src/app/tasks/page.tsx (et supabase/admin.ts) sur les
+// Voir la note dans src/app/tasks/page.tsx (et src/lib/db.ts) sur les
 // pièges de cache Next.js déjà rencontrés sur ce projet — même précaution
 // ici, cet écran affiche lui aussi des données qui doivent rester à jour.
 export const dynamic = "force-dynamic";
@@ -14,10 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const profile = await requireUser();
 
-  const supabase = createAdminClient();
   // getTasks ne renvoie que les tâches visibles par profile.id (créées par
   // lui, ou partagées avec lui) — voir src/lib/access.ts.
-  const tasks = await getTasks(supabase, profile.id);
+  const tasks = await getTasks(profile.id);
 
   // Fenêtre large (48h) récupérée côté serveur ; le fil n'affiche ensuite
   // que "aujourd'hui" (clé de date locale calculée côté client, voir
@@ -28,11 +26,10 @@ export default async function HomePage() {
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const [activity, notifications] = await Promise.all([
     getRecentActivity(
-      supabase,
       tasks.map((t) => t.id),
       sinceIso
     ),
-    getMyNotifications(supabase, profile.id),
+    getMyNotifications(profile.id),
   ]);
 
   return (

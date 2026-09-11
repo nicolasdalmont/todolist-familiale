@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getCategories, getTags, getTasks } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskFilterList } from "@/components/TaskFilterList";
 import { IconPlus } from "@/components/Icons";
 
-// Ceinture-bretelles en plus du "cache: no-store" déjà forcé dans le client
-// Supabase admin (voir src/lib/supabase/admin.ts) : garantit qu'aucune
-// couche de cache Next.js ne serve un instantané périmé de la liste des
-// tâches sur cette page.
+// Ceinture-bretelles en plus du "cache: no-store" déjà forcé sur `sql`
+// (voir src/lib/db.ts) : garantit qu'aucune couche de cache Next.js ne
+// serve un instantané périmé de la liste des tâches sur cette page.
 export const dynamic = "force-dynamic";
 
 // La portée (mes tâches / toutes), le statut, la catégorie, les tags,
@@ -27,11 +25,10 @@ export default async function TasksPage({
 }) {
   const profile = await requireUser();
 
-  const supabase = createAdminClient();
   const [tasks, allTags, categories] = await Promise.all([
-    getTasks(supabase, profile.id),
-    getTags(supabase),
-    getCategories(supabase),
+    getTasks(profile.id),
+    getTags(),
+    getCategories(),
   ]);
 
   return (

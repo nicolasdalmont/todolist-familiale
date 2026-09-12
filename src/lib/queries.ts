@@ -16,7 +16,8 @@ import type {
 } from "./types";
 import { canEdit, canView } from "./access";
 import { DEFAULT_CATEGORIES } from "./categories";
-import { dateKeyFromIso, isOverdue } from "./format";
+import { dateKeyFromDate, dateKeyFromIso, isOverdue } from "./format";
+import { computeStreak } from "./streaks";
 
 export async function getProfiles(): Promise<Profile[]> {
   const rows = await sql`
@@ -504,10 +505,16 @@ export async function getBadgeCount(userId: string): Promise<number> {
 // avec lui (les tâches qu'il a créées et ses commentaires — voir
 // deleteMemberAction dans src/lib/admin-actions.ts).
 export async function getMembers(): Promise<Member[]> {
-  const [users, tasks, comments] = await Promise.all([
+  // Fenêtre alignée sur la borne de sécurité de computeStreak() (voir
+  // src/lib/streaks.ts) : au-delà, le streak serait de toute façon plafonné.
+  const activeDaysSinceIso = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
+  const todayKey = dateKeyFromDate(new Date());
+
+  const [users, tasks, comments, activityDaysByUser] = await Promise.all([
     sql`select id, name, role, color, password_set, created_at, last_login_at from users order by name`,
     sql`select created_by, visibility from tasks`,
     sql`select author_id from comments`,
+    getAllUserActiveDays(activeDaysSinceIso),
   ]);
 
   return (
@@ -533,8 +540,32 @@ export async function getMembers(): Promise<Member[]> {
       createdTasks: own.length,
       sharedTasks: own.filter((t) => t.visibility === "shared").length,
       authoredComments: (comments as Array<{ author_id: string }>).filter((c) => c.author_id === u.id).length,
+      streak: computeStreak(activityDaysByUser.get(u.id) ?? [], todayKey),
     };
   });
+}
+
+// Jours actifs de TOUS les utilisateurs, groupés par user_id (streaks
+// affichés dans l'onglet « Membres » de l'écran admin — voir
+// getMembers() ci-dessus). Même table et même dégradation gracieuse que
+// getUserActiveDays(), mais en une seule requête plutôt qu'une par
+// membre.
+async function getAllUserActiveDays(sinceIso: string): Promise<Map<string, string[]>> {
+  try {
+    const rows = await sql`
+      select user_id, created_at from user_activity_log where created_at >= ${sinceIso}
+    `;
+    const days = new Map<string, Set<string>>();
+    for (const r of rows as Array<{ user_id: string; created_at: string }>) {
+      const day = dateKeyFromIso(r.created_at);
+      if (!days.has(r.user_id)) days.set(r.user_id, new Set());
+      days.get(r.user_id)!.add(day);
+    }
+    return new Map(Array.from(days.entries()).map(([userId, set]) => [userId, Array.from(set)]));
+  } catch (e) {
+    console.error("getAllUserActiveDays:", e instanceof Error ? e.message : e);
+    return new Map();
+  }
 }
 
 // Utilisé par l'écran de connexion et par setPasswordAction : recherche un

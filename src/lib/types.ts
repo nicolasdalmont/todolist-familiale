@@ -170,6 +170,9 @@ export interface Member {
   createdTasks: number;
   sharedTasks: number;
   authoredComments: number;
+  // Streak personnel (src/lib/streaks.ts), pour affichage seulement — ne
+  // rentre pas dans les compteurs "ce qui sera supprimé" ci-dessus.
+  streak: number;
 }
 
 export interface UserStats {

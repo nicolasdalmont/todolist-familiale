@@ -13,6 +13,7 @@ import { generateTempPassword } from "@/lib/temp-password";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "./Avatar";
+import { StreakBadge } from "./Badge";
 import { Time } from "./Time";
 import { IconCheck, IconPlus, IconX } from "./Icons";
 
@@ -294,6 +295,7 @@ export function UserManager({
                         </span>
                       ) : null}
                       {isSelf ? <span className="text-[11.5px] text-ink-muted">· toi</span> : null}
+                      {m.streak > 0 ? <StreakBadge streak={m.streak} /> : null}
                     </div>
                     <div className="mt-0.5 text-[12px] text-ink-muted">
                       {!m.password_set ? (

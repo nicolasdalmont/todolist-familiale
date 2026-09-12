@@ -24,29 +24,33 @@ type IconCmp = ComponentType<{ className?: string }>;
 // Jeu d'icônes sélectionnables pour une catégorie (écran admin →
 // « Catégories »). La clé (`name`) est stockée dans `categories.icon`.
 // `color` distingue visuellement les icônes entre elles (badge de
-// catégorie, sélecteur) — classe Tailwind `text-*`, écrite en toutes
-// lettres pour que le scan de contenu Tailwind la détecte.
-export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp; color: string }[] = [
-  { name: "dots", Icon: IconDots, color: "text-slate-500" },
-  { name: "home", Icon: IconHome, color: "text-amber-600" },
-  { name: "shopping", Icon: IconShoppingBag, color: "text-blue-600" },
-  { name: "gift", Icon: IconGift, color: "text-rose-600" },
-  { name: "baby", Icon: IconBaby, color: "text-sky-600" },
-  { name: "users", Icon: IconUsers, color: "text-violet-600" },
-  { name: "user", Icon: IconUser, color: "text-indigo-600" },
-  { name: "sun", Icon: IconSun, color: "text-yellow-600" },
-  { name: "calendar", Icon: IconCalendar, color: "text-red-600" },
-  { name: "checklist", Icon: IconChecklist, color: "text-teal-600" },
-  { name: "chat", Icon: IconChat, color: "text-cyan-600" },
-  { name: "repeat", Icon: IconRepeat, color: "text-orange-600" },
-  { name: "tag", Icon: IconTag, color: "text-fuchsia-600" },
-  { name: "leaf", Icon: IconLeaf, color: "text-green-600" },
-  { name: "heart", Icon: IconHeart, color: "text-pink-600" },
-  { name: "wrench", Icon: IconWrench, color: "text-stone-600" },
+// catégorie, sélecteur) — classe Tailwind `text-*`. `bg` est le fond pastel
+// de la même teinte, utilisé pour l'étiquette de catégorie sur les tâches
+// (l'icône y passe en noir/`text-ink`, voir categoryTagClasses ci-dessous).
+// Classes écrites en toutes lettres pour que le scan de contenu Tailwind
+// les détecte.
+export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp; color: string; bg: string }[] = [
+  { name: "dots", Icon: IconDots, color: "text-slate-500", bg: "bg-slate-100" },
+  { name: "home", Icon: IconHome, color: "text-amber-600", bg: "bg-amber-100" },
+  { name: "shopping", Icon: IconShoppingBag, color: "text-blue-600", bg: "bg-blue-100" },
+  { name: "gift", Icon: IconGift, color: "text-rose-600", bg: "bg-rose-100" },
+  { name: "baby", Icon: IconBaby, color: "text-sky-600", bg: "bg-sky-100" },
+  { name: "users", Icon: IconUsers, color: "text-violet-600", bg: "bg-violet-100" },
+  { name: "user", Icon: IconUser, color: "text-indigo-600", bg: "bg-indigo-100" },
+  { name: "sun", Icon: IconSun, color: "text-yellow-600", bg: "bg-yellow-100" },
+  { name: "calendar", Icon: IconCalendar, color: "text-red-600", bg: "bg-red-100" },
+  { name: "checklist", Icon: IconChecklist, color: "text-teal-600", bg: "bg-teal-100" },
+  { name: "chat", Icon: IconChat, color: "text-cyan-600", bg: "bg-cyan-100" },
+  { name: "repeat", Icon: IconRepeat, color: "text-orange-600", bg: "bg-orange-100" },
+  { name: "tag", Icon: IconTag, color: "text-fuchsia-600", bg: "bg-fuchsia-100" },
+  { name: "leaf", Icon: IconLeaf, color: "text-green-600", bg: "bg-green-100" },
+  { name: "heart", Icon: IconHeart, color: "text-pink-600", bg: "bg-pink-100" },
+  { name: "wrench", Icon: IconWrench, color: "text-stone-600", bg: "bg-stone-100" },
 ];
 
 const ICON_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.Icon]));
 const COLOR_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.color]));
+const BG_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.bg]));
 
 export function categoryIcon(name: string): IconCmp {
   return ICON_BY_NAME.get(name) ?? IconDots;
@@ -56,6 +60,13 @@ export function categoryIcon(name: string): IconCmp {
 // utilisée partout où l'icône est affichée seule (badge, sélecteur).
 export function categoryIconColor(name: string): string {
   return COLOR_BY_NAME.get(name) ?? "text-ink-muted";
+}
+
+// Fond pastel associé à une icône de catégorie (classe Tailwind `bg-*`) —
+// utilisé pour l'étiquette de catégorie sur les tâches (TaskCard, détail
+// tâche) : toute l'étiquette prend la couleur, l'icône repasse en noir.
+export function categoryBgColor(name: string): string {
+  return BG_BY_NAME.get(name) ?? "bg-sand";
 }
 
 // Catégorie fourre-tout : toujours présente (semée par la migration 009),

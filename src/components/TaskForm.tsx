@@ -208,6 +208,7 @@ export function TaskForm({
           <option value="daily">Quotidienne</option>
           <option value="weekly">Hebdomadaire</option>
           <option value="monthly">Mensuelle</option>
+          <option value="yearly">Annuelle</option>
           <option value="custom">Personnalisée</option>
         </select>
         <p className="mt-1 text-xs text-ink-muted">

@@ -5,7 +5,7 @@ export type Visibility = "shared" | "private";
 // "viewer" : voit et commente, sans pouvoir la modifier. Voir
 // src/lib/access.ts pour les règles de contrôle d'accès associées.
 export type ShareRole = "editor" | "viewer";
-export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom";
+export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
 // Une catégorie de tâche — depuis la migration 009, elles vivent en base
 // (table `categories`) et sont gérables depuis l'écran admin. `slug` est
 // la clé stable stockée dans `tasks.category` ; `icon` est un nom choisi

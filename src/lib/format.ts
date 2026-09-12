@@ -89,6 +89,7 @@ export function recurrenceLabel(recurrence: Recurrence | null | undefined): stri
     daily: "Quotidienne",
     weekly: "Hebdomadaire",
     monthly: "Mensuelle",
+    yearly: "Annuelle",
   };
   return labels[recurrence.type] || "Ponctuelle";
 }
@@ -108,6 +109,9 @@ export function computeNextOccurrence(dueAt: string | null, recurrence: Recurren
       return base.toISOString();
     case "monthly":
       base.setMonth(base.getMonth() + interval);
+      return base.toISOString();
+    case "yearly":
+      base.setFullYear(base.getFullYear() + interval);
       return base.toISOString();
     case "custom": {
       if (recurrence.unit === "weeks") base.setDate(base.getDate() + interval * 7);

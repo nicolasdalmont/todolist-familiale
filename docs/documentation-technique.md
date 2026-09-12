@@ -187,6 +187,8 @@ sources complémentaires, toutes deux dans `db/` :
    "$DATABASE_URL" -f ...`) :
    - `001_user_activity_log.sql` — table `user_activity_log` (streak
      personnel, voir `src/lib/streaks.ts`).
+   - `002_reward_tiers.sql` — tables `reward_tiers`, `challenge_results`,
+     `reward_achievements` (paliers de récompense, voir 6.18).
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
@@ -310,17 +312,37 @@ partagée, contrairement à `activity_log` ci-dessus (jamais pour une
 tâche privée) — voir `src/lib/streaks.ts` et migration
 `db/migrations/001_user_activity_log.sql`.
 
-12 tables au total. Aucune notion de Row Level Security côté Neon (voir
+**`reward_tiers`** — paliers de récompense configurés par l'admin (`id`,
+`scope` : `individual` \| `collective`, `metric` : `streak_days` \|
+`challenges_completed`, `threshold`, `reward_label` texte libre,
+`active`, `created_at`) — voir 6.18 et migration
+`db/migrations/002_reward_tiers.sql`.
+
+**`challenge_results`** — résultat figé d'une semaine de défi une fois
+celle-ci terminée (`week_start` date, PK, `success`, `computed_at`) :
+permet de compter les défis réussis cumulés (palier collectif) sans
+recalculer indéfiniment le passé à partir de `activity_log` — voir 6.18.
+
+**`reward_achievements`** — un palier atteint (`id`, `tier_id` →
+`reward_tiers.id`, `user_id` → `users.id` nullable — `null` pour un
+palier collectif, toute la famille —, `achieved_at`, `status` : `pending`
+\| `given`, `given_at`, `given_by` → `users.id`). Deux index uniques
+partiels (`tier_id, user_id` où `user_id is not null` ; `tier_id` où
+`user_id is null`) rendent l'obtention d'un palier idempotente côté
+insertion — voir 6.18.
+
+15 tables au total. Aucune notion de Row Level Security côté Neon (voir
 section 3) : la sécurité applicative est entièrement gérée par
 `src/lib/access.ts`.
 
 ### 5.3 Script de reconstruction intégrale (`db/neon_schema.sql`, migration Neon du 11/09/2026)
 
-Ce script est **complet et exécutable tel quel** : il recrée les 12 tables
+Ce script est **complet et exécutable tel quel** : il recrée les 15 tables
 actuelles (`users`, `tasks`, `task_assignees`, `comments`, `categories`,
 `app_settings`, `tags`, `task_tags`, `checklist_items`, `activity_log`,
-`user_activity_log`, `notifications`, `push_subscriptions`), les index de
-`activity_log`, `user_activity_log`, `notifications` et
+`user_activity_log`, `reward_tiers`, `challenge_results`,
+`reward_achievements`, `notifications`, `push_subscriptions`), les index de
+`activity_log`, `user_activity_log`, `reward_achievements`, `notifications` et
 `push_subscriptions`, et sème un compte administrateur de secours
 (`Admin`, mot de passe temporaire `bonjour2026`), la ligne unique
 `app_settings`, les 7 catégories de départ et les 9 tags de départ.
@@ -822,9 +844,9 @@ ci-dessus ne porte, lui, que sur le *code*.
 autres dans `Topbar.tsx` sur desktop, et remplacé par une entrée
 « Espace admin » sur `/compte` en mobile — voir 6.16 ; page elle-même
 protégée côté serveur par un `notFound()` sinon, même logique que les
-autres pages restreintes de l'appli — voir 6.1). Quatre onglets
+autres pages restreintes de l'appli — voir 6.1). Cinq onglets
 (`AdminScreen.tsx`, contrôle segmenté) : **Membres**, **Catégories**,
-**Réglages** et **Activité**.
+**Réglages**, **Activité** et **Récompenses**.
 
 #### Onglet « Membres » — gestion des comptes (10/09/2026)
 
@@ -919,6 +941,25 @@ fois où la personne a ouvert une page de l'appli.
 
 `last_login_at` reste `NULL` pour les comptes jamais vus depuis
 l'application de la migration 003 — affiché comme "Jamais vu".
+
+#### Onglet « Récompenses » — paliers de gamification (12/09/2026)
+
+`src/components/RewardManager.tsx` ; Server Actions de
+`src/lib/reward-actions.ts` (`createRewardTierAction`,
+`toggleRewardTierActiveAction`, `setRewardAchievementStatusAction`),
+chacune précédée de `requireAdmin()`. Détail fonctionnel complet en 6.18 —
+ici, juste l'écran : formulaire de création d'un palier (un seul menu
+« Type de palier » combinant portée + métrique — `individual_streak` ou
+`collective_challenges` — plutôt que deux champs séparés, les deux seules
+combinaisons ayant un sens produit), seuil, récompense en texte libre ;
+liste des paliers configurés avec bouton activer/désactiver ; liste des
+paliers **atteints** (tous membres) avec bouton « Marquer donné » /
+« Annuler », qui bascule `reward_achievements.status` entre `pending` et
+`given` (et horodate/attribue `given_at`/`given_by`). Si les tables de la
+migration 002 n'existent pas encore, chaque action renvoie une erreur
+explicite (« Applique d'abord la migration 002_reward_tiers.sql sur
+Neon ») plutôt qu'une erreur Postgres brute — même principe que l'onglet
+« Catégories » pour la migration 009.
 
 ### 6.10 Checklist par tâche
 
@@ -1499,6 +1540,82 @@ déjà calculée (`ChallengeProgress` — `current`/`target`/`success`/`label`,
 plus `parts[]` pour un `combo`, un sous-composant `ProgressBar` par
 partie). Affiche titre, description, jours restants dans la semaine (ou
 « Réussi ✅ »), et une ou plusieurs barres de progression.
+
+### 6.18 Paliers de récompense (12/09/2026)
+
+Deuxième lot de gamification, en complément direct de 6.17 : un **palier**
+est un seuil configuré par l'admin (onglet « Récompenses », voir 6.9) sur
+le streak personnel ou les défis familiaux réussis cumulés, associé à une
+**récompense en texte libre** — pas de monnaie virtuelle ni de catalogue
+imposé, la récompense elle-même (sortie, argent de poche…) est négociée en
+famille, hors appli. Choix produit : motiver des adolescents à utiliser
+l'appli pour s'organiser plutôt qu'à accumuler un score abstrait.
+
+**Deux portées** (`RewardScope`, `src/lib/types.ts`) :
+
+- **`individual`** — palier sur `streak_days` : le streak personnel de
+  **chaque** utilisateur (voir 6.17) est comparé au seuil ; atteint,
+  l'obtention est propre à cette personne.
+- **`collective`** — palier sur `challenges_completed` : le nombre de
+  défis familiaux **réussis cumulés** (toute la saison des 9 semaines) est
+  comparé au seuil ; atteint, l'obtention concerne toute la famille
+  (`user_id` `null` dans `reward_achievements`).
+
+**Calcul et persistance** (`src/lib/rewards.ts`), appelés
+inconditionnellement à chaque rendu de l'Accueil (`settleRewards()` dans
+`src/app/page.tsx`) — contrairement au bloc `challenge` du même fichier,
+qui ne s'exécute que dans les 9 semaines couvertes par `WEEKLY_CHALLENGES`
+(voir 6.17) : une semaine de défi peut se terminer même hors de cette
+période, et le streak, lui, est recalculé tous les jours de toute façon.
+
+1. **`settleEndedChallengeWeeks()`** — fige dans `challenge_results` le
+   résultat de chaque semaine de `WEEKLY_CHALLENGES` déjà terminée
+   (`weekEnd < todayKey`) et pas encore enregistrée, en rejouant
+   `evaluateChallenge()` (voir 6.17) avec une fenêtre d'activité **bornée**
+   des deux côtés (`getFamilyWeekActivity(sinceIso, untilIso)` — le
+   paramètre `untilIso` a été ajouté à cette fonction spécifiquement pour
+   ce cas d'usage ; l'appel du bloc `challenge` de la semaine en cours,
+   lui, continue de ne passer que `sinceIso`, comportement inchangé).
+   Nécessaire pour compter les défis réussis cumulés sans recalculer
+   indéfiniment le passé.
+
+   **Limite assumée** : `getSharedTasksSnapshot()`, utilisé par la
+   métrique `zero_overdue_shared`, reflète l'état **actuel** des tâches
+   partagées, pas leur état à la fin de la semaine passée — une tâche
+   rouverte depuis fausserait rétroactivement le résultat. Acceptable car
+   l'Accueil est visité quotidiennement par la famille : une semaine est
+   réglée dans les heures qui suivent sa fin, pas des mois après.
+
+2. **`settleCollectiveAchievements()`** — compte les succès dans
+   `challenge_results` (`countSuccessfulChallenges()`), puis pour chaque
+   palier collectif actif dont le seuil est atteint, insère (si absente)
+   une ligne dans `reward_achievements` avec `user_id = null`.
+
+3. **`settleIndividualAchievements(userId, streak)`** — même logique pour
+   les paliers individuels, à partir du streak déjà calculé par l'appelant
+   (pas de requête dupliquée) : insère (si absente) une ligne par palier
+   individuel actif dont le seuil est atteint.
+
+L'idempotence de ces insertions repose sur deux **index uniques partiels**
+sur `reward_achievements` (voir 5.2) plutôt qu'une contrainte
+`unique(tier_id, user_id)` : Postgres ne considère pas deux `NULL` comme
+égaux, une contrainte simple aurait laissé passer des doublons pour un
+même palier collectif. Un palier une fois obtenu le reste, même si le
+streak retombe ensuite sous le seuil — cohérent avec une récompense réelle
+déjà méritée.
+
+**Affichage** :
+
+- **Accueil** (`RewardsBoard.tsx`, sous `ChallengeCard`) — liste des
+  paliers atteints, collectifs d'abord puis ceux de l'utilisateur courant
+  (filtrage fait côté serveur dans `src/app/page.tsx`, à partir de la même
+  `getRewardAchievements()` que l'admin). N'affiche rien si la liste est
+  vide, même logique que `StreakBadge` en 6.17. Chaque ligne montre le
+  libellé de récompense, « Toute la famille » ou le prénom, et une pastille
+  de statut (`RewardStatusBadge`, `src/components/Badge.tsx` : « En
+  attente » / « Reçu 🎁 »).
+- **Admin → Récompenses** (voir 6.9) — configuration des paliers et
+  bascule du statut `pending`/`given`, pour tous les membres.
 
 ## 7. Routes de l'application
 

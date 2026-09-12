@@ -109,8 +109,9 @@ Structure complète et à jour : `db/neon_schema.sql` (exécutable, réservé
 numérotés, à exécuter à la main sur Neon). Tables : `users`, `tasks`,
 `task_assignees` (partage multiple, avec rôle), `comments`, `categories`,
 `app_settings`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
-`user_activity_log` (streak personnel), `notifications`,
-`push_subscriptions`.
+`user_activity_log` (streak personnel), `reward_tiers`,
+`challenge_results`, `reward_achievements` (paliers de récompense),
+`notifications`, `push_subscriptions`.
 Aucune notion de policy/Row Level Security côté Neon : l'application se
 connecte en propriétaire de la base (`DATABASE_URL`) ; la visibilité
 partagée/privée est appliquée entièrement au niveau applicatif
@@ -136,6 +137,12 @@ partagée/privée est appliquée entièrement au niveau applicatif
   compte » et l'onglet Membres de l'admin, plus une carte « Défi de la
   semaine » sur l'accueil (objectif familial hebdomadaire calculé sur les
   tâches partagées). Voir la doc technique §6.17.
+- Paliers de récompense (12/09/2026) : seuils configurables par l'admin
+  (onglet Admin → « Récompenses ») sur le streak personnel ou les défis
+  familiaux réussis cumulés, chacun associé à une récompense en texte
+  libre négociée en famille (pas de monnaie virtuelle). Suivi en
+  attente/donné géré par l'admin ; affiché sur l'accueil une fois atteint.
+  Voir la doc technique §6.18.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Créer · Compte) et « tirer pour rafraîchir » ; sur

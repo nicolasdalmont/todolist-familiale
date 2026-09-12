@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import type { ActivityLogEntry, ChallengeProgress, NotificationItem, Profile, RewardAchievement, Task, WeeklyChallenge } from "@/lib/types";
+import { computeBadgeCount } from "@/lib/badge";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
 import { canEdit } from "@/lib/access";
@@ -36,7 +37,7 @@ export function HomeDashboard({
   streak: number;
   achievements: RewardAchievement[];
 }) {
-  const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
+  const { todayCount, weekCount, overdueCount, overdueTaskIds, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
     const now = new Date();
     const todayKey = dateKeyFromDate(now);
     const sunday = upcomingSunday(now);
@@ -72,7 +73,8 @@ export function HomeDashboard({
     // isOverdue() dans src/lib/format.ts) : échéance dépassée et tâche ni
     // terminée ni archivée. isOverdue() exclut déjà "done"/"archived", donc
     // pas besoin de repartir de `open` ici.
-    const overdueCount = mine.filter((t) => isOverdue(t.due_at, t.status)).length;
+    const overdueTaskIds = mine.filter((t) => isOverdue(t.due_at, t.status)).map((t) => t.id);
+    const overdueCount = overdueTaskIds.length;
 
     const todayLabel = now.toLocaleDateString("fr-FR", {
       weekday: "long",
@@ -92,6 +94,7 @@ export function HomeDashboard({
       todayCount,
       weekCount,
       overdueCount,
+      overdueTaskIds,
       todayKey,
       sundayKey,
       todayLabel: capitalize(todayLabel),
@@ -140,14 +143,16 @@ export function HomeDashboard({
   // Pose la pastille sur l'icône de l'appli (App Badging API — voir aussi
   // le handler "push" de public/sw.js, qui la met à jour de son côté à
   // chaque notification reçue) : notifications "À ton attention" non lues
-  // + tâches en retard, même calcul que getBadgeCount() côté serveur
-  // (src/lib/queries.ts). Recalculée à chaque arrivée sur l'accueil, donc
-  // remise à jour dès qu'on a lu les notifications ou traité les tâches en
-  // retard. Best-effort, ignoré si l'API n'est pas supportée.
+  // + tâches en retard, dédoublonnées par tâche (computeBadgeCount(),
+  // src/lib/badge.ts) — même calcul que getBadgeCount() côté serveur
+  // (src/lib/queries.ts), pour que push et badge in-app affichent toujours
+  // le même chiffre. Recalculée à chaque arrivée sur l'accueil, donc remise
+  // à jour dès qu'on a lu les notifications ou traité les tâches en retard.
+  // Best-effort, ignoré si l'API n'est pas supportée.
   useEffect(() => {
     // `notifications` ne contient que les non lues (getMyNotifications les
-    // filtre déjà), donc sa longueur = le nombre de notifs non lues.
-    const total = overdueCount + notifications.length;
+    // filtre déjà).
+    const total = computeBadgeCount(overdueTaskIds, notifications);
     const nav = navigator as Navigator & {
       setAppBadge?: (count?: number) => Promise<void>;
       clearAppBadge?: () => Promise<void>;
@@ -156,7 +161,7 @@ export function HomeDashboard({
     // (utile pour un diagnostic via l'inspecteur Web distant de Safari).
     const action = total > 0 ? nav.setAppBadge?.(total) : nav.clearAppBadge?.();
     action?.catch((err) => console.error("setAppBadge (accueil) :", err));
-  }, [overdueCount, notifications]);
+  }, [overdueTaskIds, notifications]);
 
   return (
     <div className="flex flex-col gap-5 pt-2">

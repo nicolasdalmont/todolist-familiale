@@ -19,6 +19,7 @@ import type {
   UserStats,
 } from "./types";
 import { canEdit, canView } from "./access";
+import { computeBadgeCount } from "./badge";
 import { DEFAULT_CATEGORIES } from "./categories";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue } from "./format";
 import { computeStreak } from "./streaks";
@@ -501,10 +502,10 @@ export async function getMyNotifications(userId: string, limit = 30): Promise<No
 // la logique de visibilité dans une requête dédiée : le volume de tâches
 // d'une famille reste faible, la clarté prime sur la micro-optimisation.
 export async function getBadgeCount(userId: string): Promise<number> {
-  const [unread, tasks] = await Promise.all([
-    sql`select count(*)::int as n from notifications where user_id = ${userId} and read_at is null`
-      .then((rows) => (rows[0] as { n: number } | undefined)?.n ?? 0)
-      .catch(() => 0),
+  const [unreadNotifications, tasks] = await Promise.all([
+    sql`select id, task_id from notifications where user_id = ${userId} and read_at is null`
+      .then((rows) => rows as Array<{ id: string; task_id: string | null }>)
+      .catch(() => []),
     getTasks(userId),
   ]);
   // Comme les compteurs de l'écran d'accueil (HomeDashboard.tsx) : ne compte
@@ -512,8 +513,11 @@ export async function getBadgeCount(userId: string): Promise<number> {
   // assigné avec droit de modification), pas celles en lecture seule —
   // même définition, canEdit() (src/lib/access.ts), pour que la pastille et
   // la tuile "En retard" affichent toujours le même chiffre.
-  const overdue = tasks.filter((t) => canEdit(t, userId) && isOverdue(t.due_at, t.status)).length;
-  return unread + overdue;
+  const overdueTaskIds = tasks.filter((t) => canEdit(t, userId) && isOverdue(t.due_at, t.status)).map((t) => t.id);
+  // Une tâche à la fois en retard et notifiée (typiquement "due_soon" une
+  // fois l'heure d'échéance dépassée dans la journée) ne doit compter
+  // qu'une fois — voir computeBadgeCount() dans src/lib/badge.ts.
+  return computeBadgeCount(overdueTaskIds, unreadNotifications);
 }
 
 // Liste des membres pour l'onglet « Membres » de l'écran admin

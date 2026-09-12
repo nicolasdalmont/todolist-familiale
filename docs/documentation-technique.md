@@ -405,12 +405,31 @@ créateur de la tâche, pas `canEdit`).
 
 ### 6.2 Catégorie
 
-Chaque tâche a une catégorie principale à choix unique, valeur fixe
-(contrainte `check` en base) : `achats`, `autre`, `cadeaux`, `enfants`,
-`famille`, `maison`, `vacances` — triées par ordre alphabétique dans
-l'interface. Libellés et icônes associées centralisés dans
-`src/lib/categories.ts`. Affichée sur la carte de tâche et l'écran de
-détail.
+Chaque tâche a une catégorie principale à choix unique, référence
+(`tasks.category`, clé étrangère `on delete restrict`) vers la table
+`categories` (`slug`, `label`, `icon`, `position` — migration
+`009_categories.sql`). Gérables depuis l'onglet « Catégories » de
+l'admin (voir 6.9) : créer, renommer, changer d'icône, réordonner,
+supprimer (les tâches concernées repassent sur `autre`, catégorie de
+repli jamais supprimable — `FALLBACK_CATEGORY_SLUG` dans
+`src/lib/categories.ts`). Si la table n'existe pas encore (migration pas
+jouée), l'app retombe sur `DEFAULT_CATEGORIES` (même fichier) pour rester
+fonctionnelle.
+
+**Icônes** : jeu fermé de 16 choix (`CATEGORY_ICON_CHOICES` dans
+`src/lib/categories.ts`) — jeu SVG maison (`src/components/Icons.tsx`),
+chacune avec une **couleur associée** (`color`, classe Tailwind `text-*`)
+et un **fond pastel assorti** (`bg`, classe `bg-*-100`) de même teinte.
+`categoryIconColor()`/`categoryBgColor()` exposent ces classes ; repli
+`text-ink-muted`/`bg-sand` pour une icône inconnue. Sur la carte de tâche
+(`TaskCard.tsx`), l'étiquette de catégorie prend tout le fond pastel de
+son icône et l'icône elle-même repasse en `text-ink` (noir) plutôt que sa
+couleur habituelle, pour rester lisible sur ce fond — ailleurs (sélecteur
+d'icône admin, écran de détail, pilules du formulaire de tâche), c'est
+l'icône qui porte la couleur sur fond neutre. Choix disponibles :
+fourre-tout, maison, achats, cadeau, bébé, famille, personne, soleil,
+calendrier, checklist, bulle de chat, répétition, étiquette, **jardin**
+(`leaf`), santé (`heart`), bricolage (`wrench`).
 
 ### 6.3 Échéance et récurrence
 
@@ -426,7 +445,7 @@ le sélecteur natif retient souvent, ce qui rendrait une tâche « pour
 aujourd'hui » aussitôt en retard (audit UX du 10/09/2026, voir 6.16).
 
 **Récurrence** stockée en JSON dans `tasks.recurrence` : `{ type: "none" | "daily" |
-"weekly" | "monthly" | "custom", interval?, unit?: "days"|"weeks"|"months" }`.
+"weekly" | "monthly" | "yearly" | "custom", interval?, unit?: "days"|"weeks"|"months" }`.
 Quand une tâche récurrente passe à `done`
 (`setStatusAction` dans `src/lib/actions.ts`, après vérification
 `canEdit` — voir 6.1), la prochaine occurrence est calculée
@@ -760,8 +779,9 @@ ci-dessus ne porte, lui, que sur le *code*.
 autres dans `Topbar.tsx` sur desktop, et remplacé par une entrée
 « Espace admin » sur `/compte` en mobile — voir 6.16 ; page elle-même
 protégée côté serveur par un `notFound()` sinon, même logique que les
-autres pages restreintes de l'appli — voir 6.1). Deux onglets
-(`AdminScreen.tsx`, contrôle segmenté) : **Membres** et **Activité**.
+autres pages restreintes de l'appli — voir 6.1). Quatre onglets
+(`AdminScreen.tsx`, contrôle segmenté) : **Membres**, **Catégories**,
+**Réglages** et **Activité**.
 
 #### Onglet « Membres » — gestion des comptes (10/09/2026)
 
@@ -801,6 +821,25 @@ ou `throw` — on ne confirme pas la fonctionnalité à un non-admin).
   à la navigation suivante.
 
 Plus besoin de SQL pour gérer les comptes (voir section 4 et 8.4).
+
+#### Onglet « Catégories » — gestion des catégories de tâches
+
+`src/components/CategoryManager.tsx` ; Server Actions de
+`src/lib/category-actions.ts` (`createCategoryAction`,
+`updateCategoryAction`, `moveCategoryAction`, `deleteCategoryAction`),
+chacune précédée de `requireAdmin()`. Créer (nom → `slug` généré par
+`slugifyCategory()`, ASCII, 32 caractères max, collision refusée),
+renommer, changer d'icône (`IconPicker`, voir 6.2 pour le jeu de choix et
+leurs couleurs), réordonner (haut/bas, `position` échangée entre
+voisines), supprimer (`ConfirmDialog` détaillant que les tâches
+concernées repassent sur « Autre » — catégorie de repli jamais
+supprimable, ni la dernière catégorie restante). Si la table `categories`
+n'existe pas encore, chaque action renvoie une erreur explicite plutôt
+qu'une erreur Postgres brute (« Applique d'abord la migration 009 »).
+
+**Onglet « Réglages »** (`src/components/SettingsPanel.tsx` /
+`src/lib/settings-actions.ts`, non détaillé ici) : rappel automatique et
+informations d'instance.
 
 #### Onglet « Activité » — statistiques par membre
 
@@ -1599,7 +1638,9 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/lib/timezone.ts` | `APP_TIMEZONE` (Europe/Paris) + conversions heure murale de Paris ⇄ instant UTC (voir 8.1) |
 | `src/lib/calendar.ts` | `buildTaskICS()` — génère le fichier `.ics` d'une tâche pour l'agenda de l'appareil (voir 6.13) |
 | `src/app/api/tasks/[id]/calendar/route.ts` | Sert ce `.ics` (`Content-Disposition: attachment`) — accès vérifié par `getTask` (voir 6.13) |
-| `src/lib/categories.ts` | Libellés/icônes/ordre des catégories |
+| `src/lib/categories.ts` | Catégories : `CATEGORY_ICON_CHOICES` (icônes + couleur + fond pastel), résolution icône/couleur, repli/défauts (voir 6.2) |
+| `src/lib/category-actions.ts` | Server Actions CRUD catégories (admin, voir 6.9) |
+| `src/components/CategoryManager.tsx` | Onglet « Catégories » de l'admin — liste, création, édition, réordonnancement (voir 6.9) |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline (dont `IconCalendarPlus` — export agenda) |
 | `src/components/Time.tsx` | Enveloppe `<time datetime>` autour d'une date affichée (voir 6.16) |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, confirmation de suppression |

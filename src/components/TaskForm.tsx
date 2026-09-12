@@ -86,7 +86,14 @@ export function TaskForm({
   return (
     <form
       action={action}
-      onSubmit={() => setFlash(mode === "edit" ? "Tâche enregistrée" : "Tâche créée")}
+      onSubmit={() => {
+        // Referme le clavier avant la navigation qui suit l'enregistrement
+        // (redirect() serveur, actions.ts) : le champ resterait sinon focus
+        // (donc zoomé côté Safari iOS) pendant que le formulaire est
+        // démonté pour la page suivante.
+        (document.activeElement as HTMLElement | null)?.blur();
+        setFlash(mode === "edit" ? "Tâche enregistrée" : "Tâche créée");
+      }}
       className="pb-6"
     >
       <FormPendingBridge />

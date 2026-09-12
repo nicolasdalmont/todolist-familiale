@@ -14,6 +14,23 @@ body {
   overscroll-behavior-y: contain;
 }
 
+/* Safari iOS zoome automatiquement la page au focus d'un champ dont le
+   texte fait moins de 16px — et ne dézoome pas toujours de façon fiable
+   ensuite (écran qui reste "zoomé" après avoir coché une checklist,
+   ajouté un commentaire, ou enregistré une tâche, le champ restant monté
+   pendant un router.refresh()/redirect()). Tous les champs de l'appli
+   sont volontairement plus petits que 16px pour une densité mobile
+   correcte (13.5-14.5px) : on ne les agrandit qu'en dessous du point de
+   bascule desktop (`sm`, 640px — voir tailwind.config.ts), là où ce zoom
+   se déclenche, plutôt que de changer leur taille partout. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 @layer base {
   /* Anneau de focus visible et cohérent sur toute l'appli — les champs se
      contentaient d'un changement de bordure d'1 px (outline-none partout),

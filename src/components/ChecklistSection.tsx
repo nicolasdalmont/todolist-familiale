@@ -72,6 +72,12 @@ export function ChecklistSection({
     const label = newLabel.trim();
     if (!label) return;
 
+    // Referme le clavier et laisse Safari iOS dézoomer avant le
+    // router.refresh() ci-dessous : le champ resterait sinon focus (donc
+    // zoomé) pendant tout le rafraîchissement, Safari ne redézoomant pas
+    // toujours de façon fiable dans ce cas.
+    (document.activeElement as HTMLElement | null)?.blur();
+
     const formData = new FormData();
     formData.set("taskId", taskId);
     formData.set("label", label);

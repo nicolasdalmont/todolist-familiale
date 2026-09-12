@@ -27,6 +27,12 @@ export function CommentForm({ taskId }: { taskId: string }) {
     const body = value.trim();
     if (!body) return;
 
+    // Referme le clavier et laisse Safari iOS dézoomer avant le
+    // router.refresh() ci-dessous : la zone resterait sinon focus (donc
+    // zoomée) pendant tout le rafraîchissement, Safari ne redézoomant pas
+    // toujours de façon fiable dans ce cas.
+    areaRef.current?.blur();
+
     const formData = new FormData();
     formData.set("taskId", taskId);
     formData.set("body", body);

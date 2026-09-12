@@ -22,12 +22,17 @@ body {
    sont volontairement plus petits que 16px pour une densité mobile
    correcte (13.5-14.5px) : on ne les agrandit qu'en dessous du point de
    bascule desktop (`sm`, 640px — voir tailwind.config.ts), là où ce zoom
-   se déclenche, plutôt que de changer leur taille partout. */
+   se déclenche, plutôt que de changer leur taille partout.
+   `!important` est nécessaire : chaque champ porte aussi sa propre classe
+   Tailwind de taille (`text-[13.5px]` etc.), une classe ayant une
+   spécificité CSS plus forte qu'un sélecteur de balise — sans lui, ce
+   correctif est silencieusement perdant et le zoom revient (constaté
+   12/09/2026 sur l'ajout d'un item de checklist). */
 @media (max-width: 639px) {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 

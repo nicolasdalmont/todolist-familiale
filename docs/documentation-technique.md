@@ -1238,9 +1238,15 @@ générées une fois avec `npx web-push generate-vapid-keys` — voir section
 responsable** (créateur, ou assigné avec droit de modification —
 `canEdit()`, `src/lib/access.ts`, pas les tâches en lecture seule ;
 `isOverdue()` pour "en retard", `src/lib/format.ts` — même double
-définition que les compteurs de l'accueil, voir 6.6). Calculée par
-`getBadgeCount()` (`src/lib/queries.ts`, réutilise `getTasks()` déjà
-filtré par `canView`) à deux moments :
+définition que les compteurs de l'accueil, voir 6.6), **dédoublonnées par
+tâche** (`computeBadgeCount()`, `src/lib/badge.ts`, correction du
+12/09/2026) : une tâche à la fois en retard et sujette à une notification
+non lue qui la concerne (typiquement le rappel "due_soon" du jour, une
+fois l'heure d'échéance dépassée dans la journée) ne compte que pour une
+seule, plutôt que deux (une par source). Calculée par `getBadgeCount()`
+(`src/lib/queries.ts`, réutilise `getTasks()` déjà filtré par `canView`) à
+deux moments, tous deux appuyés sur `computeBadgeCount()` pour rester
+alignés :
 
 - **Au chargement de l'écran d'accueil** (`HomeDashboard.tsx`) : calcul
   local, sans requête supplémentaire (`tasks`/`notifications` déjà chargés

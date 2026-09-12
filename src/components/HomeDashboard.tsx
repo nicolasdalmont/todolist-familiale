@@ -8,6 +8,7 @@ import { APP_TIMEZONE } from "@/lib/timezone";
 import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
+import { StreakBadge } from "./Badge";
 import { ChallengeCard } from "./ChallengeCard";
 import { NotificationsNudge } from "./NotificationsNudge";
 import { SharedWithYouFeed } from "./SharedWithYouFeed";
@@ -23,12 +24,14 @@ export function HomeDashboard({
   activity,
   notifications,
   challenge,
+  streak,
 }: {
   profile: Profile;
   tasks: Task[];
   activity: ActivityLogEntry[];
   notifications: NotificationItem[];
   challenge: { challenge: WeeklyChallenge; progress: ChallengeProgress } | null;
+  streak: number;
 }) {
   const { todayCount, weekCount, overdueCount, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
     const now = new Date();
@@ -155,8 +158,9 @@ export function HomeDashboard({
   return (
     <div className="flex flex-col gap-5 pt-2">
       <div>
-        <h1 className="text-[22px] font-extrabold text-ink">
+        <h1 className="flex items-center gap-2 text-[22px] font-extrabold text-ink">
           {greeting}, {profile.name}
+          {streak > 0 ? <StreakBadge streak={streak} /> : null}
         </h1>
         <p className="text-[13.5px] text-ink-muted">{todayLabel}</p>
       </div>

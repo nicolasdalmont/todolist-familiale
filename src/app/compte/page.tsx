@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { getUserActiveDays } from "@/lib/queries";
+import { computeStreak } from "@/lib/streaks";
+import { dateKeyFromDate } from "@/lib/format";
 import { Topbar } from "@/components/Topbar";
 import { Avatar } from "@/components/Avatar";
+import { StreakBadge } from "@/components/Badge";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
 import { NotificationsToggle } from "@/components/NotificationsToggle";
 import { IconArrowLeft, IconBarChart } from "@/components/Icons";
@@ -10,6 +14,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const profile = await requireUser();
+
+  // Streak personnel (src/lib/streaks.ts) — voir src/app/page.tsx pour le
+  // même calcul, indépendamment refait ici (pas de store partagé).
+  const activeDaysSinceIso = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
+  const streak = computeStreak(await getUserActiveDays(profile.id, activeDaysSinceIso), dateKeyFromDate(new Date()));
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -29,7 +38,10 @@ export default async function AccountPage() {
         <div className="mb-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">
           <Avatar profile={profile} size="lg" />
           <div>
-            <div className="text-[15px] font-bold">{profile.name}</div>
+            <div className="flex items-center gap-2 text-[15px] font-bold">
+              {profile.name}
+              {streak > 0 ? <StreakBadge streak={streak} /> : null}
+            </div>
             <div className="text-[12.5px] text-ink-muted">
               {profile.role === "admin" ? "Administrateur" : "Utilisateur"}
             </div>

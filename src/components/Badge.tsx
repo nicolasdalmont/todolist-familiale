@@ -57,3 +57,15 @@ export function OverdueBadge() {
     </span>
   );
 }
+
+// Streak personnel (src/lib/streaks.ts) — jours consécutifs (avec grâce)
+// d'activité de l'utilisateur, toutes tâches confondues. À n'afficher que
+// pour streak > 0 (voir les appelants) : pas de pastille "🔥 0", pas plus
+// utile qu'un compteur vide.
+export function StreakBadge({ streak }: { streak: number }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-orange-50 px-2.5 py-1 text-[11.5px] font-bold text-orange-600">
+      🔥 {streak}
+    </span>
+  );
+}

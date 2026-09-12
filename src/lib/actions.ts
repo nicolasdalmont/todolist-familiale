@@ -164,6 +164,21 @@ async function logActivity(params: {
   }
 }
 
+// Streak personnel (src/lib/streaks.ts) — contrairement à logActivity()
+// ci-dessus, jamais gardée par une condition de visibilité : une tâche
+// privée compte pour le streak de son auteur au même titre qu'une tâche
+// partagée. N'enregistre ni tâche ni contenu (juste user_id + created_at)
+// pour ne jamais pouvoir fuiter une information privée si cette table
+// venait un jour à être affichée quelque part — voir
+// db/migrations/001_user_activity_log.sql.
+async function logUserActivity(userId: string) {
+  try {
+    await sql`insert into user_activity_log (user_id) values (${userId})`;
+  } catch (e) {
+    console.error("logUserActivity:", e instanceof Error ? e.message : e);
+  }
+}
+
 // Valide le slug de catégorie soumis contre la table `categories`
 // (migration 009) — repli sur « autre » si absent (formulaire d'une autre
 // session, valeur trafiquée…). La FK ON DELETE RESTRICT ferait de toute
@@ -317,6 +332,7 @@ export async function createTaskAction(formData: FormData) {
 
   await insertAssignees(task.id, shareRoles);
   await syncTaskTags(task.id, tagNames);
+  await logUserActivity(userId);
 
   if (visibility === "shared") {
     await logActivity({ taskId: task.id, actorId: userId, type: "task_created", taskTitle: title });
@@ -525,6 +541,13 @@ export async function setStatusAction(taskId: string, status: string) {
     throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour le statut.");
   }
 
+  // Streak personnel : une clôture compte pour l'auteur de l'action, tâche
+  // privée ou partagée — pas de garde de visibilité ici (voir
+  // logUserActivity ci-dessus).
+  if (status === "done") {
+    await logUserActivity(userId);
+  }
+
   if (task.visibility === "shared") {
     // Un changement de statut n'est plus notifié (ni push, ni pastille) :
     // qu'un proche fasse avancer une tâche partagée est de l'ambiance, pas
@@ -609,6 +632,8 @@ export async function addCommentAction(formData: FormData) {
     throw new Error(e instanceof Error ? e.message : "Impossible d'ajouter le commentaire.");
   }
 
+  await logUserActivity(userId);
+
   if (access.visibility === "shared") {
     await logActivity({ taskId, actorId: userId, type: "comment_added", taskTitle: access.title ?? "" });
     const who = await actorName(userId);
@@ -680,6 +705,8 @@ export async function addChecklistItemAction(formData: FormData) {
     throw new Error(e instanceof Error ? e.message : "Impossible d'ajouter l'item.");
   }
 
+  await logUserActivity(userId);
+
   if (access.visibility === "shared") {
     await logActivity({
       taskId,
@@ -716,6 +743,12 @@ export async function toggleChecklistItemAction(taskId: string, itemId: string, 
     updated = rows[0] as { label: string } | undefined;
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour l'item.");
+  }
+
+  // Streak personnel : cocher un item compte comme contribution ; le
+  // décocher (correction) non — voir logUserActivity ci-dessus.
+  if (done) {
+    await logUserActivity(userId);
   }
 
   if (access.visibility === "shared") {

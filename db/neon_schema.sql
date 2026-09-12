@@ -28,6 +28,7 @@ create extension if not exists pgcrypto;
 drop table if exists public.push_subscriptions cascade;
 drop table if exists public.notifications cascade;
 drop table if exists public.activity_log cascade;
+drop table if exists public.user_activity_log cascade;
 drop table if exists public.checklist_items cascade;
 drop table if exists public.task_tags cascade;
 drop table if exists public.tags cascade;
@@ -150,6 +151,16 @@ create table public.activity_log (
   created_at timestamptz not null default now()
 );
 
+-- Streak personnel (migration 001, voir src/lib/streaks.ts) : table
+-- volontairement minimale (pas de référence de tâche, pas de contenu),
+-- alimentée pour TOUTE tâche privée ou partagée, contrairement à
+-- activity_log ci-dessus qui ne l'est jamais pour une tâche privée.
+create table public.user_activity_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 -- Notifications "À ton attention" par utilisateur.
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -179,6 +190,7 @@ create table public.push_subscriptions (
 
 create index if not exists activity_log_task_id_idx on public.activity_log(task_id);
 create index if not exists activity_log_created_at_idx on public.activity_log(created_at);
+create index if not exists user_activity_log_user_id_idx on public.user_activity_log(user_id, created_at desc);
 create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
 create index if not exists push_subscriptions_user_idx on public.push_subscriptions(user_id);
 

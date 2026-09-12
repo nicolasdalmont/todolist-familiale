@@ -1,4 +1,4 @@
-import { dateKeyFromDate, dateKeyFromIso, isOverdue, STATUS_LABELS } from "./format";
+import { addDaysToKey, dateKeyFromDate, dateKeyFromIso, isOverdue, STATUS_LABELS } from "./format";
 import type { ActivityLogEntry, ChallengeMetric, ChallengeProgress, Profile, TaskStatus, WeeklyChallenge } from "./types";
 
 // Contenu et moteur des défis familiaux hebdomadaires — voir la carte
@@ -13,17 +13,6 @@ export interface ChallengeWeekData {
   activity: ActivityLogEntry[];
   sharedTasks: SharedTaskSnapshot[];
   members: Profile[];
-}
-
-function keyToNoonUtc(key: string): Date {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12));
-}
-
-function addDaysToKey(key: string, days: number): string {
-  const noon = keyToNoonUtc(key);
-  noon.setUTCDate(noon.getUTCDate() + days);
-  return dateKeyFromDate(noon);
 }
 
 // 9 semaines, du 14 septembre au 15 novembre 2026 — toutes centrées sur

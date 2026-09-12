@@ -213,3 +213,20 @@ export function mondayOfWeek(from: Date): Date {
   noon.setUTCDate(noon.getUTCDate() - ((noon.getUTCDay() + 6) % 7));
   return noon;
 }
+
+// Arithmétique sur des clés "YYYY-MM-DD" (jour civil, sans notion
+// d'heure) — partagée par src/lib/challenges.ts et src/lib/streaks.ts, qui
+// n'ont besoin que de comparer/décaler des jours, jamais des instants.
+// Ancrage midi UTC (comme upcomingSunday/mondayOfWeek ci-dessus) : évite
+// qu'un changement d'heure d'été/hiver ne fasse déborder sur le jour
+// voisin lors d'un +/-1 jour.
+export function dayKeyToNoonUtc(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12));
+}
+
+export function addDaysToKey(key: string, days: number): string {
+  const noon = dayKeyToNoonUtc(key);
+  noon.setUTCDate(noon.getUTCDate() + days);
+  return dateKeyFromDate(noon);
+}

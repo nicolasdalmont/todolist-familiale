@@ -16,7 +16,7 @@ import type {
 } from "./types";
 import { canEdit, canView } from "./access";
 import { DEFAULT_CATEGORIES } from "./categories";
-import { isOverdue } from "./format";
+import { dateKeyFromIso, isOverdue } from "./format";
 
 export async function getProfiles(): Promise<Profile[]> {
   const rows = await sql`
@@ -426,6 +426,27 @@ export async function getSharedTasksSnapshot(): Promise<Array<{ id: string; due_
     select id, due_at, status from tasks where visibility = 'shared'
   `;
   return rows as unknown as Array<{ id: string; due_at: string | null; status: TaskStatus }>;
+}
+
+// Jours actifs d'un utilisateur pour son streak personnel (src/lib/
+// streaks.ts) — déduplique la table user_activity_log (alimentée par
+// logUserActivity() dans src/lib/actions.ts, pour toute tâche privée ou
+// partagée) en clés de jour civil Paris. Tolère l'absence de la table :
+// la migration db/migrations/001_user_activity_log.sql doit être
+// appliquée à la main sur Neon (voir docs/migration-neon.md) — tant que
+// ce n'est pas fait, le streak reste à 0 plutôt que de faire échouer la
+// page (même principe que getRecentActivity() ci-dessus).
+export async function getUserActiveDays(userId: string, sinceIso: string): Promise<string[]> {
+  try {
+    const rows = await sql`
+      select created_at from user_activity_log where user_id = ${userId} and created_at >= ${sinceIso}
+    `;
+    const days = new Set((rows as Array<{ created_at: string }>).map((r) => dateKeyFromIso(r.created_at)));
+    return Array.from(days);
+  } catch (e) {
+    console.error("getUserActiveDays:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 // Fil « À ton attention » de l'écran d'accueil (src/components/

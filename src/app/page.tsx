@@ -66,7 +66,7 @@ export default async function HomePage() {
   // (contrairement au bloc `challenge` ci-dessus) : une semaine de défi peut
   // se terminer même hors des 9 semaines couvertes, et le streak est
   // recalculé tous les jours de toute façon.
-  await settleRewards(profile.id, streak);
+  await settleRewards(profile, streak);
   const allAchievements = await getRewardAchievements();
   const achievements = allAchievements.filter((a) => a.user === null || a.user.id === profile.id);
 

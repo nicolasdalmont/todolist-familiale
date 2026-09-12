@@ -138,7 +138,8 @@ export type NotificationType =
   | "task_deleted"
   | "comment_added"
   | "status_changed"
-  | "due_soon";
+  | "due_soon"
+  | "reward_achieved";
 
 export interface NotificationItem {
   id: string;

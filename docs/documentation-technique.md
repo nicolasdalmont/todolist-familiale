@@ -56,45 +56,60 @@ sont gérées en fuseau Europe/Paris (voir 8.1).
 |---|---|---|
 | Framework | Next.js 14.2.35 (App Router, TypeScript) | Rendu serveur, routage, Server Actions |
 | UI | React 18.3.1, Tailwind CSS 3.4 | Composants, style |
-| Base de données | Supabase (Postgres géré) | Stockage — **pas** Supabase Auth |
+| Base de données | Neon (Postgres serverless, driver HTTP) | Stockage — connexion directe en SQL, propriétaire de la base |
 | Authentification | Maison (`src/lib/auth.ts`) | Table `users`, hash scrypt, cookie JWT (`jose`) |
 | Hébergement | Vercel | Build + déploiement continu ; **Vercel Cron** (`vercel.json`) pour le rappel d'échéance (6.15) |
 | PWA | `manifest.json` + `public/sw.js` | Installabilité, cache de l'app shell, réception des notifications push (6.15) |
 | Push | `web-push` (`jose` déjà présent pour le JWT de session) | Envoi Web Push standard (VAPID), aucun service tiers (6.15) |
 
 Aucune dépendance d'UI framework (pas de librairie de composants) ni d'ORM :
-les requêtes passent directement par le client `@supabase/supabase-js`.
-Dépendances runtime : `next`, `react`, `react-dom`, `@supabase/supabase-js`,
-`jose`, `web-push`.
+les requêtes passent directement par `@neondatabase/serverless` en SQL
+paramétré (tag template). Dépendances runtime : `next`, `react`,
+`react-dom`, `@neondatabase/serverless`, `jose`, `web-push`.
+
+> **Migration Supabase → Neon (11/09/2026).** L'application tournait
+> jusque-là sur Supabase, utilisé uniquement comme base Postgres hébergée
+> (pas Supabase Auth, requêtes via le query-builder PostgREST
+> `@supabase/supabase-js`). Elle tourne depuis sur Neon, un Postgres
+> serverless piloté par une seule variable `DATABASE_URL` — objectif :
+> une appli déployable sur n'importe quel Postgres standard (voir
+> `docs/migration-neon.md` pour le détail des 7 phases). Le dossier
+> `supabase/` reste dans le dépôt le temps d'une période d'observation
+> (nettoyage prévu en Phase 6, ~25/09/2026) mais n'est plus utilisé par le
+> code.
 
 ## 3. Architecture générale
 
 ```
 Navigateur ── HTTPS ──> Vercel (Next.js, App Router)
                           ├─ Middleware Edge : vérifie le cookie JWT
-                          ├─ Server Components : lisent Supabase (clé service_role)
+                          ├─ Server Components : lisent Neon (sql`` de src/lib/db.ts)
                           │    et filtrent l'accès via src/lib/access.ts
-                          └─ Server Actions ("use server") : écrivent dans Supabase
+                          └─ Server Actions ("use server") : écrivent dans Neon
                                           │    après vérification d'accès (access.ts)
                                           ▼
-                                 Supabase Postgres
-                                 (RLS activé, SANS policy)
+                                   Neon Postgres
+                              (connexion DATABASE_URL,
+                               propriétaire de la base)
 ```
 
 Points clés :
 
-- **Supabase n'est qu'une base Postgres hébergée.** Il n'y a pas de compte
-  Supabase Auth, pas d'appel au SDK Supabase depuis le navigateur, et
-  aucune clé Supabase n'est exposée côté client. Toutes les lectures et
-  écritures passent par un unique client "admin" (`src/lib/supabase/admin.ts`),
-  instancié avec la clé **service_role**, qui contourne Row Level
-  Security par conception.
-- **RLS est activé sur toutes les tables mais sans aucune policy** :
-  ceinture-bretelles en cas de fuite de la clé publique `anon` (qui, elle,
-  n'a jamais accès à rien). La sécurité applicative (qui peut voir/modifier
-  quoi) est donc entièrement gérée dans le code Next.js, centralisée dans
-  `src/lib/access.ts` (voir section 6.1) — RLS ne joue aucun rôle dans le
-  contrôle d'accès aux tâches privées ou partagées.
+- **Neon n'est qu'une base Postgres hébergée**, interrogée en SQL brut
+  paramétré — pas de query-builder, pas de Data API. `src/lib/db.ts`
+  exporte `sql` (`neon(process.env.DATABASE_URL, { fetchOptions: { cache:
+  "no-store" } })`), utilisé partout ailleurs par tag template
+  (`` await sql`select ... where id = ${id}` ``, paramétré) ou
+  `sql.query(text, params)` pour le SQL construit dynamiquement. La
+  chaîne `DATABASE_URL` (avec identifiants) ne vit que côté serveur,
+  jamais exposée au navigateur.
+- **Aucune notion de policy/RLS côté Neon** : l'application se connecte en
+  propriétaire de la base (`DATABASE_URL`), il n'y a ni rôle restreint ni
+  Row Level Security à gérer — contrairement à Supabase (RLS activé sans
+  policy, contourné par la clé `service_role`, voir historique ci-dessus).
+  La sécurité applicative (qui peut voir/modifier quoi) reste entièrement
+  gérée dans le code Next.js, centralisée dans `src/lib/access.ts` (voir
+  section 6.1).
 - **Pas d'API REST/GraphQL générale sur les données** : la lecture passe
   par des Server Components (au chargement de page), l'écriture par des
   Server Actions (`"use server"`, déclenchées par des formulaires ou des
@@ -123,7 +138,7 @@ Entièrement maison, décrite dans `src/lib/auth.ts` et `src/middleware.ts` :
   signature (`SESSION_SECRET`) est une variable d'environnement — le
   changer déconnecte tout le monde.
 - **Middleware** (`src/middleware.ts`, Edge runtime) : vérifie uniquement
-  la signature du JWT (aucun appel réseau à Supabase) ; redirige vers
+  la signature du JWT (aucun appel réseau à la base) ; redirige vers
   `/login` si absent/invalide — en ajoutant `?next=<chemin demandé>` pour
   y revenir après connexion (`safeNextPath()` dans `src/lib/nav.ts` valide
   que c'est bien un chemin interne) —, et redirige un utilisateur déjà
@@ -144,7 +159,7 @@ Entièrement maison, décrite dans `src/lib/auth.ts` et `src/middleware.ts` :
   Créer un membre pose un mot de passe temporaire et `password_set =
   false` ; « Réinitialiser le mot de passe » fait de même pour un membre
   existant. Le seul compte à créer hors application est le tout premier
-  administrateur, semé par `supabase/recreate_full_schema.sql`
+  administrateur, semé par `db/neon_schema.sql`
   (« Admin » / « bonjour2026 »).
 
 Ce module gère uniquement *qui est connecté* ; il ne dit rien de *ce que
@@ -155,47 +170,46 @@ le rôle de `src/lib/access.ts`, voir section 6.1.
 
 ### 5.1 Où trouver le schéma de référence
 
-Deux sources complémentaires, toutes deux dans `supabase/` :
+Depuis la migration Neon (11/09/2026 — voir encadré en section 2), deux
+sources complémentaires, toutes deux dans `db/` :
 
-1. **`supabase/recreate_full_schema.sql`** — la structure **complète et à
-   jour**, exécutable telle quelle (voir 5.3). C'est la référence à
-   consulter pour connaître l'état actuel des tables (colonnes, valeurs
-   par défaut, contraintes `check`, clés étrangères et leurs clauses
-   `on delete`). C'est un **script de reset** (`drop table ... cascade`
-   puis `create table`) : il ne doit jamais être rejoué sur la base de
-   production en fonctionnement normal, il la détruirait — voir 5.3.
-2. **`supabase/migrations/`** — l'historique des évolutions **réellement
-   appliquées** sur la base de production, en scripts additifs numérotés
-   (aucun `drop`, uniquement `add column if not exists` /
-   `create table if not exists`) :
-   - `001_categories_and_tags.sql` — colonne `category` sur `tasks` +
-     tables `tags`/`task_tags`.
-   - `002_sharing_roles.sql` — colonne `role` sur `task_assignees` +
-     recalcul de `visibility` pour toutes les tâches existantes (voir 6.1).
-   - `003_last_login.sql` — colonne `users.last_login_at` (voir 6.9).
-   - `004_checklist.sql` — table `checklist_items` (voir 6.10).
-   - `005_activity_log.sql` — table `activity_log` (voir 6.12).
-   - `006_notifications.sql` — table `notifications` (voir 6.15).
-   - `007_push_subscriptions.sql` — table `push_subscriptions` (voir 6.15).
-   - `008_user_management.sql` — `ON DELETE CASCADE` sur `tasks.created_by`
-     et `comments.author_id` (suppression d'un compte, voir 6.9).
+1. **`db/neon_schema.sql`** — la structure **complète et à jour**,
+   exécutable telle quelle (voir 5.3). C'est la référence à consulter
+   pour connaître l'état actuel des tables (colonnes, valeurs par défaut,
+   contraintes `check`, clés étrangères et leurs clauses `on delete`).
+   C'est un **script de reset** (`drop table ... cascade` puis
+   `create table`) : il ne doit jamais être rejoué sur la base en
+   fonctionnement normal, il la détruirait — voir 5.3.
+2. **`db/migrations/`** — les évolutions de schéma **postérieures** à
+   `neon_schema.sql`, en scripts additifs numérotés (aucun `drop`,
+   uniquement `add column if not exists` / `create table if not
+   exists`), à exécuter à la main (SQL Editor Neon ou `psql
+   "$DATABASE_URL" -f ...`) :
+   - `001_user_activity_log.sql` — table `user_activity_log` (streak
+     personnel, voir `src/lib/streaks.ts`).
 
-Toute nouvelle évolution du schéma passe par un nouveau fichier numéroté
-dans `supabase/migrations/` (voir section 10), et `recreate_full_schema.sql`
-est mis à jour en parallèle pour rester le reflet fidèle de la structure.
+   Toute nouvelle évolution du schéma passe par un nouveau fichier
+   numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
+   parallèle pour rester le reflet fidèle de la structure.
 
-**Le contenu (les lignes) n'est pas versionné ici** : `recreate_full_schema.sql`
+**Le contenu (les lignes) n'est pas versionné ici** : `neon_schema.sql`
 ne sème qu'un compte `Admin` de secours (mot de passe temporaire
-`bonjour2026`) et neuf tags de départ. En production, `Admin` a été
+`bonjour2026`), les 7 catégories par défaut, la ligne unique
+`app_settings` et neuf tags de départ. En production, `Admin` a été
 renommé `Nicolas`, les autres membres de la famille ont été ajoutés
-manuellement en SQL, et la liste des tags s'est enrichie depuis le
-formulaire de tâche.
+manuellement en SQL, et la liste des tags/catégories s'est enrichie
+depuis l'application.
 
-> Historique : jusqu'au 04/09/2026, la référence structurelle était
-> `supabase/schema.sql`, un script de reset qui n'avait pas été maintenu
-> en parallèle des migrations `003`/`004`/`005` (il ne contenait ni
-> `checklist_items` ni `activity_log`). Il a été supprimé le 04/09/2026 au
-> profit de `recreate_full_schema.sql`, complet et vérifié (voir 5.3).
+> **Historique pré-Neon** (jusqu'au 11/09/2026) : la référence
+> structurelle était `supabase/recreate_full_schema.sql` (même rôle, sur
+> Supabase), avec un historique d'évolutions additives dans
+> `supabase/migrations/` (`001_categories_and_tags.sql` à
+> `009_categories.sql`). `db/neon_schema.sql` en est la version adaptée
+> Neon (12 tables, contenu identique — voir 5.3 pour le détail des
+> écarts). Ces fichiers `supabase/` restent dans le dépôt pour référence
+> et filet de secours (rollback) jusqu'au nettoyage de Phase 6
+> (~25/09/2026), mais ne sont plus la source de vérité : ne plus les
+> faire évoluer.
 
 ### 5.2 Schéma des tables
 
@@ -223,7 +237,7 @@ formulaire de tâche.
 | `recurrence` | jsonb | `{ type, interval?, unit? }` — voir 6.3 |
 | `status` | text | `todo` \| `in_progress` \| `done` \| `archived` |
 | `visibility` | text | `shared` \| `private` — **champ dérivé, jamais saisi par l'utilisateur** (voir 6.1) |
-| `category` | text | 7 valeurs fixes — voir 6.2 |
+| `category` | text → `categories.slug` | clé étrangère `on delete restrict`, défaut `autre` — voir 6.2 |
 | `created_by` | uuid → `users.id` | |
 | `created_at` | timestamptz | |
 
@@ -242,6 +256,18 @@ Le créateur d'une tâche figure toujours dans cette table avec `role =
 
 **`comments`** — fil de discussion par tâche (`id`, `task_id`,
 `author_id`, `body`, `created_at`) — voir 6.5.
+
+**`categories`** — catégories de tâches, gérables depuis l'admin (`slug`
+PK, `label`, `icon`, `position`, `created_at`) — voir 6.2 et 6.9. `icon`
+est une clé de `CATEGORY_ICON_CHOICES` (`src/lib/categories.ts`), pas
+contrainte en base. Amorcée par `db/neon_schema.sql` (migration
+`009_categories.sql` côté historique Supabase) avec 7 catégories de
+départ (`achats`, `autre`, `cadeaux`, `enfants`, `famille`, `maison`,
+`vacances`) — `autre` est la catégorie de repli, jamais supprimable.
+
+**`app_settings`** — réglages d'instance, une seule ligne (`id = 1`,
+contrainte `check`) : `reminder_enabled`, `updated_at`. Onglet
+« Réglages » de l'admin (voir 6.9).
 
 **`tags`** — libellés libres (`id`, `name` unique, `created_at`), créés à
 la volée depuis le formulaire de tâche, normalisés en minuscules/sans
@@ -276,50 +302,57 @@ appareil où la personne a activé les notifications (`id`, `user_id`,
 (`pushManager.subscribe()`) ; purgée automatiquement par `sendPushToUser()`
 si l'endpoint répond 404/410 (abonnement révoqué).
 
-Toutes les tables ont `row level security` activé et **aucune policy** —
-voir section 3.
+**`user_activity_log`** — streak personnel (`id`, `user_id`,
+`created_at`), table volontairement minimale : pas de référence de
+tâche, pas de contenu, juste « cette personne a fait quelque chose de
+qualifiant ce jour-là ». Alimentée pour **toute** tâche, privée ou
+partagée, contrairement à `activity_log` ci-dessus (jamais pour une
+tâche privée) — voir `src/lib/streaks.ts` et migration
+`db/migrations/001_user_activity_log.sql`.
 
-### 5.3 Script de reconstruction intégrale (`supabase/recreate_full_schema.sql`, 04/09/2026)
+12 tables au total. Aucune notion de Row Level Security côté Neon (voir
+section 3) : la sécurité applicative est entièrement gérée par
+`src/lib/access.ts`.
 
-Ce script est **complet et exécutable tel quel** : il recrée les 10 tables
-actuelles (`users`, `tasks`, `task_assignees`, `comments`, `tags`,
-`task_tags`, `checklist_items`, `activity_log`, `notifications`,
-`push_subscriptions`), les index de `activity_log`, `notifications` et
-`push_subscriptions`, active RLS partout sans policy, et sème un compte
-administrateur de secours (`Admin`, mot de passe temporaire `bonjour2026`)
-plus les 9 tags de départ. **À n'utiliser qu'en cas de sinistre** (base
-perdue/corrompue, nouvel environnement de secours) : c'est un reset complet
-(`drop table ... cascade`) qui ne doit jamais être rejoué sur la base de
-production en fonctionnement normal, et il **ne restaure aucune donnée**
-(comptes de la famille, tâches, commentaires) — seulement la structure,
-vide. Une vraie restauration de données perdues passe par les sauvegardes
-Supabase (Database → Backups) ou un export `pg_dump` antérieur, pas par ce
-script.
+### 5.3 Script de reconstruction intégrale (`db/neon_schema.sql`, migration Neon du 11/09/2026)
 
-Généré à partir d'un export du schéma réel de production (fonction
-d'export "contexte" de Supabase, explicitement marqué "for context only,
-not meant to be run" par Supabase lui-même). Deux écarts volontaires par
-rapport à cet export, documentés en tête du script :
+Ce script est **complet et exécutable tel quel** : il recrée les 12 tables
+actuelles (`users`, `tasks`, `task_assignees`, `comments`, `categories`,
+`app_settings`, `tags`, `task_tags`, `checklist_items`, `activity_log`,
+`user_activity_log`, `notifications`, `push_subscriptions`), les index de
+`activity_log`, `user_activity_log`, `notifications` et
+`push_subscriptions`, et sème un compte administrateur de secours
+(`Admin`, mot de passe temporaire `bonjour2026`), la ligne unique
+`app_settings`, les 7 catégories de départ et les 9 tags de départ.
+**À n'utiliser qu'en cas de sinistre** (base perdue/corrompue, nouvel
+environnement de secours) : c'est un reset complet (`drop table ...
+cascade`) qui ne doit jamais être rejoué sur la base en fonctionnement
+normal, et il **ne restaure aucune donnée** (comptes de la famille,
+tâches, commentaires) — seulement la structure, vide et amorcée. Une
+vraie restauration de données perdues passe par les sauvegardes Neon
+(Dashboard → Backups/branches) ou un export `pg_dump` antérieur, pas par
+ce script.
 
-1. **Clauses `on delete` restaurées.** L'export "contexte" de Supabase les
-   omet systématiquement (simplification de cet export, pas un reflet de
-   la structure réelle) ; le script les rétablit à partir des migrations
-   qui les ont introduites — `on delete cascade` pour
-   `task_assignees`/`comments`/`task_tags`/`checklist_items` et
-   `activity_log.task_id`, `on delete set null` pour
-   `activity_log.actor_id` (comportement documenté en 5.2 et 6.12).
-   **Vérifié par exécution réelle** (PostgreSQL 16 local, hors Supabase) :
-   supprimer une tâche supprime bien en cascade ses assignations,
-   commentaires, items de checklist et lignes d'activité ; supprimer
-   l'auteur d'une ligne d'activité met bien `actor_id` à `null` sans
-   supprimer la ligne ni bloquer la suppression du compte ; supprimer un
-   utilisateur encore créateur d'une tâche est bien refusé par la base
-   (`tasks.created_by` n'a pas de `on delete`, comme dans l'export).
-2. **Deux valeurs par défaut prises directement de l'export** (état réel
-   de la base de production) : `users.color` par défaut `#6C5CE7` et
-   `tasks.visibility` par défaut `shared` (sans
-   conséquence pratique, ce champ étant toujours recalculé par
-   l'application avant écriture, jamais laissé à sa valeur par défaut).
+C'est l'adaptation Neon de l'ancien `supabase/recreate_full_schema.sql`
+(voir 5.1) : même 10 tables historiques, mêmes contraintes `check`, mêmes
+clés PK/FK et leurs `on delete` (`on delete cascade` pour
+`task_assignees`/`comments`/`task_tags`/`checklist_items` et
+`activity_log.task_id`, `on delete set null` pour
+`activity_log.actor_id` — comportement documenté en 5.2 et 6.12),
+augmentée des tables ajoutées depuis (`categories`, `app_settings`,
+`user_activity_log`). Deux écarts par rapport à un Postgres géré par un
+fournisseur comme Supabase, documentés en tête du script :
+
+1. **Extension `pgcrypto` déclarée explicitement** (`create extension if
+   not exists pgcrypto`) pour `gen_random_uuid()` — native en PG13+ donc
+   déjà disponible sur Neon (PG16), déclarée par sécurité/portabilité
+   plutôt que supposée présente.
+2. **Aucune ligne `enable row level security`** : l'application se
+   connecte à Neon en propriétaire de la base (`DATABASE_URL`), exempté
+   de RLS par construction — il n'y a rien à protéger par policy (voir
+   section 3). C'est la différence structurelle avec Supabase, où RLS
+   était activé sur toutes les tables mais sans aucune policy
+   (contourné par la clé `service_role`).
 
 ## 6. Fonctionnalités
 
@@ -371,18 +404,28 @@ retiré).
 
 - `canView(task, userId)` / `canEdit(task, userId)` — vérifications
   synchrones à partir d'une tâche déjà chargée (avec ses `assignees`).
-- `getTaskAccess(supabase, taskId, userId)` — version asynchrone qui
-  requête directement la base, utilisée dans les Server Actions qui n'ont
-  pas déjà la tâche en mémoire (modification, suppression, changement de
+- `getTaskAccess(taskId, userId)` — version asynchrone qui requête
+  directement la base, utilisée dans les Server Actions qui n'ont pas
+  déjà la tâche en mémoire (modification, suppression, changement de
   statut, commentaire, checklist). Renvoie aussi `title` et `visibility`
   de la tâche (ajouté avec le journal d'activité — voir 6.12) : évite une
   requête séparée aux appelants qui ont besoin de ces deux champs pour
-  journaliser une activité.
+  journaliser une activité. **Vit dans `src/lib/actions.ts`** (fonction
+  module-locale, non exportée), pas dans `access.ts` : un bug rencontré
+  pendant la migration Neon (Phase 4) a montré que tout fichier
+  `src/lib/*.ts` importé par un composant **client** ne doit jamais
+  importer `sql` de `src/lib/db.ts` au niveau module, même si la fonction
+  qui l'utilise n'est pas celle appelée côté client — le bundler embarque
+  alors le client Neon côté navigateur, où `DATABASE_URL` est absent,
+  crash silencieux (visible seulement côté navigateur, pas dans les logs
+  serveur). `access.ts` n'exporte donc que les fonctions synchrones
+  (`canView`/`canEdit`/`computeVisibility`), importable sans risque par
+  des composants client.
 
 Ce module est appliqué systématiquement :
 
-- **En lecture** : `getTasks(supabase, userId)` et `getTask(supabase, id,
-  userId)` (`src/lib/queries.ts`) ne renvoient que ce que `canView`
+- **En lecture** : `getTasks(userId)` et `getTask(id, userId)`
+  (`src/lib/queries.ts`) ne renvoient que ce que `canView`
   autorise pour l'utilisateur connecté — le filtrage se fait à la
   **requête**, pas seulement à l'affichage.
 - **En écriture** : `updateTaskAction`, `deleteTaskAction` et
@@ -587,7 +630,7 @@ entrer les tâches déjà en retard (audit UX INC-1, voir 6.16). La tuile
 
 **Filtrage entièrement côté client, sans onglet ni paramètre `?filter=`
 côté serveur.** `src/app/tasks/page.tsx` se contente de charger
-`getTasks(supabase, profile.id)` (déjà filtré par `canView` — voir 6.1) et
+`getTasks(profile.id)` (déjà filtré par `canView` — voir 6.1) et
 de le passer tel quel à `TaskFilterList.tsx`, qui applique tous les
 critères en mémoire (`useMemo`) par-dessus cette liste — la liste de
 tâches d'une famille reste petite, ce qui évite un aller-retour serveur à
@@ -820,7 +863,7 @@ ou `throw` — on ne confirme pas la fonctionnalité à un non-admin).
   ne peut plus se connecter et `getCurrentUser()` le traite comme absent
   à la navigation suivante.
 
-Plus besoin de SQL pour gérer les comptes (voir section 4 et 8.4).
+Plus besoin de SQL pour gérer les comptes (voir section 4 et 8.5).
 
 #### Onglet « Catégories » — gestion des catégories de tâches
 
@@ -1059,7 +1102,7 @@ l'événement. Générique et indépendant de la plateforme (remplace, le
 - **Route** : `GET /api/tasks/[id]/calendar`
   (`src/app/api/tasks/[id]/calendar/route.ts`) — sous le middleware
   d'authentification, plus un contrôle d'accès à la tâche
-  (`getTask(supabase, id, userId)` renvoie `null` sans droit → 404, comme
+  (`getTask(id, userId)` renvoie `null` sans droit → 404, comme
   si elle n'existait pas). Réponse : `Content-Type: text/calendar` +
   `Content-Disposition: attachment; filename="tache.ics"`.
 - **Contenu** (`buildTaskICS()`, `src/lib/calendar.ts`, aucune dépendance —
@@ -1109,14 +1152,14 @@ moins une notification **non lue**, que les push soient activés ou non.
 **Écriture** : `src/lib/notifications.ts`, appelé depuis les Server Actions
 en même temps que `logActivity`, de façon non bloquante :
 
-- `notifyUser(supabase, { userId, type, taskId?, title, body? })` — point
+- `notifyUser({ userId, type, taskId?, title, body? })` — point
   d'entrée unique. Écrit la ligne `notifications`, **puis** appelle
   `sendPushToUser()` (`src/lib/push.ts`) pour envoyer un push web à chaque
   appareil où la personne a activé les notifications (table
   `push_subscriptions`, migration `007_push_subscriptions.sql`) — no-op
   silencieux tant qu'elle n'en a activé aucun. L'envoi et l'écriture sont
   chacun indépendamment non bloquants.
-- `notifyTaskParticipants(supabase, { taskId, excludeUserId, … })` —
+- `notifyTaskParticipants({ taskId, excludeUserId, … })` —
   fan-out vers créateur + assigné(e)s + lecteurs, moins l'auteur de
   l'action.
 
@@ -1450,19 +1493,19 @@ heure murale de Paris. Sans conséquence pratique (tâches récurrentes,
 
 ### 8.2 Quatre pièges de cache déjà rencontrés et corrigés
 
-Documentés en détail dans `claude/prototype-notes.md` ; résumé pour
-mémoire, en cas de nouveau symptôme d'affichage périmé après création,
-modification ou suppression d'une tâche :
+Résumé pour mémoire, en cas de nouveau symptôme d'affichage périmé après
+création, modification ou suppression d'une tâche :
 
 1. **Rendu statique** — une page sans appel à une "dynamic function"
    (`cookies()`, etc.) peut être pré-rendue au build et figer ses
    données. Corrigé par `export const dynamic = "force-dynamic"` sur
    chaque page qui affiche des données mutables.
 2. **Data Cache de `fetch()`** — Next.js met en cache les requêtes GET
-   faites via `fetch()`, y compris celles du SDK Supabase, même sur une
-   page dynamique. Corrigé une fois pour toutes dans
-   `src/lib/supabase/admin.ts` (`cache: "no-store"` forcé sur le client
-   admin).
+   faites via `fetch()`, y compris celles du driver Neon (HTTP sous le
+   capot), même sur une page dynamique. Corrigé une fois pour toutes dans
+   `src/lib/db.ts` (`fetchOptions: { cache: "no-store" }` forcé sur
+   `neon()` — même principe qu'avant sur `src/lib/supabase/admin.ts`,
+   reporté lors de la migration Neon du 11/09/2026).
 3. **Client Router Cache** — le navigateur réutilise jusqu'à 30s le rendu
    déjà récupéré pour une URL visitée en navigation douce (`<Link>`).
    Corrigé par `experimental.staleTimes.dynamic = 0` dans
@@ -1494,7 +1537,43 @@ mutation ; le gel d'écran ne change rien à cette fraîcheur, il empêche
 seulement l'utilisateur d'interagir avec l'écran *pendant* qu'une mutation
 est en cours de traitement.
 
-### 8.3 Faille de confidentialité initiale — corrigée le 01/09/2026
+### 8.3 Zoom automatique iOS Safari sur les champs (12/09/2026)
+
+Safari iOS zoome automatiquement la page au focus d'un champ dont le
+texte affiché fait moins de 16px — et ne dézoome pas toujours de façon
+fiable ensuite, en particulier quand le champ reste monté pendant un
+`router.refresh()`/`redirect()` (écran qui reste "zoomé" après avoir
+ajouté un item de checklist, un commentaire, ou enregistré une tâche).
+Tous les champs de l'appli sont volontairement plus petits que 16px pour
+une densité mobile correcte (13.5-14.5px, classes Tailwind du type
+`text-[13.5px]` sur chaque `<input>`/`<textarea>`/`<select>`).
+
+**Fix, en deux temps** (`src/app/globals.css`, `ChecklistSection.tsx`,
+`CommentForm.tsx`, `TaskForm.tsx`) :
+
+1. Sous 640px (breakpoint `sm` de Tailwind), tous les champs passent à
+   16px via une règle globale dans `globals.css`, pour empêcher le zoom
+   de se déclencher — `blur()` explicite avant le rafraîchissement/la
+   navigation en complément, pour fermer le clavier proprement.
+2. **Cette règle globale doit porter `!important`.** Premier essai sans
+   (commit `cefac59`, 12/09/2026) : silencieusement perdant, le zoom
+   revenait malgré tout. Cause : chaque champ porte déjà sa propre classe
+   Tailwind de taille (`text-[13.5px]`), et une classe a une spécificité
+   CSS plus forte (0,1,0) qu'un sélecteur de balise `input` (0,0,1),
+   quel que soit l'ordre des règles dans la feuille de style ou
+   l'imbrication en `@media`. Sans `!important`, le champ restait sous
+   16px et le zoom persistait — repéré par l'utilisateur en testant sur
+   son iPhone après le premier correctif, corrigé dans la foulée (commit
+   `a709109`).
+
+**Leçon pour tout futur correctif du même genre** : une règle CSS globale
+censée l'emporter sur les classes Tailwind posées composant par
+composant doit soit porter `!important` (scopée étroitement — une seule
+propriété, une intention claire), soit avoir une spécificité au moins
+égale à une classe. Vérifier le style **calculé** dans le navigateur
+(`getComputedStyle`), ne pas se fier à la lecture du CSS seul.
+
+### 8.4 Faille de confidentialité initiale — corrigée le 01/09/2026
 
 Une version antérieure de l'application ne filtrait les tâches privées
 que sur l'onglet dédié "Privées" : l'onglet "Toutes" (par défaut) et la
@@ -1504,11 +1583,9 @@ son URL directe. Ce point a été corrigé par la refonte du modèle de
 confidentialité/partage décrite en 6.1 : l'accès est désormais vérifié à
 la **requête** (`getTasks`/`getTask`) et non plus seulement à
 l'affichage, et de la même façon pour chaque Server Action de mutation.
-Conservé ici pour mémoire — voir `claude/prototype-notes.md` pour le
-détail de la découverte et de la décision de refonte plutôt que d'un
-correctif ponctuel.
+Conservé ici pour mémoire.
 
-### 8.4 Fonctionnalités non implémentées
+### 8.5 Fonctionnalités non implémentées
 
 Conformément au phasage du cahier des charges :
 
@@ -1545,10 +1622,11 @@ Palette définie dans `tailwind.config.ts` :
 utilitaires transverses : anneau `:focus-visible` global (accent
 `brand`), marges de sécurité iOS (`pb-safe` / `pt-safe` / `bottom-safe`,
 `env(safe-area-inset-*)`), `.tap-target` (zone tactile ≥ 44 px autour
-d'une petite icône) et `overscroll-behavior-y: contain` sur `body` (voir
-« tirer pour rafraîchir », 6.8). Les pages utilisent `min-h-dvh` (et non
-`min-h-screen`) pour composer avec les barres d'outils mobiles
-rétractables. Voir 6.16.
+d'une petite icône), `overscroll-behavior-y: contain` sur `body` (voir
+« tirer pour rafraîchir », 6.8) et une règle `font-size: 16px !important`
+sur tous les champs sous 640px (anti-zoom iOS Safari, voir 8.3). Les
+pages utilisent `min-h-dvh` (et non `min-h-screen`) pour composer avec
+les barres d'outils mobiles rétractables. Voir 6.16.
 
 Icônes : jeu SVG inline maison (`src/components/Icons.tsx`, trait fin,
 couleur pilotée par `currentColor`). Exception : `IconBerry`, le logo
@@ -1566,58 +1644,55 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 
 ## 10. Workflow de développement et de déploiement
 
-- **Pas de copie de travail locale dans le flux retenu** : le code est
-  écrit depuis une session cloud Claude et livré en `.zip`; l'utilisateur
-  dépose le contenu sur GitHub via "Add file → Upload files" (interface
-  web, sans `git` ni `npm` local). Vercel redéploie automatiquement à
-  chaque push sur la branche par défaut. Le dépôt a été passé en public le
-  03/09/2026, ce qui permet désormais à une session Claude de le cloner
-  directement en lecture (`git clone`) pour lire le code existant avant
-  d'y apporter des modifications, sans changer le mode de livraison
-  (toujours en `.zip`, jamais de push direct depuis la session cloud — le
-  pare-feu réseau de la session bloque ça, voir
-  `claude/prototype-notes.md`).
-- **Piège de cet upload web** : il ajoute/écrase les fichiers présents
-  dans le zip mais **ne supprime jamais** un fichier absent du zip qui
-  existait déjà sur GitHub. Toute livraison qui supprime un fichier côté
-  code doit donc le signaler explicitement pour suppression manuelle sur
-  GitHub.
-- **Toujours livrer un zip complet et autonome** (leçon du 02/09/2026,
-  après un échec de build causé par un zip ne contenant qu'une partie des
-  fichiers touchés par une fonctionnalité) : lister les fichiers modifiés
-  (`git diff --name-only`), les inclure tous dans un seul zip, et
-  vérifier son contenu (`unzip -l`, recherche des symboles utilisés)
-  avant de le livrer — plutôt que plusieurs livraisons partielles.
-- **Vérification TypeScript en deux passes avant toute livraison**
-  (leçon du 02/09/2026, après un échec de build en production dû à un
-  conflit de type qu'un check permissif n'avait pas détecté) : une passe
-  permissive (`strict: false`) puis une passe stricte (`strict: true`,
-  `noImplicitAny: false` — ce dernier flag neutralise le bruit propre au
-  shim maison, qui type les dépendances externes en `any` et fait perdre
-  l'inférence de type sur les résultats Supabase, sans rapport avec un
-  vrai risque de conflit de type) sur le même shim TypeScript maison — la
-  passe stricte rattrape les conflits d'intersection de types que le mode
-  permissif laisse passer.
+- **Copie de travail locale, Claude commit/push lui-même** (flux actuel).
+  Une session Claude Code clone le dépôt (public depuis le 03/09/2026),
+  modifie le code localement, vérifie (voir ci-dessous), puis exécute
+  elle-même `git add`/`commit`/`push` sur `main` quand un lot cohérent est
+  prêt et que la vérification passe — identité git `nicolasdalmont`
+  (`nicolas.dalmont@laposte.net`), commits par lots logiques, messages en
+  français, jamais de rewrite de l'historique `main`. **Chaque push sur
+  `main` déclenche un déploiement Vercel production immédiat** — pas
+  d'étape de revue intermédiaire, la vérification doit donc être faite
+  *avant* de pousser, pas après. Avec `DATABASE_URL` renseignée dans
+  `.env.local` (voir README), le serveur dev local (`npm run dev`)
+  fonctionne aussi contre la vraie base Neon — utile pour un test manuel
+  avant de pousser.
+  > Historique : jusqu'au 03/09/2026, le dépôt était privé et le code
+  > livré en `.zip` que l'utilisateur déposait sur GitHub via l'interface
+  > web ("Add file → Upload files"), sans `git` ni copie locale — une
+  > session cloud ne pouvant pas pousser directement. Ce mode de
+  > livraison n'est plus utilisé.
+- **Vérifier avant de pousser** : `npx tsc --noEmit` (le projet est en
+  `strict: true` sans exception, voir `tsconfig.json`) puis `npm run
+  build`. Tuer `next dev` avant un `npm run build` (sinon `.next` peut se
+  corrompre — les deux écrivent dans le même dossier). Pour une
+  vérification visuelle, démarrer/relancer `npm run dev` (après avoir
+  arrêté un build en cours) plutôt que de supposer qu'un changement UI
+  fonctionne.
 - **Évolutions du schéma de base** : toujours via un nouveau fichier
-  numéroté dans `supabase/migrations/` (additif : `add column if not
-  exists`, `create table if not exists`, jamais de `drop`) — jamais en
-  réexécutant `supabase/recreate_full_schema.sql`, qui est un reset
-  destructeur pour la base de production (voir 5.1). Penser à répercuter
-  chaque migration dans `recreate_full_schema.sql` pour qu'il reste le
-  reflet fidèle de la structure. Migrations à ce jour :
-  `001_categories_and_tags.sql`, `002_sharing_roles.sql`,
-  `003_last_login.sql`, `004_checklist.sql`, `005_activity_log.sql`,
-  `006_notifications.sql`, `007_push_subscriptions.sql`,
-  `008_user_management.sql`.
+  numéroté dans `db/migrations/` (additif : `add column if not exists`,
+  `create table if not exists`, jamais de `drop`), exécuté à la main
+  (SQL Editor Neon ou `psql "$DATABASE_URL" -f ...`) — jamais en
+  réexécutant `db/neon_schema.sql`, qui est un reset destructeur pour la
+  base en fonctionnement normal (voir 5.1). Penser à répercuter chaque
+  migration dans `neon_schema.sql` pour qu'il reste le reflet fidèle de
+  la structure. Migrations à ce jour : `001_user_activity_log.sql`.
+  (Historique pré-Neon, non maintenu depuis le 11/09/2026 :
+  `supabase/migrations/` `001_categories_and_tags.sql` à
+  `009_categories.sql` — voir 5.1.)
 - **Variables d'environnement** (Vercel → Project Settings → Environment
-  Variables, type "Secret") : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-  (Supabase → Project Settings → API), `SESSION_SECRET` (chaîne aléatoire
-  générée une fois, ex. `openssl rand -base64 48`), et depuis les
-  notifications push (voir 6.15) `NEXT_PUBLIC_VAPID_PUBLIC_KEY` /
-  `VAPID_PRIVATE_KEY` (générées une fois avec
-  `npx web-push generate-vapid-keys`) et `VAPID_SUBJECT`
+  Variables, type "Secret") : `DATABASE_URL` (chaîne **pooled** Neon —
+  Connection Details du dashboard Neon, host `...-pooler...`),
+  `SESSION_SECRET` (chaîne aléatoire générée une fois, ex. `openssl rand
+  -base64 48`), et depuis les notifications push (voir 6.15)
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (générées une fois
+  avec `npx web-push generate-vapid-keys`) et `VAPID_SUBJECT`
   (`mailto:quelqu'un@exemple.fr`). Détail dans `.env.example` et
-  `README.md`.
+  `README.md`. **Piège rencontré pendant la migration Neon** : une
+  rotation de mot de passe Neon invalide `DATABASE_URL` dans son
+  intégralité (pas seulement le mot de passe isolé) — après une
+  rotation, toujours régénérer la chaîne complète depuis le dashboard
+  Neon plutôt que de tenter un montage manuel.
 
 ## 11. Inventaire des fichiers principaux
 
@@ -1627,7 +1702,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/lib/nav.ts` | `safeNextPath()` — valide la destination `?next=` (chemin interne uniquement) |
 | `src/lib/auth.ts` | Hash de mot de passe, session JWT |
 | `src/lib/access.ts` | Contrôle d'accès aux tâches (`canView`/`canEdit`/`computeVisibility`/`getTaskAccess`) |
-| `src/lib/supabase/admin.ts` | Client Supabase service_role (+ `cache: "no-store"`) |
+| `src/lib/db.ts` | `sql` — client Neon (`@neondatabase/serverless`, `DATABASE_URL`, `cache: "no-store"`) |
 | `src/lib/queries.ts` | Lectures (profils, membres — `getMembers`, tâches, tags, commentaires, stats admin, activité, notifications — `getMyNotifications`, pastille — `getBadgeCount`) — filtrées par `access.ts` |
 | `src/lib/actions.ts` | Server Actions (écritures : auth + mot de passe, tâches, tags, commentaires, checklist, journal d'activité — `logActivity`, notifications lues) — vérifiées par `access.ts` |
 | `src/lib/admin-actions.ts` | Server Actions de gestion des comptes (créer / réinitialiser / supprimer un membre) — `requireAdmin()` (voir 6.9) |
@@ -1678,6 +1753,9 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/CommentThread.tsx` | Fil de commentaires + suppression annulable (auteur ou créateur de la tâche — voir 6.5, 6.16) |
 | `src/components/CommentForm.tsx` | Saisie d'un commentaire — `<textarea>` auto, envoi Ctrl/Cmd+Entrée (voir 6.5) |
 | `src/app/error.tsx` / `not-found.tsx` / `loading.tsx` | Pages système à la marque (voir 6.16) |
-| `supabase/recreate_full_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
-| `supabase/migrations/` | Évolutions additives appliquées sur la base réelle |
-| `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée, à ne pas rejouer (voir 8.1) |
+| `db/neon_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
+| `db/migrations/` | Évolutions de schéma additives postérieures à `neon_schema.sql` |
+| `db/migrate.mjs` | Script de copie Supabase → Neon utilisé lors de la migration (Phases 3 et 5, voir `docs/migration-neon.md`) — `--rollback` en sens inverse, non utilisé en fonctionnement normal |
+| `supabase/recreate_full_schema.sql` | **Historique, non maintenu depuis le 11/09/2026** — équivalent Supabase de `db/neon_schema.sql` (voir 5.1), conservé pour référence/rollback jusqu'à la Phase 6 |
+| `supabase/migrations/` | **Historique, non maintenu depuis le 11/09/2026** — évolutions additives appliquées du temps de Supabase |
+| `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée (données reprises telles quelles par la migration Neon), à ne pas rejouer (voir 8.1) |

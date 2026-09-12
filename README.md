@@ -2,34 +2,37 @@
 
 Application web responsive de gestion de tâches partagées en famille
 (anciennement « To-Do List Familiale » ; dépôt toujours
-`todolist-familiale`) — Next.js (App Router) + Supabase (base de données
-Postgres uniquement) + Vercel (hébergement).
+`todolist-familiale`) — Next.js (App Router) + Neon (Postgres serverless)
++ Vercel (hébergement).
 
-Ce dépôt a été écrit par Claude depuis une session cloud (pas de clone local
-dans le flux de travail retenu pour ce projet) et poussé sur GitHub via
-l'interface web — voir le guide de mise en route (GitHub / Supabase /
-Vercel) partagé en artifact dans la conversation pour le détail des étapes.
+Ce dépôt est développé par Claude Code depuis une copie locale : lecture,
+modification, vérification (`tsc`/`build`) et `git commit`/`push` directs
+sur `main`, chaque push déclenchant un déploiement Vercel production (voir
+"Développement local" ci-dessous et la doc technique §10). La base tournait
+jusqu'au 11/09/2026 sur Supabase, migrée depuis vers Neon — voir
+`docs/migration-neon.md` pour le détail.
 
 ## Pile technique
 
 - **Next.js 14** (App Router, TypeScript, Tailwind CSS)
-- **Supabase** : utilisé uniquement comme base Postgres hébergée (pas
-  Supabase Auth — voir "Authentification" ci-dessous)
+- **Neon** : Postgres serverless, connexion directe en SQL paramétré via
+  `@neondatabase/serverless` (pas d'ORM, pas de query-builder) — voir
+  "Schéma de base de données" ci-dessous
 - **Vercel** : build et hébergement, déploiement continu sur chaque push
 
 ## Authentification
 
-L'authentification est entièrement maison, sans Supabase Auth : une table
-`users` (voir `supabase/recreate_full_schema.sql`) stocke un prénom et un mot de passe
+L'authentification est entièrement maison : une table `users` (voir
+"Schéma de base de données" ci-dessous) stocke un prénom et un mot de passe
 haché (algorithme scrypt, module `crypto` intégré à Node.js — aucune
-dépendance externe). Next.js accède à Supabase exclusivement côté serveur
-avec la clé **service_role**, qui contourne Row Level Security ; RLS reste
-activé sur toutes les tables mais sans aucune policy, ce qui bloque tout
-accès par la clé publique `anon` en cas de fuite.
+dépendance externe). Next.js se connecte à Neon exclusivement côté serveur
+avec la chaîne `DATABASE_URL`, en propriétaire de la base — aucune notion
+de policy/Row Level Security à gérer côté Neon (l'appli n'est jamais
+jointe depuis le navigateur).
 
 La session est portée par un cookie HTTP-only contenant un JWT signé
 (bibliothèque `jose`), vérifié dans le middleware Next.js (Edge runtime)
-sans appel réseau à Supabase.
+sans appel réseau à la base.
 
 - **Connexion.** L'écran affiche les membres de la famille (prénom +
   avatar) ; on clique sur son profil puis on entre son mot de passe.
@@ -52,11 +55,11 @@ sans appel réseau à Supabase.
 
 ### Bootstrap : premier compte administrateur
 
-`supabase/recreate_full_schema.sql` crée automatiquement un premier
-utilisateur `Admin` avec le mot de passe temporaire **`bonjour2026`**. Se
-connecter avec ce compte, définir immédiatement un mot de passe personnel
-via l'écran de première connexion, puis créer les autres membres depuis
-l'onglet **Admin → « Membres »**.
+`db/neon_schema.sql` crée automatiquement un premier utilisateur `Admin`
+avec le mot de passe temporaire **`bonjour2026`**. Se connecter avec ce
+compte, définir immédiatement un mot de passe personnel via l'écran de
+première connexion, puis créer les autres membres depuis l'onglet
+**Admin → « Membres »**.
 
 ## Variables d'environnement
 
@@ -64,8 +67,7 @@ l'onglet **Admin → « Membres »**.
 `.env.example`) :
 
 ```
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
+DATABASE_URL=
 SESSION_SECRET=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
@@ -73,12 +75,17 @@ VAPID_SUBJECT=
 CRON_SECRET=
 ```
 
-`SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` viennent de Supabase → Project
-Settings → API (la clé `service_role`, pas `anon`). `SESSION_SECRET` est une
-chaîne aléatoire longue à générer soi-même (ex. `openssl rand -base64 48`) :
-elle signe les cookies de session, donc la garder secrète et ne jamais la
-changer sans effet de bord (tout changement déconnecte tous les
-utilisateurs).
+`DATABASE_URL` est la chaîne de connexion **pooled** Neon (dashboard Neon
+→ Connection Details, host en `...-pooler...`) — strictement secrète,
+jamais exposée au navigateur. Une rotation du mot de passe Neon invalide
+toute la chaîne (pas seulement le mot de passe isolé) : après une
+rotation, toujours régénérer `DATABASE_URL` en entier depuis le dashboard
+plutôt que de tenter un montage manuel.
+
+`SESSION_SECRET` est une chaîne aléatoire longue à générer soi-même (ex.
+`openssl rand -base64 48`) : elle signe les cookies de session, donc la
+garder secrète et ne jamais la changer sans effet de bord (tout
+changement déconnecte tous les utilisateurs).
 
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` sont la paire de clés
 des notifications push web (protocole standard, aucun compte/service tiers
@@ -96,17 +103,18 @@ variable est définie sur le projet ; à générer une fois
 
 ## Schéma de base de données
 
-Structure complète et à jour : `supabase/recreate_full_schema.sql`
-(exécutable, réservé à la reconstruction d'un environnement — voir la
-documentation technique §5.3). Évolutions successives appliquées sur la
-base réelle : `supabase/migrations/` (scripts additifs numérotés, 001 à
-008). Tables : `users`, `tasks`, `task_assignees` (partage multiple, avec
-rôle), `comments`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
-`notifications`, `push_subscriptions`.
-RLS est activé sur toutes les tables mais sans policy : tout accès légitime
-passe par le serveur Next.js via la clé service_role ; la visibilité
-partagée/privée est appliquée au niveau applicatif (`src/lib/access.ts`),
-pas par RLS.
+Structure complète et à jour : `db/neon_schema.sql` (exécutable, réservé
+à la reconstruction d'un environnement — voir la documentation technique
+§5.3). Évolutions postérieures : `db/migrations/` (scripts additifs
+numérotés, à exécuter à la main sur Neon). Tables : `users`, `tasks`,
+`task_assignees` (partage multiple, avec rôle), `comments`, `categories`,
+`app_settings`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
+`user_activity_log` (streak personnel), `notifications`,
+`push_subscriptions`.
+Aucune notion de policy/Row Level Security côté Neon : l'application se
+connecte en propriétaire de la base (`DATABASE_URL`) ; la visibilité
+partagée/privée est appliquée entièrement au niveau applicatif
+(`src/lib/access.ts`).
 
 ## Fonctionnement
 
@@ -135,15 +143,21 @@ pas par RLS.
   reconnexion) — le service worker gère le cache de l'app shell et les
   notifications push, pas les mutations créées hors-ligne.
 
-## Développement local (optionnel)
+## Développement local
 
-Le flux de travail retenu pour ce projet ne repose pas sur une copie
-locale — Claude modifie le code depuis sa session cloud et le dépôt GitHub
-est mis à jour via l'upload web. Si tu veux malgré tout lancer le projet en
-local (ex : sur une machine ayant accès à npm) :
+C'est le flux de travail retenu pour ce projet (voir doc technique §10) :
+Claude Code travaille sur une copie locale du dépôt, `git commit`/`push`
+directement sur `main` — chaque push déclenche un déploiement Vercel
+production, la vérification (voir ci-dessous) se fait donc *avant* de
+pousser.
 
 ```bash
 npm install
-cp .env.example .env.local   # puis renseigner les trois valeurs
+cp .env.example .env.local   # puis renseigner les valeurs (voir "Variables d'environnement")
 npm run dev
 ```
+
+Avec `DATABASE_URL` renseignée, `npm run dev` fonctionne contre la vraie
+base Neon (pas de base de dev séparée). Avant de pousser sur `main` :
+`npx tsc --noEmit` puis `npm run build` — tuer `next dev` avant le build
+(les deux écrivent dans `.next`, qui peut se corrompre sinon).

@@ -131,6 +131,11 @@ partagée/privée est appliquée entièrement au niveau applicatif
   Cron). Voir la doc technique §6.15 et §6.16.
 - Export d'une tâche datée vers le calendrier de l'appareil (fichier
   `.ics`). Voir §6.13.
+- Gamification (12/09/2026, en test) : streak personnel (jours actifs
+  consécutifs, une grâce par semaine) affiché sur l'accueil, « Mon
+  compte » et l'onglet Membres de l'admin, plus une carte « Défi de la
+  semaine » sur l'accueil (objectif familial hebdomadaire calculé sur les
+  tâches partagées). Voir la doc technique §6.17.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Créer · Compte) et « tirer pour rafraîchir » ; sur

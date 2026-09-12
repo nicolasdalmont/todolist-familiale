@@ -1418,6 +1418,88 @@ modifications les plus visibles :
 - `IconCalendarPlus` distincte pour l'export agenda sur l'écran de détail,
   pour ne plus réutiliser l'icône d'échéance avec deux sens différents.
 
+### 6.17 Gamification — streaks et défi de la semaine (12/09/2026)
+
+Premier lot de gamification, en deux volets indépendants : un **streak
+personnel** (assiduité individuelle) et un **défi familial hebdomadaire**
+(objectif collectif sur les tâches partagées). Test en conditions réelles
+jusqu'à ~20/09/2026.
+
+**Streak personnel** (`src/lib/streaks.ts`, `computeStreak()`) — jours
+consécutifs d'activité de l'utilisateur, **toutes tâches confondues,
+privées comme partagées** (contrairement à `activity_log`, jamais
+alimenté pour une tâche privée — voir 6.12). Alimenté par
+`logUserActivity(userId)` (`src/lib/actions.ts`), qui insère une ligne
+minimale dans `user_activity_log` (`user_id`, `created_at` — voir 5.2)
+sans référence de tâche ni contenu, pour ne jamais pouvoir fuiter une
+information privée si cette table venait un jour à être affichée ailleurs
+que sous forme de compte. Actions qui comptent comme « jour actif » :
+créer une tâche (`createTaskAction`), clôturer une tâche
+(`setStatusAction`, seulement vers `done`), ajouter un commentaire
+(`addCommentAction`), ajouter un item de checklist
+(`addChecklistItemAction`), **cocher** un item de checklist
+(`toggleChecklistItemAction`, seulement `done → true` : décocher, qui
+sert à corriger une erreur, ne compte pas).
+
+`computeStreak(activeDays, todayKey)` parcourt les jours en arrière depuis
+aujourd'hui (borné à 400 jours, `MAX_LOOKBACK_DAYS`) : un jour actif
+incrémente le compteur ; un jour inactif consomme **une grâce par semaine
+civile** (lundi-dimanche, Paris) si elle n'a pas déjà servi cette
+semaine-là, sinon le streak s'arrête. Aujourd'hui n'est jamais compté
+comme un échec s'il est encore inactif — la journée n'est simplement pas
+terminée. Limite acceptée : la grâce étant par semaine civile et non par
+fenêtre glissante, un trou à cheval sur une frontière de semaine
+(dimanche + lundi) peut être pardonné deux fois de suite.
+
+Affiché (`StreakBadge`, `src/components/Badge.tsx`, 🔥 + nombre,
+seulement si > 0 — pas de pastille « 🔥 0 ») à trois endroits, chacun
+recalculant `computeStreak()` à partir de `getUserActiveDays()`
+(`src/lib/queries.ts`) :
+
+- **Écran d'accueil** (`HomeDashboard.tsx`) — à côté de la salutation,
+  streak de l'utilisateur connecté.
+- **« Mon compte »** (`/compte`) — même donnée, dans le résumé du profil.
+- **Onglet « Membres » de l'admin** (`UserManager.tsx`) — le streak de
+  **chaque** membre à côté de son nom (`getMembers()`, qui calcule les
+  streaks de tout le monde en une seule requête groupée plutôt qu'un
+  `getUserActiveDays()` par membre — voir `getAllUserActiveDays()` dans
+  `queries.ts`), donnant à la famille une vue d'ensemble plutôt que
+  chacun ne voyant que le sien.
+
+**Défi familial hebdomadaire** (`src/lib/challenges.ts`,
+`ChallengeCard.tsx` sur l'écran d'accueil) — un objectif collectif par
+semaine (lundi-dimanche, Paris), calculé à partir des **tâches
+partagées** et du journal d'activité **uniquement** (jamais des tâches
+privées d'un membre). `WEEKLY_CHALLENGES` est une liste **fixe, rédigée à
+l'avance** (pas de génération dynamique) : 9 semaines, du 14/09 au
+15/11/2026 (« Rentrée sereine », « Zéro retard », « Équipe complète », «
+On papote », « Créateurs actifs », « Grand ménage », « Check-list en
+béton », « Sans dernière minute », « Le combo final ») ; `null` hors de
+cette période. `getCurrentChallenge(todayKey)` sélectionne l'entrée dont
+la semaine couvre aujourd'hui.
+
+Chaque défi porte une `metric` typée (`ChallengeMetric`,
+`src/lib/types.ts`), évaluée par `evaluateMetric()`/`evaluateChallenge()`
+à partir de trois sources chargées côté serveur (`src/app/page.tsx`) :
+l'activité de la semaine (`getFamilyWeekActivity()`), un instantané des
+tâches partagées (`getSharedTasksSnapshot()`) et, seulement si la métrique
+en a besoin (`challengeNeedsMembers()`, évite une requête `getProfiles()`
+pour rien la plupart des semaines), la liste des membres du foyer. Types
+de métrique : `activity_count` (compter des lignes `activity_log` d'un
+type donné, avec dédoublonnage par tâche optionnel — ex. « 10 tâches
+complétées »), `distinct_active_days` (jours distincts avec au moins une
+activité d'un type donné), `zero_overdue_shared` (aucune tâche partagée
+en retard, calculé sur l'instantané, pas sur l'activité),
+`full_team_daily_completion` (chaque membre a clôturé au moins une tâche
+chaque jour déjà écoulé de la semaine), et `combo` (plusieurs métriques,
+réussi seulement si toutes le sont — utilisé pour le défi final).
+
+`ChallengeCard.tsx` est purement présentationnel : la progression arrive
+déjà calculée (`ChallengeProgress` — `current`/`target`/`success`/`label`,
+plus `parts[]` pour un `combo`, un sous-composant `ProgressBar` par
+partie). Affiche titre, description, jours restants dans la semaine (ou
+« Réussi ✅ »), et une ou plusieurs barres de progression.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |

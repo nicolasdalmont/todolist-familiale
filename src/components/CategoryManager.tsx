@@ -9,7 +9,7 @@ import {
   moveCategoryAction,
   updateCategoryAction,
 } from "@/lib/category-actions";
-import { CATEGORY_ICON_CHOICES, categoryIcon, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
+import { CATEGORY_ICON_CHOICES, categoryIcon, categoryIconColor, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconArrowLeft, IconCheck, IconPlus } from "./Icons";
@@ -20,7 +20,7 @@ import { IconArrowLeft, IconCheck, IconPlus } from "./Icons";
 function IconPicker({ value, onChange }: { value: string; onChange: (name: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {CATEGORY_ICON_CHOICES.map(({ name, Icon }) => (
+      {CATEGORY_ICON_CHOICES.map(({ name, Icon, color }) => (
         <button
           key={name}
           type="button"
@@ -28,7 +28,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (name: strin
           aria-label={`Icône ${name}`}
           onClick={() => onChange(name)}
           className={`flex h-8 w-8 items-center justify-center rounded-lg border ${
-            value === name ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+            value === name ? "border-brand bg-brand text-white" : `border-line bg-surface ${color}`
           }`}
         >
           <Icon className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
             <div key={c.slug} className="rounded-2xl border border-line bg-surface p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sand text-ink-muted">
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-lg bg-sand ${categoryIconColor(c.icon)}`}>
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="text-[14px] font-bold">{c.label}</span>

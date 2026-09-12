@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Category, Task } from "@/lib/types";
 import { isOverdue } from "@/lib/format";
-import { categoryIcon, resolveCategory } from "@/lib/categories";
+import { categoryIcon, categoryIconColor, resolveCategory } from "@/lib/categories";
 import { Avatar } from "./Avatar";
 import { OverdueBadge, StatusBadge, VisibilityBadge } from "./Badge";
 import { Time } from "./Time";
@@ -48,7 +48,7 @@ export function TaskCard({ task, categories }: { task: Task; categories: Categor
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-muted">
         <span className="flex items-center gap-1 rounded-full bg-sand px-2 py-0.5 font-semibold text-ink">
-          <CategoryIcon className="h-3.5 w-3.5" /> {category.label}
+          <CategoryIcon className={`h-3.5 w-3.5 ${categoryIconColor(category.icon)}`} /> {category.label}
         </span>
         {overdue ? (
           <OverdueBadge />

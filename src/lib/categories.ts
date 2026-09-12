@@ -7,39 +7,55 @@ import {
   IconChecklist,
   IconDots,
   IconGift,
+  IconHeart,
   IconHome,
+  IconLeaf,
   IconRepeat,
   IconShoppingBag,
   IconSun,
   IconTag,
   IconUser,
   IconUsers,
+  IconWrench,
 } from "@/components/Icons";
 
 type IconCmp = ComponentType<{ className?: string }>;
 
 // Jeu d'icônes sélectionnables pour une catégorie (écran admin →
 // « Catégories »). La clé (`name`) est stockée dans `categories.icon`.
-export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp }[] = [
-  { name: "dots", Icon: IconDots },
-  { name: "home", Icon: IconHome },
-  { name: "shopping", Icon: IconShoppingBag },
-  { name: "gift", Icon: IconGift },
-  { name: "baby", Icon: IconBaby },
-  { name: "users", Icon: IconUsers },
-  { name: "user", Icon: IconUser },
-  { name: "sun", Icon: IconSun },
-  { name: "calendar", Icon: IconCalendar },
-  { name: "checklist", Icon: IconChecklist },
-  { name: "chat", Icon: IconChat },
-  { name: "repeat", Icon: IconRepeat },
-  { name: "tag", Icon: IconTag },
+// `color` distingue visuellement les icônes entre elles (badge de
+// catégorie, sélecteur) — classe Tailwind `text-*`, écrite en toutes
+// lettres pour que le scan de contenu Tailwind la détecte.
+export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp; color: string }[] = [
+  { name: "dots", Icon: IconDots, color: "text-slate-500" },
+  { name: "home", Icon: IconHome, color: "text-amber-600" },
+  { name: "shopping", Icon: IconShoppingBag, color: "text-blue-600" },
+  { name: "gift", Icon: IconGift, color: "text-rose-600" },
+  { name: "baby", Icon: IconBaby, color: "text-sky-600" },
+  { name: "users", Icon: IconUsers, color: "text-violet-600" },
+  { name: "user", Icon: IconUser, color: "text-indigo-600" },
+  { name: "sun", Icon: IconSun, color: "text-yellow-600" },
+  { name: "calendar", Icon: IconCalendar, color: "text-red-600" },
+  { name: "checklist", Icon: IconChecklist, color: "text-teal-600" },
+  { name: "chat", Icon: IconChat, color: "text-cyan-600" },
+  { name: "repeat", Icon: IconRepeat, color: "text-orange-600" },
+  { name: "tag", Icon: IconTag, color: "text-fuchsia-600" },
+  { name: "leaf", Icon: IconLeaf, color: "text-green-600" },
+  { name: "heart", Icon: IconHeart, color: "text-pink-600" },
+  { name: "wrench", Icon: IconWrench, color: "text-stone-600" },
 ];
 
 const ICON_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.Icon]));
+const COLOR_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.color]));
 
 export function categoryIcon(name: string): IconCmp {
   return ICON_BY_NAME.get(name) ?? IconDots;
+}
+
+// Couleur associée à une icône de catégorie (classe Tailwind `text-*`) —
+// utilisée partout où l'icône est affichée seule (badge, sélecteur).
+export function categoryIconColor(name: string): string {
+  return COLOR_BY_NAME.get(name) ?? "text-ink-muted";
 }
 
 // Catégorie fourre-tout : toujours présente (semée par la migration 009),

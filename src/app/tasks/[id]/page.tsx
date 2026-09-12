@@ -11,7 +11,7 @@ import { CommentThread } from "@/components/CommentThread";
 import { Time } from "@/components/Time";
 import { IconArrowLeft, IconCalendar, IconCalendarPlus, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { isOverdue, recurrenceLabel } from "@/lib/format";
-import { categoryIcon, resolveCategory } from "@/lib/categories";
+import { categoryIcon, categoryIconColor, resolveCategory } from "@/lib/categories";
 import { canEdit } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +88,7 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
           ) : null}
 
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
-            <CategoryIcon className="h-4 w-4" /> Catégorie : <strong className="ml-1 text-ink">{category.label}</strong>
+            <CategoryIcon className={`h-4 w-4 ${categoryIconColor(category.icon)}`} /> Catégorie : <strong className="ml-1 text-ink">{category.label}</strong>
           </div>
           <div className="flex items-center gap-1.5 border-t border-line-soft py-1.5 text-[13px] text-ink-muted">
             <IconCalendar className="h-4 w-4" /> Échéance : <strong className="ml-1 text-ink"><Time iso={task.due_at} /></strong>

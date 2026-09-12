@@ -7,7 +7,7 @@ import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOver
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { setFlash } from "@/components/Toast";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
-import { categoryIcon, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
+import { categoryIcon, categoryIconColor, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import type { Category, Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
 
 // Les trois niveaux d'accès proposés pour chaque membre de la famille
@@ -189,7 +189,7 @@ export function TaskForm({
                   category === c.slug ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" /> {c.label}
+                <Icon className={`h-3.5 w-3.5 ${category === c.slug ? "" : categoryIconColor(c.icon)}`} /> {c.label}
               </button>
             );
           })}

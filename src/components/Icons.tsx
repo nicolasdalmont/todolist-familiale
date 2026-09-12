@@ -341,3 +341,49 @@ export function IconBerry({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Icônes de catégorie ajoutées pour élargir le choix de l'admin (voir
+// CATEGORY_ICON_CHOICES dans src/lib/categories.ts) : jardin, santé,
+// bricolage.
+export function IconLeaf({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M6 20c-1.2-7.3 3-13.4 12.5-14.3.9 9.2-5.2 13.4-12.5 14.3Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M7.5 18c1.8-4.2 5-7.5 9.3-10.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IconHeart({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M12 20s-7.1-4.35-9.5-9C1.1 7.3 3 4.2 6.3 4.2c2 0 3.4 1.2 4.3 2.6.9-1.4 2.3-2.6 4.3-2.6 3.3 0 5.2 3.1 3.8 6.8C20.1 15.65 12 20 12 20Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function IconWrench({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M14.7 6.3a4 4 0 0 0-5.35 5.35L4 17l3 3 5.35-5.35a4 4 0 0 0 5.35-5.35l-2.55 2.55-2-2 2.55-2.55Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

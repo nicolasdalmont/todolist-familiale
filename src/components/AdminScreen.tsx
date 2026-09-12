@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { AppSettings, Category, Member, UserStats } from "@/lib/types";
+import type { AppSettings, Category, Member, RewardAchievement, RewardTier, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
 import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
-import { IconBarChart, IconSliders, IconTag, IconUsers } from "./Icons";
+import { RewardManager } from "./RewardManager";
+import { IconBarChart, IconGift, IconSliders, IconTag, IconUsers } from "./Icons";
 
-// Écran /admin réorganisé (voir 6.9) : quatre onglets — « Membres »
-// (gestion des comptes), « Catégories » (catégories de tâches),
-// « Réglages » (rappel + infos d'instance) et « Activité » (statistiques
-// par membre). Réservé au rôle admin, protégé côté serveur dans
+// Écran /admin réorganisé (voir 6.9) : cinq onglets — « Membres » (gestion
+// des comptes), « Catégories » (catégories de tâches), « Réglages » (rappel
+// + infos d'instance), « Activité » (statistiques par membre) et
+// « Récompenses » (paliers de gamification, migration 002 — voir
+// src/lib/rewards.ts). Réservé au rôle admin, protégé côté serveur dans
 // src/app/admin/page.tsx.
-type Tab = "members" | "categories" | "settings" | "activity";
+type Tab = "members" | "categories" | "settings" | "activity" | "rewards";
 
 export function AdminScreen({
   currentUserId,
@@ -21,12 +23,16 @@ export function AdminScreen({
   categories,
   settings,
   stats,
+  rewardTiers,
+  rewardAchievements,
 }: {
   currentUserId: string;
   members: Member[];
   categories: Category[];
   settings: AppSettings;
   stats: UserStats[];
+  rewardTiers: RewardTier[];
+  rewardAchievements: RewardAchievement[];
 }) {
   const [tab, setTab] = useState<Tab>("members");
 
@@ -35,6 +41,7 @@ export function AdminScreen({
     { value: "categories" as const, label: "Catégories", Icon: IconTag },
     { value: "settings" as const, label: "Réglages", Icon: IconSliders },
     { value: "activity" as const, label: "Activité", Icon: IconBarChart },
+    { value: "rewards" as const, label: "Récompenses", Icon: IconGift },
   ];
 
   return (
@@ -72,8 +79,10 @@ export function AdminScreen({
         <CategoryManager categories={categories} />
       ) : tab === "settings" ? (
         <SettingsPanel settings={settings} />
-      ) : (
+      ) : tab === "activity" ? (
         <UserStatsList stats={stats} />
+      ) : (
+        <RewardManager tiers={rewardTiers} achievements={rewardAchievements} />
       )}
     </div>
   );

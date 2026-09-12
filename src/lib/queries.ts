@@ -8,6 +8,10 @@ import type {
   Member,
   NotificationItem,
   Profile,
+  RewardAchievement,
+  RewardMetric,
+  RewardScope,
+  RewardTier,
   ShareRole,
   Tag,
   Task,
@@ -377,17 +381,32 @@ export async function getRecentActivity(taskIds: string[], sinceIso: string): Pr
 // l'utilisateur qui regarde l'écran. Sûr par construction : logActivity()
 // (src/lib/actions.ts) n'est jamais appelée pour une tâche privée, donc
 // activity_log ne contient déjà que de l'activité partagée.
-export async function getFamilyWeekActivity(sinceIso: string): Promise<ActivityLogEntry[]> {
+// `untilIso` optionnel : borne haute, nécessaire pour recalculer fidèlement
+// une semaine de défi déjà terminée (voir settleEndedChallengeWeeks() dans
+// src/lib/rewards.ts) sans englober l'activité des semaines suivantes.
+// Absent (semaine en cours, cas d'origine) : aucune borne haute, comme
+// avant.
+export async function getFamilyWeekActivity(sinceIso: string, untilIso?: string): Promise<ActivityLogEntry[]> {
   try {
-    const rows = await sql`
-      select al.id as id, al.task_id as task_id, al.task_title as task_title, al.actor_id as actor_id,
-             al.type as type, al.detail as detail, al.created_at as created_at,
-             u.id as actor_user_id, u.name as actor_name, u.color as actor_color
-      from activity_log al
-      left join users u on u.id = al.actor_id
-      where al.created_at >= ${sinceIso}
-      order by al.created_at desc
-    `;
+    const rows = untilIso
+      ? await sql`
+          select al.id as id, al.task_id as task_id, al.task_title as task_title, al.actor_id as actor_id,
+                 al.type as type, al.detail as detail, al.created_at as created_at,
+                 u.id as actor_user_id, u.name as actor_name, u.color as actor_color
+          from activity_log al
+          left join users u on u.id = al.actor_id
+          where al.created_at >= ${sinceIso} and al.created_at < ${untilIso}
+          order by al.created_at desc
+        `
+      : await sql`
+          select al.id as id, al.task_id as task_id, al.task_title as task_title, al.actor_id as actor_id,
+                 al.type as type, al.detail as detail, al.created_at as created_at,
+                 u.id as actor_user_id, u.name as actor_name, u.color as actor_color
+          from activity_log al
+          left join users u on u.id = al.actor_id
+          where al.created_at >= ${sinceIso}
+          order by al.created_at desc
+        `;
 
     return (
       rows as Array<{
@@ -581,4 +600,137 @@ export async function getUserWithPasswordHash(
     where id = ${id}
   `;
   return (rows[0] as unknown as (Profile & { password_hash: string })) ?? null;
+}
+
+// Paliers de récompense (migration 002, voir src/lib/rewards.ts). Toutes
+// les fonctions ci-dessous tolèrent l'absence des tables (même principe que
+// getUserActiveDays plus haut) : tant que la migration 002 n'est pas
+// appliquée sur Neon, l'Accueil et l'admin dégradent en "aucun palier"
+// plutôt que de planter.
+
+function rewardTierFromRow(r: {
+  id: string;
+  scope: RewardScope;
+  metric: RewardMetric;
+  threshold: number;
+  reward_label: string;
+  active: boolean;
+}): RewardTier {
+  return { id: r.id, scope: r.scope, metric: r.metric, threshold: r.threshold, rewardLabel: r.reward_label, active: r.active };
+}
+
+export async function getActiveRewardTiers(): Promise<RewardTier[]> {
+  try {
+    const rows = await sql`select id, scope, metric, threshold, reward_label, active from reward_tiers where active order by scope, threshold`;
+    return (rows as Parameters<typeof rewardTierFromRow>[0][]).map(rewardTierFromRow);
+  } catch (e) {
+    console.error("getActiveRewardTiers:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+// Actifs + désactivés, pour l'onglet « Récompenses » de l'écran admin.
+export async function getAllRewardTiers(): Promise<RewardTier[]> {
+  try {
+    const rows = await sql`select id, scope, metric, threshold, reward_label, active from reward_tiers order by scope, threshold`;
+    return (rows as Parameters<typeof rewardTierFromRow>[0][]).map(rewardTierFromRow);
+  } catch (e) {
+    console.error("getAllRewardTiers:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+export async function getSettledChallengeWeekStarts(): Promise<Set<string>> {
+  try {
+    const rows = await sql`select week_start from challenge_results`;
+    // week_start est une colonne `date` : Neon la renvoie déjà en "YYYY-MM-DD".
+    return new Set((rows as Array<{ week_start: string }>).map((r) => r.week_start));
+  } catch (e) {
+    console.error("getSettledChallengeWeekStarts:", e instanceof Error ? e.message : e);
+    return new Set();
+  }
+}
+
+export async function insertChallengeResult(weekStart: string, success: boolean): Promise<void> {
+  try {
+    await sql`
+      insert into challenge_results (week_start, success) values (${weekStart}, ${success})
+      on conflict (week_start) do nothing
+    `;
+  } catch (e) {
+    console.error("insertChallengeResult:", e instanceof Error ? e.message : e);
+  }
+}
+
+export async function countSuccessfulChallenges(): Promise<number> {
+  try {
+    const rows = await sql`select count(*)::int as n from challenge_results where success`;
+    return (rows[0] as { n: number } | undefined)?.n ?? 0;
+  } catch (e) {
+    console.error("countSuccessfulChallenges:", e instanceof Error ? e.message : e);
+    return 0;
+  }
+}
+
+// `userId` null pour un palier collectif — voir les deux index uniques
+// partiels de la migration 002 (un par portée) qui rendent cet insert
+// idempotent. Renvoie `true` si le palier vient d'être obtenu (première
+// insertion), `false` s'il l'était déjà.
+export async function insertRewardAchievementIfAbsent(tierId: string, userId: string | null): Promise<boolean> {
+  try {
+    const rows = await sql`
+      insert into reward_achievements (tier_id, user_id) values (${tierId}, ${userId})
+      on conflict do nothing
+      returning id
+    `;
+    return rows.length > 0;
+  } catch (e) {
+    console.error("insertRewardAchievementIfAbsent:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+// Tous les paliers atteints, triés du plus récent au plus ancien — jointure
+// avec le palier et (si individuel) la personne. Réutilisée telle quelle
+// par l'admin (tout) et par l'Accueil (filtrée en mémoire par l'appelant :
+// collectifs + ceux de l'utilisateur courant).
+export async function getRewardAchievements(): Promise<RewardAchievement[]> {
+  try {
+    const rows = await sql`
+      select
+        ra.id as id, ra.achieved_at as achieved_at, ra.status as status, ra.given_at as given_at,
+        rt.id as tier_id, rt.scope as tier_scope, rt.metric as tier_metric, rt.threshold as tier_threshold, rt.reward_label as tier_reward_label,
+        u.id as user_id, u.name as user_name, u.color as user_color
+      from reward_achievements ra
+      join reward_tiers rt on rt.id = ra.tier_id
+      left join users u on u.id = ra.user_id
+      order by ra.achieved_at desc
+    `;
+    return (
+      rows as Array<{
+        id: string;
+        achieved_at: string;
+        status: RewardAchievement["status"];
+        given_at: string | null;
+        tier_id: string;
+        tier_scope: RewardScope;
+        tier_metric: RewardMetric;
+        tier_threshold: number;
+        tier_reward_label: string;
+        user_id: string | null;
+        user_name: string | null;
+        user_color: string | null;
+      }>
+    ).map((r) => ({
+      id: r.id,
+      tier: { id: r.tier_id, scope: r.tier_scope, metric: r.tier_metric, threshold: r.tier_threshold, rewardLabel: r.tier_reward_label },
+      user: r.user_id ? { id: r.user_id, name: r.user_name!, color: r.user_color! } : null,
+      achievedAt: r.achieved_at,
+      status: r.status,
+      givenAt: r.given_at,
+    }));
+  } catch (e) {
+    console.error("getRewardAchievements:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }

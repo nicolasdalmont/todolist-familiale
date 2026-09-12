@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getFamilyWeekActivity, getMyNotifications, getProfiles, getRecentActivity, getSharedTasksSnapshot, getTasks, getUserActiveDays } from "@/lib/queries";
+import { getFamilyWeekActivity, getMyNotifications, getProfiles, getRecentActivity, getRewardAchievements, getSharedTasksSnapshot, getTasks, getUserActiveDays } from "@/lib/queries";
 import { challengeNeedsMembers, evaluateChallenge, getCurrentChallenge } from "@/lib/challenges";
 import { computeStreak } from "@/lib/streaks";
+import { settleRewards } from "@/lib/rewards";
 import { dateKeyFromDate } from "@/lib/format";
 import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { Topbar } from "@/components/Topbar";
@@ -61,6 +62,14 @@ export default async function HomePage() {
   const activeDaysSinceIso = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
   const streak = computeStreak(await getUserActiveDays(profile.id, activeDaysSinceIso), todayKey);
 
+  // Paliers de récompense (src/lib/rewards.ts) — tourne inconditionnellement
+  // (contrairement au bloc `challenge` ci-dessus) : une semaine de défi peut
+  // se terminer même hors des 9 semaines couvertes, et le streak est
+  // recalculé tous les jours de toute façon.
+  await settleRewards(profile.id, streak);
+  const allAchievements = await getRewardAchievements();
+  const achievements = allAchievements.filter((a) => a.user === null || a.user.id === profile.id);
+
   return (
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
@@ -72,6 +81,7 @@ export default async function HomePage() {
           notifications={notifications}
           challenge={challenge}
           streak={streak}
+          achievements={achievements}
         />
       </main>
       <Link

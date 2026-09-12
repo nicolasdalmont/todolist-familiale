@@ -27,6 +27,9 @@ create extension if not exists pgcrypto;
 
 drop table if exists public.push_subscriptions cascade;
 drop table if exists public.notifications cascade;
+drop table if exists public.reward_achievements cascade;
+drop table if exists public.challenge_results cascade;
+drop table if exists public.reward_tiers cascade;
 drop table if exists public.activity_log cascade;
 drop table if exists public.user_activity_log cascade;
 drop table if exists public.checklist_items cascade;
@@ -161,6 +164,45 @@ create table public.user_activity_log (
   created_at timestamptz not null default now()
 );
 
+-- Paliers de récompense (migration 002, voir src/lib/rewards.ts) : un
+-- palier configuré par l'admin (portée individuelle sur le streak, ou
+-- collective sur les défis familiaux réussis cumulés), un seuil, et un
+-- libellé de récompense en texte libre — la récompense est négociée en
+-- famille, hors appli.
+create table public.reward_tiers (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('individual', 'collective')),
+  metric text not null check (metric in ('streak_days', 'challenges_completed')),
+  threshold int not null check (threshold > 0),
+  reward_label text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- Résultat figé d'une semaine de défi une fois celle-ci terminée — permet
+-- de compter les défis réussis cumulés sans recalculer indéfiniment le
+-- passé à partir d'activity_log.
+create table public.challenge_results (
+  week_start date primary key,
+  success boolean not null,
+  computed_at timestamptz not null default now()
+);
+
+create table public.reward_achievements (
+  id uuid primary key default gen_random_uuid(),
+  tier_id uuid not null references public.reward_tiers(id) on delete cascade,
+  -- null pour un palier collectif (toute la famille) ; renseigné pour un
+  -- palier individuel. Deux index uniques partiels ci-dessous au lieu d'une
+  -- contrainte unique(tier_id, user_id) : Postgres ne considère pas deux
+  -- NULL comme égaux, une contrainte simple laisserait passer des doublons
+  -- collectifs.
+  user_id uuid references public.users(id) on delete cascade,
+  achieved_at timestamptz not null default now(),
+  status text not null default 'pending' check (status in ('pending', 'given')),
+  given_at timestamptz,
+  given_by uuid references public.users(id) on delete set null
+);
+
 -- Notifications "À ton attention" par utilisateur.
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -191,6 +233,10 @@ create table public.push_subscriptions (
 create index if not exists activity_log_task_id_idx on public.activity_log(task_id);
 create index if not exists activity_log_created_at_idx on public.activity_log(created_at);
 create index if not exists user_activity_log_user_id_idx on public.user_activity_log(user_id, created_at desc);
+create unique index if not exists reward_achievements_individual_uidx
+  on public.reward_achievements(tier_id, user_id) where user_id is not null;
+create unique index if not exists reward_achievements_collective_uidx
+  on public.reward_achievements(tier_id) where user_id is null;
 create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
 create index if not exists push_subscriptions_user_idx on public.push_subscriptions(user_id);
 

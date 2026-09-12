@@ -228,3 +228,32 @@ export interface ChallengeProgress {
   // par sous-métrique, dans le même ordre).
   parts?: ChallengeProgress[];
 }
+
+// Paliers de récompense (migration 002, voir src/lib/rewards.ts) — un
+// palier configuré par l'admin, sur le streak personnel (individuel) ou les
+// défis familiaux réussis cumulés (collectif). La récompense elle-même est
+// un texte libre saisi par l'admin, négociée en famille hors appli.
+export type RewardScope = "individual" | "collective";
+export type RewardMetric = "streak_days" | "challenges_completed";
+export type RewardStatus = "pending" | "given";
+
+export interface RewardTier {
+  id: string;
+  scope: RewardScope;
+  metric: RewardMetric;
+  threshold: number;
+  rewardLabel: string;
+  active: boolean;
+}
+
+// Un palier atteint, avec le nécessaire déjà joint pour l'affichage — voir
+// getRewardAchievements() dans src/lib/queries.ts. `user` est `null` pour un
+// palier collectif (toute la famille), sinon la personne qui l'a atteint.
+export interface RewardAchievement {
+  id: string;
+  tier: Pick<RewardTier, "id" | "scope" | "metric" | "threshold" | "rewardLabel">;
+  user: Pick<Profile, "id" | "name" | "color"> | null;
+  achievedAt: string;
+  status: RewardStatus;
+  givenAt: string | null;
+}

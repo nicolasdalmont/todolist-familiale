@@ -1,4 +1,4 @@
-import type { TaskStatus, Visibility } from "@/lib/types";
+import type { RewardStatus, TaskStatus, Visibility } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/format";
 import { IconAlertTriangle, IconLock, IconUsers } from "./Icons";
 
@@ -66,6 +66,24 @@ export function StreakBadge({ streak }: { streak: number }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-orange-50 px-2.5 py-1 text-[11.5px] font-bold text-orange-600">
       🔥 {streak}
+    </span>
+  );
+}
+
+// Statut d'un palier de récompense atteint (src/lib/rewards.ts) — "En
+// attente" tant que l'admin n'a pas déclaré la récompense donnée en vrai,
+// "Reçu" une fois marqué comme tel (voir RewardsBoard.tsx, RewardManager.tsx).
+const REWARD_STATUS_STYLES: Record<RewardStatus, string> = {
+  pending: "bg-amber-50 text-amber-700",
+  given: "bg-emerald-50 text-emerald-700",
+};
+
+export function RewardStatusBadge({ status }: { status: RewardStatus }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-bold ${REWARD_STATUS_STYLES[status]}`}
+    >
+      {status === "given" ? "Reçu 🎁" : "En attente"}
     </span>
   );
 }

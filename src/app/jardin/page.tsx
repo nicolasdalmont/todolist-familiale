@@ -12,7 +12,11 @@ export const dynamic = "force-dynamic";
 // Onglet Jardin (migration 003) : liste des activités récurrentes du
 // jardin, ouverte à tout membre connecté (pas réservée à l'admin,
 // contrairement à /admin) — voir src/lib/garden-actions.ts.
-export default async function JardinPage() {
+export default async function JardinPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const profile = await requireUser();
 
   const [activities, members, categories] = await Promise.all([
@@ -21,6 +25,17 @@ export default async function JardinPage() {
     getGardenActivityCategories(),
   ]);
   const { month } = currentParisYearMonth();
+
+  // Prérempli depuis TaskForm.tsx quand l'utilisateur choisit de créer une
+  // activité Jardin plutôt qu'une tâche (voir AGENDA_CATEGORY_INFO).
+  const prefillName = typeof searchParams.prefillName === "string" ? searchParams.prefillName : undefined;
+  const prefill = prefillName
+    ? {
+        name: prefillName,
+        description: typeof searchParams.prefillDescription === "string" ? searchParams.prefillDescription : "",
+        month: typeof searchParams.prefillMonth === "string" ? Number(searchParams.prefillMonth) || null : null,
+      }
+    : undefined;
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -38,7 +53,13 @@ export default async function JardinPage() {
           <h2 className="text-lg font-extrabold">Jardin</h2>
         </div>
 
-        <JardinScreen activities={activities} members={members} categories={categories} currentMonth={month} />
+        <JardinScreen
+          activities={activities}
+          members={members}
+          categories={categories}
+          currentMonth={month}
+          prefill={prefill}
+        />
       </main>
     </div>
   );

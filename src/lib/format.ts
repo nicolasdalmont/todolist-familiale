@@ -1,4 +1,4 @@
-import type { Recurrence, TaskStatus } from "./types";
+import type { Recurrence, RecurrenceType, TaskStatus } from "./types";
 import { APP_TIMEZONE } from "./timezone";
 
 export function initials(name: string): string {
@@ -259,4 +259,49 @@ export function addDaysToKey(key: string, days: number): string {
   const noon = dayKeyToNoonUtc(key);
   noon.setUTCDate(noon.getUTCDate() + days);
   return dateKeyFromDate(noon);
+}
+
+export type AgendaActivityPrefill = {
+  name: string;
+  description: string;
+  dueDate: string;
+  recurrenceType?: RecurrenceType;
+  recurrenceInterval?: number;
+  recurrenceUnit?: "days" | "weeks" | "months" | "years";
+};
+
+const RECURRENCE_TYPES: RecurrenceType[] = ["none", "daily", "weekly", "monthly", "yearly", "custom"];
+const RECURRENCE_UNITS = ["days", "weeks", "months", "years"];
+
+// Reprise de saisie depuis TaskForm.tsx (voir AGENDA_CATEGORY_INFO) : lit
+// les paramètres `prefill*` posés dans l'URL par redirectToAgenda() et les
+// restitue prêts à l'emploi pour VoitureScreen/SanteScreen/
+// FinancesScreen, qui partagent la même structure de formulaire
+// (name/description/dueDate/récurrence). Jardin a son propre format
+// (mois plutôt que date), traité directement dans src/app/jardin/page.tsx.
+export function parseAgendaActivityPrefill(searchParams: {
+  [key: string]: string | string[] | undefined;
+}): AgendaActivityPrefill | undefined {
+  const name = typeof searchParams.prefillName === "string" ? searchParams.prefillName : undefined;
+  if (!name) return undefined;
+  const recurrenceTypeRaw = searchParams.prefillRecurrenceType;
+  const recurrenceType =
+    typeof recurrenceTypeRaw === "string" && (RECURRENCE_TYPES as string[]).includes(recurrenceTypeRaw)
+      ? (recurrenceTypeRaw as RecurrenceType)
+      : undefined;
+  const recurrenceUnitRaw = searchParams.prefillRecurrenceUnit;
+  const recurrenceUnit =
+    typeof recurrenceUnitRaw === "string" && RECURRENCE_UNITS.includes(recurrenceUnitRaw)
+      ? (recurrenceUnitRaw as AgendaActivityPrefill["recurrenceUnit"])
+      : undefined;
+  const intervalRaw =
+    typeof searchParams.prefillRecurrenceInterval === "string" ? Number(searchParams.prefillRecurrenceInterval) : NaN;
+  return {
+    name,
+    description: typeof searchParams.prefillDescription === "string" ? searchParams.prefillDescription : "",
+    dueDate: typeof searchParams.prefillDueDate === "string" ? searchParams.prefillDueDate : "",
+    recurrenceType,
+    recurrenceInterval: Number.isFinite(intervalRaw) && intervalRaw > 0 ? intervalRaw : undefined,
+    recurrenceUnit,
+  };
 }

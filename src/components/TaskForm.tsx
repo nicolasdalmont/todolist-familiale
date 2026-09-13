@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
 import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOverlay";
@@ -17,6 +17,17 @@ const SHARE_OPTIONS: { value: "none" | ShareRole; label: string }[] = [
   { value: "viewer", label: "Lecture seule" },
   { value: "editor", label: "Assigné(e)" },
 ];
+
+// Catégories adossées à un agenda dédié (Jardin/Voiture/Santé/Finances,
+// voir GARDEN_CATEGORY_SLUG et consorts dans src/lib/{garden,car,health,
+// finances}.ts) : à la création d'une tâche, on propose de créer plutôt
+// une activité dans l'agenda, en reprenant la saisie déjà faite.
+const AGENDA_CATEGORY_INFO: Record<string, { label: string; path: string }> = {
+  jardin: { label: "Jardin", path: "/jardin" },
+  voiture: { label: "Voiture", path: "/voiture" },
+  sante: { label: "Santé", path: "/sante" },
+  finances: { label: "Finances", path: "/finances" },
+};
 
 export function TaskForm({
   mode,
@@ -40,6 +51,11 @@ export function TaskForm({
   const defaultCategory =
     categories.find((c) => c.slug === FALLBACK_CATEGORY_SLUG)?.slug ?? categories[0]?.slug ?? FALLBACK_CATEGORY_SLUG;
   const [category, setCategory] = useState(task?.category ?? defaultCategory);
+  const [agendaPrompt, setAgendaPrompt] = useState<{ slug: string; label: string; path: string } | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const recurrenceIntervalRef = useRef<HTMLInputElement>(null);
+  const recurrenceUnitRef = useRef<HTMLSelectElement>(null);
   // Champ contrôlé pour pouvoir le vider via le bouton "Retirer" : l'effacer
   // renvoie une échéance vide, que les Server Actions traduisent en
   // due_at = null (voir createTaskAction / updateTaskAction, actions.ts).
@@ -83,6 +99,35 @@ export function TaskForm({
     setNewTag("");
   }
 
+  // Bascule vers la création d'activité dans l'agenda dédié (Jardin/
+  // Voiture/Santé/Finances), en reprenant ce qui a déjà été saisi ici —
+  // voir AGENDA_CATEGORY_INFO. Jardin fonctionne par mois (pas de date
+  // précise) : on en déduit le mois depuis l'échéance si elle est posée.
+  function redirectToAgenda(target: { slug: string; path: string }) {
+    const params = new URLSearchParams();
+    const name = titleRef.current?.value.trim() ?? "";
+    if (name) params.set("prefillName", name);
+    const description = descriptionRef.current?.value.trim() ?? "";
+    if (description) params.set("prefillDescription", description);
+    if (dueAt) {
+      const datePart = dueAt.slice(0, 10);
+      if (target.slug === "jardin") {
+        params.set("prefillMonth", String(Number(datePart.slice(5, 7))));
+      } else {
+        params.set("prefillDueDate", datePart);
+      }
+    }
+    if (target.slug !== "jardin" && recurrenceType !== "none") {
+      params.set("prefillRecurrenceType", recurrenceType);
+      if (recurrenceType === "custom") {
+        params.set("prefillRecurrenceInterval", recurrenceIntervalRef.current?.value || "2");
+        params.set("prefillRecurrenceUnit", recurrenceUnitRef.current?.value || "weeks");
+      }
+    }
+    const query = params.toString();
+    router.push(query ? `${target.path}?${query}` : target.path);
+  }
+
   return (
     <form
       action={action}
@@ -109,6 +154,7 @@ export function TaskForm({
           name="title"
           type="text"
           required
+          ref={titleRef}
           defaultValue={task?.title}
           placeholder="Ex : Courses de la semaine"
           className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
@@ -122,6 +168,7 @@ export function TaskForm({
         <textarea
           id="description"
           name="description"
+          ref={descriptionRef}
           defaultValue={task?.description}
           placeholder="Détails, liste, instructions..."
           className="min-h-[90px] w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px] outline-none focus:border-brand"
@@ -179,12 +226,19 @@ export function TaskForm({
         <div role="group" aria-label="Catégorie" className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const Icon = categoryIcon(c.icon);
+            const agendaInfo = mode === "create" ? AGENDA_CATEGORY_INFO[c.slug] : undefined;
             return (
               <button
                 key={c.slug}
                 type="button"
                 aria-pressed={category === c.slug}
-                onClick={() => setCategory(c.slug)}
+                onClick={() => {
+                  if (agendaInfo && category !== c.slug) {
+                    setAgendaPrompt({ slug: c.slug, ...agendaInfo });
+                    return;
+                  }
+                  setCategory(c.slug);
+                }}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
                   category === c.slug ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
                 }`}
@@ -232,11 +286,13 @@ export function TaskForm({
               type="number"
               name="recurrenceInterval"
               min={1}
+              ref={recurrenceIntervalRef}
               defaultValue={task?.recurrence?.interval ?? 2}
               className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px]"
             />
             <select
               name="recurrenceUnit"
+              ref={recurrenceUnitRef}
               defaultValue={task?.recurrence?.unit ?? "weeks"}
               className="w-full rounded-xl border border-line px-3 py-2.5 text-[14.5px]"
             >
@@ -393,6 +449,22 @@ export function TaskForm({
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={agendaPrompt !== null}
+        title={agendaPrompt ? `Créer une activité ${agendaPrompt.label} à la place ?` : ""}
+        body="Cette catégorie a un agenda dédié. Tu peux y créer l'activité directement en gardant ce que tu as déjà saisi, ou continuer à créer une tâche classée dans cette catégorie."
+        confirmLabel="Créer l'activité"
+        cancelLabel="Garder la tâche"
+        onCancel={() => {
+          if (agendaPrompt) setCategory(agendaPrompt.slug);
+          setAgendaPrompt(null);
+        }}
+        onConfirm={() => {
+          if (agendaPrompt) redirectToAgenda(agendaPrompt);
+          setAgendaPrompt(null);
+        }}
+      />
     </form>
   );
 }

@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import type { CarActivity, Profile, Recurrence, RecurrenceType } from "@/lib/types";
 import { createCarActivityAction, deleteCarActivityAction, updateCarActivityAction } from "@/lib/car-actions";
 import { setStatusAction } from "@/lib/actions";
-import { formatDateOnly, formatMonthYear, isDateOnlyOverdue, recurrenceLabel } from "@/lib/format";
+import {
+  formatDateOnly,
+  formatMonthYear,
+  isDateOnlyOverdue,
+  recurrenceLabel,
+  type AgendaActivityPrefill,
+} from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
@@ -276,16 +282,20 @@ function matchesQuery(activity: CarActivity, query: string): boolean {
 export function VoitureScreen({
   activities,
   members,
+  prefill,
 }: {
   activities: CarActivity[];
   members: Pick<Profile, "id" | "name" | "color">[];
+  // Reprise de saisie depuis TaskForm.tsx (voir AGENDA_CATEGORY_INFO) :
+  // ouvre directement le formulaire de création avec ces valeurs.
+  prefill?: AgendaActivityPrefill;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
   const [query, setQuery] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(!!prefill);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -295,6 +305,18 @@ export function VoitureScreen({
     () => activities.filter((a) => matchesQuery(a, query.trim().toLowerCase())),
     [activities, query]
   );
+
+  const createInitial: FormState = prefill
+    ? {
+        ...EMPTY_FORM,
+        name: prefill.name,
+        description: prefill.description,
+        dueDate: prefill.dueDate,
+        recurrenceType: prefill.recurrenceType ?? "none",
+        recurrenceInterval: prefill.recurrenceInterval ?? EMPTY_FORM.recurrenceInterval,
+        recurrenceUnit: prefill.recurrenceUnit ?? EMPTY_FORM.recurrenceUnit,
+      }
+    : EMPTY_FORM;
 
   // Positionnement sur la première activité à l'arrivée sur la page — liste
   // déjà triée chronologiquement par le serveur (car-queries.ts), la
@@ -383,7 +405,7 @@ export function VoitureScreen({
       {showCreate ? (
         <ActivityForm
           members={members}
-          initial={EMPTY_FORM}
+          initial={createInitial}
           onSubmit={handleCreate}
           onCancel={() => setShowCreate(false)}
           submitLabel="Créer l'activité"

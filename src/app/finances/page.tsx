@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { getFinancesActivities } from "@/lib/finances-queries";
 import { getProfiles } from "@/lib/queries";
+import { parseAgendaActivityPrefill } from "@/lib/format";
 import { Topbar } from "@/components/Topbar";
 import { FinancesScreen } from "@/components/FinancesScreen";
 import { IconArrowLeft, IconEuro } from "@/components/Icons";
@@ -11,10 +12,15 @@ export const dynamic = "force-dynamic";
 // Onglet Finances (migration 008) : liste des activités récurrentes de
 // finances, ouverte à tout membre connecté (comme Jardin/Voiture/Santé) —
 // voir src/lib/finances-actions.ts.
-export default async function FinancesPage() {
+export default async function FinancesPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const profile = await requireUser();
 
   const [activities, members] = await Promise.all([getFinancesActivities(), getProfiles()]);
+  const prefill = parseAgendaActivityPrefill(searchParams);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -32,7 +38,7 @@ export default async function FinancesPage() {
           <h2 className="text-lg font-extrabold">Finances</h2>
         </div>
 
-        <FinancesScreen activities={activities} members={members} />
+        <FinancesScreen activities={activities} members={members} prefill={prefill} />
       </main>
     </div>
   );

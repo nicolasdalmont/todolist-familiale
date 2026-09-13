@@ -244,17 +244,21 @@ export function JardinScreen({
   members,
   categories,
   currentMonth,
+  prefill,
 }: {
   activities: GardenActivity[];
   members: Pick<Profile, "id" | "name" | "color">[];
   categories: Category[];
   currentMonth: number;
+  // Reprise de saisie depuis TaskForm.tsx (voir AGENDA_CATEGORY_INFO) :
+  // ouvre directement le formulaire de création avec ces valeurs.
+  prefill?: { name: string; description: string; month: number | null };
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(!!prefill);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
@@ -325,6 +329,15 @@ export function JardinScreen({
   }
 
   const defaultCategory = categories[0]?.slug ?? "autre";
+  const createInitial: FormState = prefill
+    ? {
+        name: prefill.name,
+        description: prefill.description,
+        months: prefill.month ? [prefill.month] : [],
+        assigneeIds: [],
+        category: defaultCategory,
+      }
+    : { name: "", description: "", months: [], assigneeIds: [], category: defaultCategory };
 
   return (
     <div className="flex flex-col gap-4">
@@ -350,7 +363,7 @@ export function JardinScreen({
         <ActivityForm
           members={members}
           categories={categories}
-          initial={{ name: "", description: "", months: [], assigneeIds: [], category: defaultCategory }}
+          initial={createInitial}
           onSubmit={handleCreate}
           onCancel={() => setShowCreate(false)}
           submitLabel="Créer l'activité"

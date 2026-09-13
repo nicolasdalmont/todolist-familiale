@@ -243,6 +243,7 @@ export function TaskForm({
               <option value="days">jour(s)</option>
               <option value="weeks">semaine(s)</option>
               <option value="months">mois</option>
+              <option value="years">an(s)</option>
             </select>
           </div>
         </div>

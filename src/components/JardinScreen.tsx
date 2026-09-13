@@ -427,10 +427,12 @@ export function JardinScreen({
                               {activity.description ? (
                                 <p className="text-[12.5px] text-ink-muted">{activity.description}</p>
                               ) : null}
-                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                {activity.assignees.map((a) => (
-                                  <Avatar key={a.id} profile={a} size="sm" />
-                                ))}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <div className="flex -space-x-2">
+                                  {activity.assignees.map((a) => (
+                                    <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
+                                  ))}
+                                </div>
                                 {activity.openTask?.due_at ? (
                                   <span className="text-[11.5px] text-ink-muted">
                                     Échéance : {formatDateOnly(activity.openTask.due_at)}

@@ -100,7 +100,14 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
 export function recurrenceLabel(recurrence: Recurrence | null | undefined): string {
   if (!recurrence || recurrence.type === "none") return "Ponctuelle";
   if (recurrence.type === "custom") {
-    const unit = recurrence.unit === "weeks" ? "semaine(s)" : recurrence.unit === "months" ? "mois" : "jour(s)";
+    const unit =
+      recurrence.unit === "years"
+        ? "an(s)"
+        : recurrence.unit === "weeks"
+          ? "semaine(s)"
+          : recurrence.unit === "months"
+            ? "mois"
+            : "jour(s)";
     return `Tous les ${recurrence.interval ?? 1} ${unit}`;
   }
   const labels: Record<string, string> = {
@@ -132,7 +139,8 @@ export function computeNextOccurrence(dueAt: string | null, recurrence: Recurren
       base.setFullYear(base.getFullYear() + interval);
       return base.toISOString();
     case "custom": {
-      if (recurrence.unit === "weeks") base.setDate(base.getDate() + interval * 7);
+      if (recurrence.unit === "years") base.setFullYear(base.getFullYear() + interval);
+      else if (recurrence.unit === "weeks") base.setDate(base.getDate() + interval * 7);
       else if (recurrence.unit === "months") base.setMonth(base.getMonth() + interval);
       else base.setDate(base.getDate() + interval);
       return base.toISOString();

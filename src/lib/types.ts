@@ -20,7 +20,7 @@ export interface Category {
 export interface Recurrence {
   type: RecurrenceType;
   interval?: number;
-  unit?: "days" | "weeks" | "months";
+  unit?: "days" | "weeks" | "months" | "years";
 }
 
 // Représente une ligne de la table "users". Ne contient jamais

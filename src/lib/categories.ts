@@ -3,6 +3,7 @@ import type { Category } from "./types";
 import {
   IconBaby,
   IconCalendar,
+  IconCar,
   IconChat,
   IconChecklist,
   IconDots,
@@ -46,6 +47,7 @@ export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp; color: string
   { name: "leaf", Icon: IconLeaf, color: "text-green-600", bg: "bg-green-100" },
   { name: "heart", Icon: IconHeart, color: "text-pink-600", bg: "bg-pink-100" },
   { name: "wrench", Icon: IconWrench, color: "text-stone-600", bg: "bg-stone-100" },
+  { name: "car", Icon: IconCar, color: "text-slate-700", bg: "bg-slate-200" },
 ];
 
 const ICON_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.Icon]));

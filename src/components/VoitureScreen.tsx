@@ -63,7 +63,7 @@ type FormState = {
   dueMonth: string; // "YYYY-MM", valeur du <input type="month">
   recurrenceType: RecurrenceType;
   recurrenceInterval: number;
-  recurrenceUnit: "days" | "weeks" | "months";
+  recurrenceUnit: "days" | "weeks" | "months" | "years";
   assigneeIds: string[];
 };
 
@@ -213,6 +213,7 @@ function ActivityForm({
               <option value="days">jour(s)</option>
               <option value="weeks">semaine(s)</option>
               <option value="months">mois</option>
+              <option value="years">an(s)</option>
             </select>
           </div>
         </div>
@@ -420,9 +421,9 @@ export function VoitureScreen({
                       <span>·</span>
                       <span>{recurrenceLabel(activity.recurrence)}</span>
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <div className="mt-1.5 flex -space-x-2">
                       {activity.assignees.map((a) => (
-                        <Avatar key={a.id} profile={a} size="sm" />
+                        <Avatar key={a.id} profile={a} size="sm" className="border-2 border-surface" />
                       ))}
                     </div>
                   </div>

@@ -658,16 +658,19 @@ contrairement à la suppression d'une tâche entière.
 
 Message de bienvenue (« Bonjour / Bonsoir, {Prénom} » selon l'heure de
 Paris — voir 6.16 — + date du jour), trois tuiles cliquables
-(`HomeDashboard.tsx`), puis, dans l'ordre : la bannière d'invite aux
-notifications (`NotificationsNudge`, voir 6.16, conditionnelle), le fil
-**« À ton attention »** (`AttentionFeed.tsx` — voir 6.15, affiché
-seulement s'il y a au moins une notification non lue), le fil
-**« Partagées avec toi »** (`SharedWithYouFeed.tsx` — voir 6.16, tâches en
-lecture seule, affiché seulement s'il y en a) et enfin le fil « Activité
-du jour » (`ActivityFeed.tsx` — voir 6.12, toujours affiché, avec un état
-vide sinon). « À ton attention » et « Activité du jour » sont
-**volontairement disjoints** — voir INC-7 dans 6.12 et 6.16. Les
-compteurs sont calculés **côté
+(`HomeDashboard.tsx`), la liste **« Prochaines tâches à faire »**
+(`NextTasksList.tsx` — voir plus bas), puis, dans l'ordre : la carte
+« Défi de la semaine » (`ChallengeCard`, voir 6.17, conditionnelle), le
+tableau des paliers de récompense atteints (`RewardsBoard`, voir 6.18),
+la bannière d'invite aux notifications (`NotificationsNudge`, voir 6.16,
+conditionnelle), le fil **« À ton attention »** (`AttentionFeed.tsx` —
+voir 6.15, affiché seulement s'il y a au moins une notification non
+lue), le fil **« Partagées avec toi »** (`SharedWithYouFeed.tsx` — voir
+6.16, tâches en lecture seule, affiché seulement s'il y en a) et enfin
+le fil « Activité du jour » (`ActivityFeed.tsx` — voir 6.12, toujours
+affiché, avec un état vide sinon). « À ton attention » et « Activité du
+jour » sont **volontairement disjoints** — voir INC-7 dans 6.12 et 6.16.
+Les compteurs sont calculés **côté
 client** (voir 8.1 sur la raison de ce choix) à partir de la liste de
 tâches déjà filtrée par `getTasks` (donc uniquement les tâches visibles
 par l'utilisateur connecté — voir 6.1), puis restreinte aux tâches dont il
@@ -691,7 +694,13 @@ qu'elle comptait.
   l'échéance tombe le jour même.
 - **Cette semaine** : nombre de tâches ouvertes dont l'échéance tombe
   entre aujourd'hui et le dimanche à venir inclus (semaine restante, pas
-  lundi-dimanche).
+  lundi-dimanche). **Correctif du 13/09/2026** : le dimanche, cette borne
+  se réduisait à aujourd'hui — déjà compté dans "Aujourd'hui" — rendant la
+  tuile redondante. Elle bascule désormais sur la semaine **suivante**
+  (lundi à dimanche prochains) dès que `upcomingSunday(now)` tombe le jour
+  même (`isSunday` dans `HomeDashboard.tsx`, bornes calculées avec
+  `addDaysToKey()` de `src/lib/format.ts`) ; le lien de la tuile suit la
+  même borne (`weekFromKey`/`weekToKey`).
 
 Les tuiles "Aujourd'hui" et "Cette semaine" utilisent une disposition
 compacte : icône à gauche, compteur et libellé empilés à sa droite au même
@@ -1997,12 +2006,24 @@ tâche) alors que l'activité venait d'être créée avec succès. Chaque
 consommés au montage, protégé par une ref pour ne s'exécuter qu'une
 fois.
 
-## 7. Routes de l'application
+### 6.25 Accueil — « Prochaines tâches à faire » (13/09/2026)
+
+Nouvelle liste (`NextTasksList.tsx`) affichée sous les trois tuiles de
+l'accueil (voir 6.6) : les **3 tâches ouvertes les plus proches dans le
+temps**, calculées dans `HomeDashboard.tsx` sur la même liste `open`
+(tâches `todo`/`in_progress` dont l'utilisateur est responsable — voir
+6.6) que les trois compteurs, donc toujours cohérente avec eux. Tri en
+retard d'abord puis par échéance croissante (même ordre que
+`SharedWithYouFeed`, voir 6.16) ; les tâches sans échéance sont écartées,
+faute de pouvoir les ordonner. Rien affiché si la liste est vide. Chaque
+ligne est un lien vers `/tasks/[id]`, avec le badge "En retard" ou
+l'échéance (`Time`) à droite — même gabarit visuel que
+`SharedWithYouFeed.tsx`.
 
 | Route | Contenu |
 |---|---|
 | `/login` | Grille des profils + connexion / première connexion / changement de mot de passe ; honore `?next=` (voir 4) |
-| `/` | Écran d'accueil (bienvenue, compteurs, fil « À ton attention » — 6.15, activité du jour — 6.12) |
+| `/` | Écran d'accueil (bienvenue, compteurs, « Prochaines tâches à faire » — 6.25, fil « À ton attention » — 6.15, activité du jour — 6.12) |
 | `/tasks` | Liste des tâches (recherche + volet de filtres, voir 6.7) |
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |

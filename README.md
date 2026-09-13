@@ -179,6 +179,11 @@ partagée/privée est appliquée entièrement au niveau applicatif
   activité dans l'agenda correspondant, en reprenant la saisie déjà
   faite (titre, description, échéance, récurrence). Voir la doc
   technique §6.24.
+- Accueil — « Prochaines tâches à faire » (13/09/2026) : liste des 3
+  tâches ouvertes les plus proches dans le temps, affichée sous les
+  compteurs. La tuile « Dues cette semaine » bascule sur la semaine
+  suivante dès le dimanche (le reliquat de la semaine en cours est déjà
+  compté dans « Aujourd'hui »). Voir la doc technique §6.6 et §6.25.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

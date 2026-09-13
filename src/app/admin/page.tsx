@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getAllRewardTiers, getAppSettings, getCategories, getMembers, getRewardAchievements, getUserStats } from "@/lib/queries";
+import { getGardenActivityCategories } from "@/lib/garden-queries";
 import { Topbar } from "@/components/Topbar";
 import { AdminScreen } from "@/components/AdminScreen";
 import { IconUsers } from "@/components/Icons";
@@ -18,9 +19,10 @@ export default async function AdminPage() {
   const profile = await requireUser();
   if (profile.role !== "admin") notFound();
 
-  const [members, categories, settings, stats, rewardTiers, rewardAchievements] = await Promise.all([
+  const [members, categories, gardenCategories, settings, stats, rewardTiers, rewardAchievements] = await Promise.all([
     getMembers(),
     getCategories(),
+    getGardenActivityCategories(),
     getAppSettings(),
     getUserStats(),
     getAllRewardTiers(),
@@ -40,6 +42,7 @@ export default async function AdminPage() {
           currentUserId={profile.id}
           members={members}
           categories={categories}
+          gardenCategories={gardenCategories}
           settings={settings}
           stats={stats}
           rewardTiers={rewardTiers}

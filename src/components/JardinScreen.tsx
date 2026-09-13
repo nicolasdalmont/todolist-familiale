@@ -10,8 +10,7 @@ import { formatDateOnly } from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
-import { GardenCategoryManager } from "@/components/GardenCategoryManager";
-import { IconChecklist, IconLeaf, IconPencil, IconPlus, IconTag, IconTrash } from "./Icons";
+import { IconChecklist, IconPencil, IconPlus, IconTrash } from "./Icons";
 
 // Onglet Jardin (voir migration 003 et src/lib/garden.ts) : liste des
 // activités récurrentes du jardin (taille, tonte, semis, plantation…),
@@ -255,7 +254,6 @@ export function JardinScreen({
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
-  const [section, setSection] = useState<"activities" | "categories">("activities");
   const [showCreate, setShowCreate] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -330,44 +328,6 @@ export function JardinScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Deux sections dans le même onglet (pas un écran séparé) : la liste
-          des activités, et la gestion de leurs catégories — même mécanique
-          que les onglets de AdminScreen.tsx. */}
-      <div className="-mx-4 overflow-x-auto px-4">
-        <div
-          role="tablist"
-          aria-label="Sections du jardin"
-          className="flex w-max overflow-hidden rounded-full border border-line text-[13px] font-semibold"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={section === "activities"}
-            onClick={() => setSection("activities")}
-            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 ${
-              section === "activities" ? "bg-brand text-white" : "bg-surface text-ink-muted"
-            }`}
-          >
-            <IconLeaf className="h-3.5 w-3.5" /> Activités
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={section === "categories"}
-            onClick={() => setSection("categories")}
-            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-l border-line px-3.5 py-1.5 ${
-              section === "categories" ? "bg-brand text-white" : "bg-surface text-ink-muted"
-            }`}
-          >
-            <IconTag className="h-3.5 w-3.5" /> Catégories
-          </button>
-        </div>
-      </div>
-
-      {section === "categories" ? (
-        <GardenCategoryManager categories={categories} />
-      ) : (
-        <>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] text-ink-muted">
           {activities.length} activité{activities.length > 1 ? "s" : ""}
@@ -558,8 +518,6 @@ export function JardinScreen({
           if (target) run(() => deleteGardenActivityAction(target.id), "Activité supprimée");
         }}
       />
-        </>
-      )}
     </div>
   );
 }

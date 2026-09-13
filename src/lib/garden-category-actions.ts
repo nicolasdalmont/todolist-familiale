@@ -1,18 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getSessionUserId } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin-guard";
 import { CATEGORY_ICON_CHOICES, slugifyCategory } from "@/lib/categories";
 import { FALLBACK_GARDEN_CATEGORY_SLUG } from "@/lib/garden-categories";
 
-// Gestion des catégories d'activités de jardin (section « Catégories » de
-// l'onglet Jardin — voir src/components/GardenCategoryManager.tsx), même
-// mécanique que src/lib/category-actions.ts (catégories de tâches) mais
-// ouverte à tout utilisateur connecté plutôt que réservée à l'admin : ces
-// catégories vivent dans l'onglet Jardin, pas dans /admin, au même titre
-// que les activités elles-mêmes (src/lib/garden-actions.ts).
+// Gestion des catégories d'activités de jardin — section dédiée de l'onglet
+// « Catégories » de l'écran /admin (voir src/components/AdminScreen.tsx et
+// src/components/GardenCategoryManager.tsx), distincte du bloc « Catégories
+// de tâches » juste au-dessus (src/lib/category-actions.ts) : deux tables
+// et deux jeux d'actions indépendants, réservés à l'admin comme le reste de
+// l'écran. Les activités de jardin elles-mêmes restent gérables par tout
+// utilisateur (src/lib/garden-actions.ts) — seule la définition des
+// catégories qu'elles utilisent est passée côté admin.
 
 type Result = { error?: string; ok?: boolean };
 
@@ -24,18 +25,16 @@ function tableMissing(e: unknown): boolean {
 }
 const MIGRATION_MISSING = "Applique d'abord la migration 004_garden_activity_categories.sql sur Neon.";
 
+// Les catégories de jardin apparaissent sur /admin (gestion) et /jardin
+// (sélecteur du formulaire d'activité) — voir getGardenActivityCategories()
+// dans src/lib/garden-queries.ts.
 function revalidate() {
+  revalidatePath("/admin");
   revalidatePath("/jardin");
 }
 
-async function requireLogin(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  return userId;
-}
-
 export async function createGardenCategoryAction(formData: FormData): Promise<Result> {
-  await requireLogin();
+  await requireAdmin();
 
   const label = String(formData.get("label") ?? "").trim();
   if (!label) return { error: "Indique un nom." };
@@ -76,7 +75,7 @@ export async function updateGardenCategoryAction(
   slug: string,
   patch: { label?: string; icon?: string }
 ): Promise<Result> {
-  await requireLogin();
+  await requireAdmin();
   if (!slug) return { error: "Catégorie introuvable." };
 
   const update: { label?: string; icon?: string } = {};
@@ -105,7 +104,7 @@ export async function updateGardenCategoryAction(
 }
 
 export async function moveGardenCategoryAction(slug: string, direction: "up" | "down"): Promise<Result> {
-  await requireLogin();
+  await requireAdmin();
 
   let list: { slug: string; position: number }[];
   try {
@@ -132,7 +131,7 @@ export async function moveGardenCategoryAction(slug: string, direction: "up" | "
 }
 
 export async function deleteGardenCategoryAction(slug: string): Promise<Result> {
-  await requireLogin();
+  await requireAdmin();
   if (!slug) return { error: "Catégorie introuvable." };
   if (slug === FALLBACK_GARDEN_CATEGORY_SLUG) {
     return { error: "« Autre » ne peut pas être supprimée (catégorie de repli)." };

@@ -15,10 +15,14 @@ import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconArrowLeft, IconCheck, IconPlus } from "./Icons";
 
-// Section « Catégories » de l'onglet Jardin (voir JardinScreen.tsx) —
-// même moule que CategoryManager.tsx (catégories de tâches, écran admin),
-// mais ouverte à tout utilisateur : les catégories d'activités Jardin
-// vivent dans cet onglet, pas dans /admin (migration 004).
+// Second bloc de l'onglet « Catégories » de l'écran /admin (voir
+// AdminScreen.tsx), juste après CategoryManager.tsx (catégories de tâches) :
+// même moule, mais table et actions entièrement indépendantes
+// (garden_activity_categories, migration 004) — les deux gestions ne
+// partagent aucune donnée. Réservé au rôle admin comme le reste de l'écran
+// (src/lib/garden-category-actions.ts) ; les activités de jardin
+// elles-mêmes restent gérables par tout utilisateur depuis l'onglet Jardin
+// (src/lib/garden-actions.ts).
 function IconPicker({ value, onChange }: { value: string; onChange: (name: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">

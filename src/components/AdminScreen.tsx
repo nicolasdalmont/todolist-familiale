@@ -4,15 +4,18 @@ import { useState } from "react";
 import type { AppSettings, Category, Member, RewardAchievement, RewardTier, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
+import { GardenCategoryManager } from "./GardenCategoryManager";
 import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
 import { RewardManager } from "./RewardManager";
 import { IconBarChart, IconGift, IconSliders, IconTag, IconUsers } from "./Icons";
 
 // Écran /admin réorganisé (voir 6.9) : cinq onglets — « Membres » (gestion
-// des comptes), « Catégories » (catégories de tâches), « Réglages » (rappel
-// + infos d'instance), « Activité » (statistiques par membre) et
-// « Récompenses » (paliers de gamification, migration 002 — voir
+// des comptes), « Catégories » (catégories de tâches, puis — second bloc —
+// catégories d'activités de jardin, migration 004 : deux gestions
+// indépendantes, deux tables séparées, juste co-localisées dans cet onglet),
+// « Réglages » (rappel + infos d'instance), « Activité » (statistiques par
+// membre) et « Récompenses » (paliers de gamification, migration 002 — voir
 // src/lib/rewards.ts). Réservé au rôle admin, protégé côté serveur dans
 // src/app/admin/page.tsx.
 type Tab = "members" | "categories" | "settings" | "activity" | "rewards";
@@ -21,6 +24,7 @@ export function AdminScreen({
   currentUserId,
   members,
   categories,
+  gardenCategories,
   settings,
   stats,
   rewardTiers,
@@ -29,6 +33,7 @@ export function AdminScreen({
   currentUserId: string;
   members: Member[];
   categories: Category[];
+  gardenCategories: Category[];
   settings: AppSettings;
   stats: UserStats[];
   rewardTiers: RewardTier[];
@@ -76,7 +81,16 @@ export function AdminScreen({
       {tab === "members" ? (
         <UserManager currentUserId={currentUserId} members={members} />
       ) : tab === "categories" ? (
-        <CategoryManager categories={categories} />
+        <div className="flex flex-col gap-6">
+          <div>
+            <h3 className="mb-3 text-sm font-bold">Catégories de tâches</h3>
+            <CategoryManager categories={categories} />
+          </div>
+          <div className="border-t border-line-soft pt-6">
+            <h3 className="mb-3 text-sm font-bold">Catégories d&apos;activités de jardin</h3>
+            <GardenCategoryManager categories={gardenCategories} />
+          </div>
+        </div>
       ) : tab === "settings" ? (
         <SettingsPanel settings={settings} />
       ) : tab === "activity" ? (

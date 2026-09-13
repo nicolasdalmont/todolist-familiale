@@ -409,6 +409,22 @@ export function IconCar({ className = "" }: IconProps) {
   );
 }
 
+export function IconEuro({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M16.2 6.3c-1.1-.85-2.5-1.3-4-1.3-3.6 0-6.5 2.9-6.5 6.5v1c0 3.6 2.9 6.5 6.5 6.5 1.5 0 2.9-.45 4-1.3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M4 10h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M4 13.5h7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IconTrash({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">

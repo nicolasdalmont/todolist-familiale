@@ -7,6 +7,7 @@ import {
   IconChat,
   IconChecklist,
   IconDots,
+  IconEuro,
   IconGift,
   IconHeart,
   IconHome,
@@ -48,6 +49,7 @@ export const CATEGORY_ICON_CHOICES: { name: string; Icon: IconCmp; color: string
   { name: "heart", Icon: IconHeart, color: "text-pink-600", bg: "bg-pink-100" },
   { name: "wrench", Icon: IconWrench, color: "text-stone-600", bg: "bg-stone-100" },
   { name: "car", Icon: IconCar, color: "text-slate-700", bg: "bg-slate-200" },
+  { name: "euro", Icon: IconEuro, color: "text-emerald-700", bg: "bg-emerald-100" },
 ];
 
 const ICON_BY_NAME = new Map(CATEGORY_ICON_CHOICES.map((c) => [c.name, c.Icon]));

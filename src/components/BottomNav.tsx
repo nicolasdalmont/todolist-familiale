@@ -25,7 +25,8 @@ export function BottomNav() {
         pathname.startsWith("/agendas") ||
         pathname.startsWith("/jardin") ||
         pathname.startsWith("/voiture") ||
-        pathname.startsWith("/sante"),
+        pathname.startsWith("/sante") ||
+        pathname.startsWith("/finances"),
     },
     { href: "/compte", label: "Compte", Icon: IconUser, active: pathname.startsWith("/compte") },
   ];

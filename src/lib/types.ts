@@ -316,3 +316,21 @@ export interface HealthActivity {
   assignees: Pick<Profile, "id" | "name" | "color">[];
   openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
 }
+
+// Activité récurrente de finances (onglet Finances, migration 008) — voir
+// src/lib/finances.ts. Même montage que HealthActivity/CarActivity : chaque
+// instance EST une occurrence datée, sa clôture crée une NOUVELLE ligne
+// (l'instance suivante) plutôt que d'avancer un compteur sur celle-ci.
+export interface FinancesActivity {
+  id: string;
+  name: string;
+  description: string;
+  dueDate: string; // "YYYY-MM-DD"
+  dayKnown: boolean;
+  recurrence: Recurrence;
+  status: TaskStatus;
+  createdBy: string;
+  createdAt: string;
+  assignees: Pick<Profile, "id" | "name" | "color">[];
+  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+}

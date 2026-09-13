@@ -21,6 +21,7 @@ import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import { advanceGardenActivity } from "@/lib/garden";
 import { advanceCarActivity } from "@/lib/car";
 import { advanceHealthActivity } from "@/lib/health";
+import { advanceFinancesActivity } from "@/lib/finances";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus, Visibility } from "@/lib/types";
 
 // Vérifie les droits d'un utilisateur sur une tâche par son id, sans avoir
@@ -494,7 +495,7 @@ export async function deleteTaskAction(formData: FormData) {
   // advanceGardenActivity(), src/lib/garden.ts) — la suppression d'une tâche
   // Jardin déclenche la même régénération que sa clôture.
   const gardenRows = await sql`
-    select garden_activity_id, garden_occurrence_month, garden_occurrence_year, car_activity_id, health_activity_id from tasks where id = ${taskId}
+    select garden_activity_id, garden_occurrence_month, garden_occurrence_year, car_activity_id, health_activity_id, finances_activity_id from tasks where id = ${taskId}
   `;
   const gardenTask = gardenRows[0] as
     | {
@@ -503,6 +504,7 @@ export async function deleteTaskAction(formData: FormData) {
         garden_occurrence_year: number | null;
         car_activity_id: string | null;
         health_activity_id: string | null;
+        finances_activity_id: string | null;
       }
     | undefined;
 
@@ -524,6 +526,13 @@ export async function deleteTaskAction(formData: FormData) {
   // Voiture ci-dessus, voir advanceHealthActivity() (src/lib/health.ts).
   if (gardenTask?.health_activity_id) {
     await advanceHealthActivity(gardenTask.health_activity_id);
+  }
+
+  // Origine "activité Finances" (migration 008) : même comportement que
+  // Voiture/Santé ci-dessus, voir advanceFinancesActivity()
+  // (src/lib/finances.ts).
+  if (gardenTask?.finances_activity_id) {
+    await advanceFinancesActivity(gardenTask.finances_activity_id);
   }
 
   if (recipients.length > 0) {
@@ -574,6 +583,7 @@ export async function setStatusAction(taskId: string, status: string) {
         garden_occurrence_year: number | null;
         car_activity_id: string | null;
         health_activity_id: string | null;
+        finances_activity_id: string | null;
       }
     | undefined;
   if (!task) return;
@@ -676,6 +686,14 @@ export async function setStatusAction(taskId: string, status: string) {
   // ci-dessus.
   if (status === "done" && task.health_activity_id) {
     await advanceHealthActivity(task.health_activity_id);
+  }
+
+  // Origine "activité Finances" (migration 008) : sa clôture clôt
+  // l'activité et crée l'instance suivante si elle est récurrente — voir
+  // advanceFinancesActivity(), src/lib/finances.ts. Même logique que
+  // Voiture/Santé ci-dessus.
+  if (status === "done" && task.finances_activity_id) {
+    await advanceFinancesActivity(task.finances_activity_id);
   }
 
   revalidatePath("/");

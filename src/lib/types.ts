@@ -269,6 +269,11 @@ export interface GardenActivity {
   name: string;
   description: string;
   months: number[];
+  // Slug de catégorie d'activité (migration 004, voir
+  // src/lib/garden-categories.ts) — axe séparé de Category/tasks.category :
+  // classe l'activité elle-même (Taille/Semis/Plantation/Autre), pas la
+  // tâche générée (toujours catégorie "jardin" côté Tâches).
+  category: string;
   createdBy: string;
   createdAt: string;
   assignees: Pick<Profile, "id" | "name" | "color">[];

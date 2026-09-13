@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { GardenActivity, Profile } from "@/lib/types";
+import type { Category, GardenActivity, Profile } from "@/lib/types";
 import { createGardenActivityAction, deleteGardenActivityAction, updateGardenActivityAction } from "@/lib/garden-actions";
+import { categoryBgColor, categoryIcon, categoryIconColor, resolveCategory } from "@/lib/categories";
 import { formatDateOnly } from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
-import { IconLeaf, IconPencil, IconPlus } from "./Icons";
+import { GardenCategoryManager } from "@/components/GardenCategoryManager";
+import { IconLeaf, IconPencil, IconPlus, IconTag } from "./Icons";
 
 // Onglet Jardin (voir migration 003 et src/lib/garden.ts) : liste des
 // activités récurrentes du jardin (taille, tonte, semis, plantation…),
@@ -112,10 +114,43 @@ function AssigneeField({
   );
 }
 
-type FormState = { name: string; description: string; months: number[]; assigneeIds: string[] };
+type FormState = { name: string; description: string; months: number[]; assigneeIds: string[]; category: string };
+
+function CategoryField({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: Category[];
+  value: string;
+  onChange: (slug: string) => void;
+}) {
+  return (
+    <div role="group" aria-label="Catégorie" className="flex flex-wrap gap-1.5">
+      {categories.map((c) => {
+        const Icon = categoryIcon(c.icon);
+        const active = value === c.slug;
+        return (
+          <button
+            key={c.slug}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(c.slug)}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+              active ? "border-brand bg-brand text-white" : "border-line bg-surface text-ink-muted"
+            }`}
+          >
+            <Icon className={`h-3.5 w-3.5 ${active ? "" : categoryIconColor(c.icon)}`} /> {c.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function ActivityForm({
   members,
+  categories,
   initial,
   onSubmit,
   onCancel,
@@ -124,6 +159,7 @@ function ActivityForm({
   error,
 }: {
   members: Pick<Profile, "id" | "name" | "color">[];
+  categories: Category[];
   initial: FormState;
   onSubmit: (state: FormState) => void;
   onCancel: () => void;
@@ -135,10 +171,11 @@ function ActivityForm({
   const [description, setDescription] = useState(initial.description);
   const [months, setMonths] = useState<number[]>(initial.months);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(initial.assigneeIds);
+  const [category, setCategory] = useState(initial.category);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ name, description, months, assigneeIds });
+    onSubmit({ name, description, months, assigneeIds, category });
   }
 
   return (
@@ -169,6 +206,10 @@ function ActivityForm({
           onChange={(e) => setDescription(e.target.value)}
           className="w-full rounded-xl border border-line px-3 py-2.5 text-[14px] outline-none focus:border-brand"
         />
+      </div>
+      <div>
+        <span className="mb-1 block text-[12.5px] font-bold">Catégorie</span>
+        <CategoryField categories={categories} value={category} onChange={setCategory} />
       </div>
       <div>
         <span className="mb-1 block text-[12.5px] font-bold">Période(s)</span>
@@ -202,16 +243,19 @@ function ActivityForm({
 export function JardinScreen({
   activities,
   members,
+  categories,
   currentMonth,
 }: {
   activities: GardenActivity[];
   members: Pick<Profile, "id" | "name" | "color">[];
+  categories: Category[];
   currentMonth: number;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
+  const [section, setSection] = useState<"activities" | "categories">("activities");
   const [showCreate, setShowCreate] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -246,6 +290,7 @@ export function JardinScreen({
     const fd = new FormData();
     fd.set("name", state.name);
     fd.set("description", state.description);
+    fd.set("category", state.category);
     for (const m of state.months) fd.append("months", String(m));
     for (const id of state.assigneeIds) fd.append("assignees", id);
     startTransition(async () => {
@@ -266,6 +311,7 @@ export function JardinScreen({
     fd.set("activityId", activity.id);
     fd.set("name", state.name);
     fd.set("description", state.description);
+    fd.set("category", state.category);
     for (const m of state.months) fd.append("months", String(m));
     for (const id of state.assigneeIds) fd.append("assignees", id);
     startTransition(async () => {
@@ -280,8 +326,48 @@ export function JardinScreen({
     });
   }
 
+  const defaultCategory = categories[0]?.slug ?? "autre";
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Deux sections dans le même onglet (pas un écran séparé) : la liste
+          des activités, et la gestion de leurs catégories — même mécanique
+          que les onglets de AdminScreen.tsx. */}
+      <div className="-mx-4 overflow-x-auto px-4">
+        <div
+          role="tablist"
+          aria-label="Sections du jardin"
+          className="flex w-max overflow-hidden rounded-full border border-line text-[13px] font-semibold"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === "activities"}
+            onClick={() => setSection("activities")}
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 ${
+              section === "activities" ? "bg-brand text-white" : "bg-surface text-ink-muted"
+            }`}
+          >
+            <IconLeaf className="h-3.5 w-3.5" /> Activités
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === "categories"}
+            onClick={() => setSection("categories")}
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-l border-line px-3.5 py-1.5 ${
+              section === "categories" ? "bg-brand text-white" : "bg-surface text-ink-muted"
+            }`}
+          >
+            <IconTag className="h-3.5 w-3.5" /> Catégories
+          </button>
+        </div>
+      </div>
+
+      {section === "categories" ? (
+        <GardenCategoryManager categories={categories} />
+      ) : (
+        <>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] text-ink-muted">
           {activities.length} activité{activities.length > 1 ? "s" : ""}
@@ -303,7 +389,8 @@ export function JardinScreen({
       {showCreate ? (
         <ActivityForm
           members={members}
-          initial={{ name: "", description: "", months: [], assigneeIds: [] }}
+          categories={categories}
+          initial={{ name: "", description: "", months: [], assigneeIds: [], category: defaultCategory }}
           onSubmit={handleCreate}
           onCancel={() => setShowCreate(false)}
           submitLabel="Créer l'activité"
@@ -360,15 +447,23 @@ export function JardinScreen({
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {occurrences.map(({ key, activity }) => (
+                    {occurrences.map(({ key, activity }) => {
+                      const activityCategory = resolveCategory(activity.category, categories);
+                      const CategoryIcon = categoryIcon(activityCategory.icon);
+                      return (
                       <div key={key} className="rounded-2xl border border-line bg-surface p-3.5 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-2.5">
-                            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600">
-                              <IconLeaf className="h-4 w-4" />
+                            <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${categoryBgColor(activityCategory.icon)}`}>
+                              <CategoryIcon className="h-4 w-4 text-ink" />
                             </span>
                             <div className="min-w-0">
-                              <p className="text-[13.5px] font-bold text-ink">{activity.name}</p>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="text-[13.5px] font-bold text-ink">{activity.name}</p>
+                                <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-ink ${categoryBgColor(activityCategory.icon)}`}>
+                                  {activityCategory.label}
+                                </span>
+                              </div>
                               {activity.description ? (
                                 <p className="text-[12.5px] text-ink-muted">{activity.description}</p>
                               ) : null}
@@ -418,11 +513,13 @@ export function JardinScreen({
                           <div className="mt-3 border-t border-line-soft pt-3">
                             <ActivityForm
                               members={members}
+                              categories={categories}
                               initial={{
                                 name: activity.name,
                                 description: activity.description,
                                 months: activity.months,
                                 assigneeIds: activity.assignees.map((a) => a.id),
+                                category: activity.category,
                               }}
                               onSubmit={(state) => handleUpdate(activity, state)}
                               onCancel={() => setEditingKey(null)}
@@ -433,7 +530,8 @@ export function JardinScreen({
                           </div>
                         ) : null}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -455,6 +553,8 @@ export function JardinScreen({
           if (target) run(() => deleteGardenActivityAction(target.id), "Activité supprimée");
         }}
       />
+        </>
+      )}
     </div>
   );
 }

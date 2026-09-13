@@ -32,6 +32,7 @@ drop table if exists public.challenge_results cascade;
 drop table if exists public.reward_tiers cascade;
 drop table if exists public.garden_activity_assignees cascade;
 drop table if exists public.garden_activities cascade;
+drop table if exists public.garden_activity_categories cascade;
 drop table if exists public.activity_log cascade;
 drop table if exists public.user_activity_log cascade;
 drop table if exists public.checklist_items cascade;
@@ -211,6 +212,21 @@ create table public.reward_achievements (
   given_by uuid references public.users(id) on delete set null
 );
 
+-- Catégories des activités de jardin (migration 004, voir
+-- src/lib/garden-categories.ts) : axe de classement séparé des catégories
+-- de tâches (table `categories` ci-dessus) — une activité de jardin est
+-- "Taille"/"Semis"/"Plantation"/"Autre", indépendamment de la catégorie
+-- "Jardin" unique que porte la tâche générée dans l'onglet Tâches. Même
+-- forme et mêmes icônes que `categories` (CATEGORY_ICON_CHOICES, réutilisé
+-- tel quel).
+create table public.garden_activity_categories (
+  slug text primary key,
+  label text not null,
+  icon text not null default 'dots',
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- Activités récurrentes du jardin (migration 003, voir src/lib/garden.ts) :
 -- un nom, une description, un ensemble de mois de l'année (`months`) et un
 -- ou plusieurs responsables (garden_activity_assignees, many-to-many comme
@@ -222,9 +238,16 @@ create table public.garden_activities (
   name text not null,
   description text not null default '',
   months smallint[] not null check (array_length(months, 1) > 0),
+  -- Slug de catégorie d'activité (migration 004) ; FK ajoutée après la
+  -- création de public.garden_activity_categories.
+  category text not null default 'autre',
   created_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+
+alter table public.garden_activities
+  add constraint garden_activities_category_fkey
+  foreign key (category) references public.garden_activity_categories(slug) on delete restrict;
 
 create table public.garden_activity_assignees (
   garden_activity_id uuid not null references public.garden_activities(id) on delete cascade,
@@ -308,6 +331,13 @@ insert into public.categories (slug, label, icon, position) values
   ('maison',   'Maison',   'home',     5),
   ('vacances', 'Vacances', 'sun',      6),
   ('jardin',   'Jardin',   'leaf',     7)
+on conflict (slug) do nothing;
+
+insert into public.garden_activity_categories (slug, label, icon, position) values
+  ('taille',     'Taille',     'wrench', 0),
+  ('semis',      'Semis',      'leaf',   1),
+  ('plantation', 'Plantation', 'sun',    2),
+  ('autre',      'Autre',      'dots',   3)
 on conflict (slug) do nothing;
 
 insert into public.tags (name) values

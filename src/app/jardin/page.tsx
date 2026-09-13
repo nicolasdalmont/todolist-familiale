@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { getGardenActivities } from "@/lib/garden-queries";
+import { getGardenActivities, getGardenActivityCategories } from "@/lib/garden-queries";
 import { getProfiles } from "@/lib/queries";
 import { currentParisYearMonth } from "@/lib/garden";
 import { Topbar } from "@/components/Topbar";
@@ -14,7 +14,11 @@ export const dynamic = "force-dynamic";
 export default async function JardinPage() {
   const profile = await requireUser();
 
-  const [activities, members] = await Promise.all([getGardenActivities(), getProfiles()]);
+  const [activities, members, categories] = await Promise.all([
+    getGardenActivities(),
+    getProfiles(),
+    getGardenActivityCategories(),
+  ]);
   const { month } = currentParisYearMonth();
 
   return (
@@ -26,7 +30,7 @@ export default async function JardinPage() {
           <h2 className="text-lg font-extrabold">Jardin</h2>
         </div>
 
-        <JardinScreen activities={activities} members={members} currentMonth={month} />
+        <JardinScreen activities={activities} members={members} categories={categories} currentMonth={month} />
       </main>
     </div>
   );

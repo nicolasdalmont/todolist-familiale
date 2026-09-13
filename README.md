@@ -148,8 +148,9 @@ partagée/privée est appliquée entièrement au niveau applicatif
   attente/donné géré par l'admin ; affiché sur l'accueil une fois atteint.
   Voir la doc technique §6.18.
 - Menu **Agendas** (13/09/2026, `/agendas`) : regroupe les onglets Jardin,
-  Voiture et Santé (liens de menu remplaçant l'ancien lien direct
-  « Jardin »). Chacun a un lien retour vers `/agendas` en tête de page.
+  Voiture, Santé et Finances (liens de menu remplaçant l'ancien lien
+  direct « Jardin »). Chacun a un lien retour vers `/agendas` en tête de
+  page.
 - Onglet Jardin (13/09/2026) : activités récurrentes du jardin (taille,
   semis, plantation…), classées par mois avec un ou plusieurs
   responsables. Créer/modifier une activité crée/met à jour
@@ -167,10 +168,17 @@ partagée/privée est appliquée entièrement au niveau applicatif
   catégories dédiée. Voir la doc technique §6.20.
 - Onglet Santé (13/09/2026) : même principe que Voiture (visites
   médicales, dentiste, vaccins…). Voir la doc technique §6.21.
+- Onglet Finances (13/09/2026) : même principe que Voiture/Santé (impôts,
+  assurances, abonnements…), icône € dédiée. Voir la doc technique §6.23.
 - Mode hors ligne — lecture seule (13/09/2026) : les pages déjà visitées
   en ligne restent consultables sans connexion (bandeau « Hors ligne —
   dernières données à HH:mm »), avec une page de secours pour une route
   jamais visitée. Aucune écriture hors ligne. Voir la doc technique §6.22.
+- Bascule tâche → agenda dédié (13/09/2026) : créer une tâche en
+  catégorie Jardin/Voiture/Santé/Finances propose de créer plutôt une
+  activité dans l'agenda correspondant, en reprenant la saisie déjà
+  faite (titre, description, échéance, récurrence). Voir la doc
+  technique §6.24.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

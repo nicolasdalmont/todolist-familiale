@@ -4,8 +4,17 @@
 `nicolasdalmont/todolist-familiale`.)*
 
 Dernière mise à jour : 13/09/2026. Lot de ce jour (le plus récent
-d'abord) : **lien retour vers `/agendas`** sur Jardin/Voiture/Santé
-(6.21) ; **onglet Santé — activités récurrentes** (6.21), réplique exacte
+d'abord) : **bascule tâche → agenda dédié** (6.24) : créer une tâche en
+catégorie Jardin/Voiture/Santé/Finances propose de créer une activité
+dans l'agenda correspondant à la place, en reprenant la saisie déjà
+faite (titre, description, échéance, récurrence) ; **onglet Finances —
+activités récurrentes** (6.23), réplique exacte de Voiture/Santé
+(migration `008_finances_activities.sql`), avec au passage un correctif
+du champ « Répéter tous les » (Voiture/Santé/Finances) qui empêchait de
+le vider ; **mode hors ligne — lecture seule** (6.22) : les pages déjà
+visitées restent consultables sans connexion ; **lien retour vers
+`/agendas`** sur Jardin/Voiture/Santé (6.21) ; **onglet Santé — activités
+récurrentes** (6.21), réplique exacte
 de Voiture (migration `007_health_activities.sql`) ; **onglet Voiture —
 activités récurrentes d'entretien** (6.20) : nouvel onglet, chaque
 activité est une instance datée avec sa propre récurrence par intervalle
@@ -1914,6 +1923,80 @@ a pas. Aucune écriture hors ligne (voir 8.5, toujours non implémenté).
   (seulement sur un appareil physiquement partagé, et seulement tant que
   la personne suivante reste hors ligne).
 
+### 6.23 Finances — activités récurrentes (13/09/2026)
+
+Nouvel onglet **Finances** (`IconEuro`), réplique exacte du modèle
+Voiture/Santé (6.20/6.21) : impôts, assurances, abonnements… Tables
+`finances_activities`/`finances_activity_assignees`, colonne
+`tasks.finances_activity_id` (migration
+`008_finances_activities.sql`), logique dans `src/lib/finances.ts`
+(`FINANCES_CATEGORY_SLUG = "finances"`, `advanceFinancesActivity()`),
+Server Actions `src/lib/finances-actions.ts`, lecture
+`src/lib/finances-queries.ts`, écran `FinancesScreen.tsx`, page
+`src/app/finances/page.tsx` — mêmes comportements que Voiture/Santé
+point par point (occurrence datée, récurrence par intervalle, une seule
+tâche ouverte à la fois, écran identique). Ajoutée à la page `/agendas`
+aux côtés de Jardin/Voiture/Santé.
+
+**Catégorie.** Contrairement à Voiture/Santé, la catégorie `finances`
+existait déjà (créée manuellement depuis Admin → « Catégories », icône
+générique `tag`) : la migration 008 la bascule sur une icône dédiée
+**`IconEuro`** via `on conflict (slug) do update` plutôt que de la créer.
+
+**Fix — champ « Répéter tous les » (13/09/2026).** Sur les trois écrans
+Voiture/Santé/Finances, le champ numérique de récurrence personnalisée
+appliquait `Math.max(1, Number(value) || 1)` à chaque frappe : le vider
+(`value=""`) donnait `Number("")=0` → clampé à `1`, qui se réaffichait
+aussitôt et empêchait de retaper une nouvelle valeur (retour
+utilisateur : « un 1 apparaît qu'on ne peut pas supprimer »). Le champ
+autorise désormais un état vide transitoire pendant la frappe
+(`recurrenceInterval: number | ""`), clampé à `1` seulement au `blur` si
+laissé vide. `TaskForm.tsx` (récurrence des tâches ordinaires) n'était
+pas concerné : son champ y est non contrôlé (`defaultValue`).
+
+### 6.24 Bascule tâche → agenda dédié (13/09/2026)
+
+À la création d'une tâche (`TaskForm.tsx`, mode création uniquement —
+pas en modification), choisir une catégorie **Jardin/Voiture/Santé/
+Finances** ouvre une confirmation (`ConfirmDialog`) proposant de créer
+directement une activité dans l'agenda dédié correspondant plutôt qu'une
+tâche classée dans cette catégorie.
+
+- **Accepter** → `redirectToAgenda()` construit une URL
+  `?prefillName=&prefillDescription=&prefillDueDate=` (ou
+  `prefillMonth=` pour Jardin, qui raisonne en mois plutôt qu'en date
+  précise) `&prefillRecurrenceType=...` (Voiture/Santé/Finances
+  seulement — Jardin n'a pas de récurrence par intervalle) à partir des
+  champs déjà saisis (titre, description, échéance, récurrence — lus via
+  des refs, ces champs étant non contrôlés dans `TaskForm.tsx`), et
+  navigue (`router.push`) vers `/jardin`, `/voiture`, `/sante` ou
+  `/finances`.
+- **Refuser** → la catégorie est simplement appliquée, la création de
+  tâche continue normalement.
+
+**Lecture côté agenda.** Chaque page
+(`src/app/{jardin,voiture,sante,finances}/page.tsx`, Server Component)
+reçoit `searchParams` et en extrait les valeurs `prefill*` —
+`parseAgendaActivityPrefill()` (`src/lib/format.ts`) mutualise ce
+parsing pour Voiture/Santé/Finances (structure de formulaire identique) ;
+Jardin, dont le formulaire raisonne en mois, le fait en ligne dans sa
+page. Le résultat est passé en prop `prefill` à l'écran client
+(`JardinScreen`/`VoitureScreen`/`SanteScreen`/`FinancesScreen`), qui
+ouvre alors directement son formulaire de création avec ces valeurs
+(`showCreate` initialisé à `!!prefill`).
+
+**Fix — le formulaire se rouvrait après création (13/09/2026, même
+jour).** Les paramètres `prefill*` restaient dans l'URL après ouverture
+du formulaire ; le `router.refresh()` qui suit la création de l'activité
+(`handleCreate`) redéclenchait la lecture de ces paramètres côté
+serveur, et un nouveau rendu recalculait l'état initial `showCreate` à
+`true` — rouvrant le formulaire avec les données d'origine (celles de la
+tâche) alors que l'activité venait d'être créée avec succès. Chaque
+écran retire désormais ces paramètres de l'URL
+(`router.replace(pathname, { scroll: false })`) dès qu'ils ont été
+consommés au montage, protégé par une ref pour ne s'exécuter qu'une
+fois.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -1924,10 +2007,11 @@ a pas. Aucune écriture hors ligne (voir 8.5, toujours non implémenté).
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
-| `/agendas` | Page de liens vers Jardin, Voiture, Santé (voir 6.20) — ouverte à tout utilisateur connecté |
+| `/agendas` | Page de liens vers Jardin, Voiture, Santé, Finances (voir 6.20) — ouverte à tout utilisateur connecté |
 | `/jardin` | Activités récurrentes du jardin, par mois (voir 6.19) — ouverte à tout utilisateur connecté |
 | `/voiture` | Activités récurrentes d'entretien de la voiture, liste chronologique (voir 6.20) — ouverte à tout utilisateur connecté |
 | `/sante` | Activités récurrentes de santé, liste chronologique (voir 6.21) — ouverte à tout utilisateur connecté |
+| `/finances` | Activités récurrentes de finances, liste chronologique (voir 6.23) — ouverte à tout utilisateur connecté |
 | `/compte` | Mon compte : identité, « Modifier mon mot de passe » et activation des notifications (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |

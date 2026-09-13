@@ -8,6 +8,7 @@ import { Avatar } from "@/components/Avatar";
 import { StreakBadge } from "@/components/Badge";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
 import { NotificationsToggle } from "@/components/NotificationsToggle";
+import { HelpButton } from "@/components/HelpButton";
 import { IconArrowLeft, IconBarChart } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -24,15 +25,25 @@ export default async function AccountPage() {
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-24 pt-1 sm:pb-16">
-        <div className="mb-4 mt-1.5 flex items-center gap-2.5">
-          <Link
-            href="/"
-            aria-label="Retour à l'accueil"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
-          >
-            <IconArrowLeft className="h-4 w-4" />
-          </Link>
-          <h2 className="text-lg font-extrabold">Mon compte</h2>
+        <div className="mb-4 mt-1.5 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/"
+              aria-label="Retour à l'accueil"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
+            >
+              <IconArrowLeft className="h-4 w-4" />
+            </Link>
+            <h2 className="text-lg font-extrabold">Mon compte</h2>
+          </div>
+          <HelpButton title="Mon compte">
+            <p>Ton profil, ton streak (jours actifs consécutifs) et deux réglages personnels :</p>
+            <ul>
+              <li>Activer les notifications push de cet appareil.</li>
+              <li>Modifier ton mot de passe.</li>
+            </ul>
+            <p>Sur mobile, l&apos;accès à l&apos;espace admin (si tu es administrateur) est aussi ici.</p>
+          </HelpButton>
         </div>
 
         <div className="mb-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm">

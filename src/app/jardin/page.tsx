@@ -7,6 +7,7 @@ import { currentParisYearMonth } from "@/lib/garden";
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
 import { JardinScreen } from "@/components/JardinScreen";
+import { HelpButton } from "@/components/HelpButton";
 import { IconArrowLeft, IconLeaf } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -48,16 +49,27 @@ export default async function JardinPage({
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-24 pt-1 sm:pb-16">
-        <div className="mb-4 mt-1.5 flex items-center gap-2.5">
-          <Link
-            href="/agendas"
-            aria-label="Retour aux agendas"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
-          >
-            <IconArrowLeft className="h-4 w-4" />
-          </Link>
-          <IconLeaf className="h-5 w-5 text-brand" />
-          <h2 className="text-lg font-extrabold">Jardin</h2>
+        <div className="mb-4 mt-1.5 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/agendas"
+              aria-label="Retour aux agendas"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface"
+            >
+              <IconArrowLeft className="h-4 w-4" />
+            </Link>
+            <IconLeaf className="h-5 w-5 text-brand" />
+            <h2 className="text-lg font-extrabold">Jardin</h2>
+          </div>
+          <HelpButton title="Jardin">
+            <p>Les activités récurrentes du jardin (taille, semis, plantation…), classées par mois.</p>
+            <ul>
+              <li>Chaque activité a un ou plusieurs responsables.</li>
+              <li>Créer ou modifier une activité crée/met à jour automatiquement la tâche de son mois.</li>
+              <li>Clôturer ou supprimer cette tâche régénère automatiquement celle du mois suivant.</li>
+            </ul>
+            <p>Les catégories d&apos;activités se gèrent depuis Admin → Catégories.</p>
+          </HelpButton>
         </div>
 
         <JardinScreen

@@ -434,3 +434,20 @@ export function IconTrash({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Bouton d'aide contextuelle (voir src/components/HelpButton.tsx).
+export function IconHelpCircle({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M9.6 9.3a2.4 2.4 0 1 1 3.5 2.1c-.7.4-1.1.8-1.1 1.6v.3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="16.7" r="0.15" fill="currentColor" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}

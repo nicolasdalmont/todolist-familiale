@@ -6,6 +6,7 @@ import { STATUS_LABELS, dateKeyFromIso, isOverdue } from "@/lib/format";
 import { canEdit } from "@/lib/access";
 import { TaskCard } from "./TaskCard";
 import { EmptyState } from "./EmptyState";
+import { HelpButton } from "./HelpButton";
 import { IconAlertTriangle, IconCheck, IconChevronDown, IconSearch, IconUser } from "./Icons";
 
 // Mémorisation du filtre (04/09/2026) : ouvrir puis fermer une tâche
@@ -339,15 +340,28 @@ export function TaskFilterList({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative">
-        <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher une tâche..."
-          className="w-full rounded-xl border border-line bg-surface py-2.5 pl-9 pr-3 text-[14px] outline-none focus:border-brand"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher une tâche..."
+            className="w-full rounded-xl border border-line bg-surface py-2.5 pl-9 pr-3 text-[14px] outline-none focus:border-brand"
+          />
+        </div>
+        <HelpButton title="Tâches">
+          <p>Toutes tes tâches — celles que tu as créées, ou partagées avec toi.</p>
+          <ul>
+            <li>La recherche porte sur le titre et la description.</li>
+            <li>
+              Le volet <strong>Filtres</strong> affine par portée, statut, catégorie, intervalle
+              d&apos;échéance, visibilité, retard ou tags — ton dernier choix est mémorisé.
+            </li>
+            <li>Le bouton « + » en bas crée une nouvelle tâche.</li>
+          </ul>
+        </HelpButton>
       </div>
 
       {/* Arrivée depuis une tuile / un lien de l'accueil : le filtrage

@@ -8,6 +8,7 @@ import { GardenCategoryManager } from "./GardenCategoryManager";
 import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
 import { RewardManager } from "./RewardManager";
+import { HelpButton } from "./HelpButton";
 import { IconBarChart, IconGift, IconSliders, IconTag, IconUsers } from "./Icons";
 
 // Écran /admin réorganisé (voir 6.9) : cinq onglets — « Membres » (gestion
@@ -46,6 +47,70 @@ function useAdminTab(): [Tab, (tab: Tab) => void] {
   return [tab, setTab];
 }
 
+// Aide contextuelle : dépend de l'onglet actif (voir HelpButton.tsx), pour
+// rester courte et pertinente plutôt qu'une seule aide générique décrivant
+// les cinq onglets à la fois.
+const HELP_CONTENT: Record<Tab, { title: string; body: React.ReactNode }> = {
+  members: {
+    title: "Membres",
+    body: (
+      <>
+        <p>Gère les comptes de la famille.</p>
+        <ul>
+          <li>Créer un membre (prénom, rôle, mot de passe temporaire à lui transmettre).</li>
+          <li>Réinitialiser son mot de passe s&apos;il est oublié.</li>
+          <li>Supprimer un compte (détaille ce qui part avec lui avant de confirmer).</li>
+        </ul>
+      </>
+    ),
+  },
+  categories: {
+    title: "Catégories",
+    body: (
+      <>
+        <p>Deux gestions indépendantes, l&apos;une sous l&apos;autre :</p>
+        <ul>
+          <li><strong>Catégories de tâches</strong> : nom, icône, ordre — utilisées partout dans l&apos;appli.</li>
+          <li><strong>Catégories d&apos;activités de jardin</strong> : propres à l&apos;onglet Jardin, sans lien avec les précédentes.</li>
+        </ul>
+      </>
+    ),
+  },
+  settings: {
+    title: "Réglages",
+    body: (
+      <>
+        <p>Réglages qui s&apos;appliquent à toute l&apos;instance :</p>
+        <ul>
+          <li>Rappel d&apos;échéance quotidien (in-app + notification).</li>
+          <li>Activation/désactivation de chacun des 4 agendas (Jardin/Voiture/Santé/Finances).</li>
+        </ul>
+      </>
+    ),
+  },
+  activity: {
+    title: "Activité",
+    body: (
+      <>
+        <p>Dernière activité et compteurs de tâches (total, 7 derniers jours, privées/partagées) par membre.</p>
+        <p>Volontairement limité à des chiffres : le contenu des tâches privées d&apos;un autre membre n&apos;est jamais visible ici.</p>
+      </>
+    ),
+  },
+  rewards: {
+    title: "Récompenses",
+    body: (
+      <>
+        <p>Des paliers configurables sur le streak personnel ou les défis familiaux réussis cumulés.</p>
+        <ul>
+          <li>Créer un palier : seuil + récompense en texte libre (pas de monnaie virtuelle).</li>
+          <li>Marquer une récompense atteinte comme donnée une fois remise en vrai.</li>
+        </ul>
+      </>
+    ),
+  },
+};
+
 export function AdminScreen({
   currentUserId,
   members,
@@ -77,31 +142,34 @@ export function AdminScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Conteneur qui défile horizontalement si les 4 onglets ne tiennent
-          pas (petit écran) — évite le débordement hors de la page. Les
-          icônes n'apparaissent qu'à partir de sm. */}
-      <div className="-mx-4 overflow-x-auto px-4">
-        <div
-          role="tablist"
-          aria-label="Sections de l'administration"
-          className="flex w-max overflow-hidden rounded-full border border-line text-[13px] font-semibold"
-        >
-          {tabs.map((t, i) => (
-            <button
-              key={t.value}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.value}
-              onClick={() => setTab(t.value)}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 sm:px-3.5 ${
-                i > 0 ? "border-l border-line" : ""
-              } ${tab === t.value ? "bg-brand text-white" : "bg-surface text-ink-muted"}`}
-            >
-              <t.Icon className="hidden h-3.5 w-3.5 sm:block" />
-              {t.label}
-            </button>
-          ))}
+      <div className="flex items-center gap-2">
+        {/* Conteneur qui défile horizontalement si les 4 onglets ne tiennent
+            pas (petit écran) — évite le débordement hors de la page. Les
+            icônes n'apparaissent qu'à partir de sm. */}
+        <div className="-mx-4 min-w-0 flex-1 overflow-x-auto px-4">
+          <div
+            role="tablist"
+            aria-label="Sections de l'administration"
+            className="flex w-max overflow-hidden rounded-full border border-line text-[13px] font-semibold"
+          >
+            {tabs.map((t, i) => (
+              <button
+                key={t.value}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.value}
+                onClick={() => setTab(t.value)}
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 sm:px-3.5 ${
+                  i > 0 ? "border-l border-line" : ""
+                } ${tab === t.value ? "bg-brand text-white" : "bg-surface text-ink-muted"}`}
+              >
+                <t.Icon className="hidden h-3.5 w-3.5 sm:block" />
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
+        <HelpButton title={HELP_CONTENT[tab].title}>{HELP_CONTENT[tab].body}</HelpButton>
       </div>
 
       {tab === "members" ? (

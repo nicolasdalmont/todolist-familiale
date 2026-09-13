@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getAppSettings } from "@/lib/queries";
 import { isAgendaEnabled, type AgendaKey } from "@/lib/agendas";
 import { Topbar } from "@/components/Topbar";
+import { HelpButton } from "@/components/HelpButton";
 import { IconCar, IconEuro, IconHeart, IconLeaf } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,19 @@ export default async function AgendasPage() {
     <div className="min-h-dvh bg-paper">
       <Topbar user={profile} />
       <main className="mx-auto max-w-[720px] px-4 pb-24 pt-1 sm:pb-16">
-        <h2 className="mb-4 mt-1.5 text-lg font-extrabold">Agendas</h2>
+        <div className="mb-4 mt-1.5 flex items-center justify-between gap-2.5">
+          <h2 className="text-lg font-extrabold">Agendas</h2>
+          <HelpButton title="Agendas">
+            <p>
+              Chaque agenda regroupe des activités récurrentes propres à un domaine (Jardin, Voiture,
+              Santé, Finances) — ouvre l&apos;un d&apos;eux pour le détail de son fonctionnement.
+            </p>
+            <p>
+              L&apos;admin peut désactiver un agenda inutilisé depuis Admin → Réglages : il disparaît
+              alors de ce menu, sans perdre ses données.
+            </p>
+          </HelpButton>
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {agendas.map(({ href, label, description, Icon }) => (

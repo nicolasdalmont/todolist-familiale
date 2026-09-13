@@ -15,6 +15,7 @@ import { NextTasksList } from "./NextTasksList";
 import { NotificationsNudge } from "./NotificationsNudge";
 import { RewardsBoard } from "./RewardsBoard";
 import { SharedWithYouFeed } from "./SharedWithYouFeed";
+import { HelpButton } from "./HelpButton";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
 
 // Calcule les trois compteurs "En retard" / "Aujourd'hui" / "Cette semaine"
@@ -196,12 +197,23 @@ export function HomeDashboard({
 
   return (
     <div className="flex flex-col gap-5 pt-2">
-      <div>
-        <h1 className="flex items-center gap-2 text-[22px] font-extrabold text-ink">
-          {greeting}, {profile.name}
-          {streak > 0 ? <StreakBadge streak={streak} /> : null}
-        </h1>
-        <p className="text-[13.5px] text-ink-muted">{todayLabel}</p>
+      <div className="flex items-start justify-between gap-2.5">
+        <div>
+          <h1 className="flex items-center gap-2 text-[22px] font-extrabold text-ink">
+            {greeting}, {profile.name}
+            {streak > 0 ? <StreakBadge streak={streak} /> : null}
+          </h1>
+          <p className="text-[13.5px] text-ink-muted">{todayLabel}</p>
+        </div>
+        <HelpButton title="Accueil">
+          <p>Les trois compteurs (En retard/Aujourd&apos;hui/Cette semaine) mènent chacun vers la liste des tâches déjà filtrée.</p>
+          <ul>
+            <li><strong>Prochaines tâches à faire</strong> : les 3 tâches ouvertes les plus proches dans le temps.</li>
+            <li><strong>À ton attention</strong> : ce qui te concerne et attend peut-être une action.</li>
+            <li><strong>Activité du jour</strong> : ce que fait le reste de la famille.</li>
+            <li><strong>Partagées avec toi</strong> : les tâches où tu es en lecture seule.</li>
+          </ul>
+        </HelpButton>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -4,13 +4,14 @@ import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import type { ActivityLogEntry, ChallengeProgress, NotificationItem, Profile, RewardAchievement, Task, WeeklyChallenge } from "@/lib/types";
 import { computeBadgeCount } from "@/lib/badge";
-import { dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
+import { addDaysToKey, dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
 import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
 import { StreakBadge } from "./Badge";
 import { ChallengeCard } from "./ChallengeCard";
+import { NextTasksList } from "./NextTasksList";
 import { NotificationsNudge } from "./NotificationsNudge";
 import { RewardsBoard } from "./RewardsBoard";
 import { SharedWithYouFeed } from "./SharedWithYouFeed";
@@ -37,11 +38,30 @@ export function HomeDashboard({
   streak: number;
   achievements: RewardAchievement[];
 }) {
-  const { todayCount, weekCount, overdueCount, overdueTaskIds, todayKey, sundayKey, todayLabel, greeting } = useMemo(() => {
+  const {
+    todayCount,
+    weekCount,
+    overdueCount,
+    overdueTaskIds,
+    todayKey,
+    weekFromKey,
+    weekToKey,
+    todayLabel,
+    greeting,
+    nextTasks,
+  } = useMemo(() => {
     const now = new Date();
     const todayKey = dateKeyFromDate(now);
-    const sunday = upcomingSunday(now);
-    const sundayKey = dateKeyFromDate(sunday);
+    const sundayKey = dateKeyFromDate(upcomingSunday(now));
+    // "Cette semaine" = du jour même jusqu'à dimanche inclus (semaine
+    // restante), et non l'ensemble lundi-dimanche : on regarde devant soi,
+    // pas les jours déjà passés cette semaine. Le dimanche, la semaine en
+    // cours se réduit à aujourd'hui, déjà compté dans « Aujourd'hui » — la
+    // tuile bascule alors sur la semaine suivante (lundi à dimanche
+    // prochains) pour rester utile plutôt que d'afficher un doublon.
+    const isSunday = sundayKey === todayKey;
+    const weekFromKey = isSunday ? addDaysToKey(todayKey, 1) : todayKey;
+    const weekToKey = isSunday ? addDaysToKey(todayKey, 7) : sundayKey;
 
     // Les trois compteurs ne portent que sur les tâches dont je suis
     // responsable — créées par moi, ou partagées avec moi avec droit de
@@ -62,11 +82,8 @@ export function HomeDashboard({
     const open = mine.filter((t) => t.status === "todo" || t.status === "in_progress");
 
     const todayCount = open.filter((t) => t.due_at && dateKeyFromIso(t.due_at) === todayKey).length;
-    // "Cette semaine" = du jour même jusqu'à dimanche inclus (semaine
-    // restante), et non l'ensemble lundi-dimanche : on regarde devant soi,
-    // pas les jours déjà passés cette semaine.
     const weekCount = open.filter(
-      (t) => t.due_at && dateKeyFromIso(t.due_at) >= todayKey && dateKeyFromIso(t.due_at) <= sundayKey
+      (t) => t.due_at && dateKeyFromIso(t.due_at) >= weekFromKey && dateKeyFromIso(t.due_at) <= weekToKey
     ).length;
     // Même définition du retard que partout ailleurs dans l'appli (badge
     // "En retard" sur la carte de tâche et l'écran de détail — voir
@@ -75,6 +92,18 @@ export function HomeDashboard({
     // pas besoin de repartir de `open` ici.
     const overdueTaskIds = mine.filter((t) => isOverdue(t.due_at, t.status)).map((t) => t.id);
     const overdueCount = overdueTaskIds.length;
+
+    // « Prochaines tâches à faire » : les 3 tâches ouvertes les plus
+    // proches dans le temps (en retard d'abord, par échéance croissante),
+    // tous mes chantiers confondus — on retrouve dans cette liste ce
+    // qu'on ferait « ensuite » quelle que soit la tuile (retard/aujourd'hui/
+    // semaine) qui la contient. Les tâches sans échéance sont écartées :
+    // on ne peut pas les ordonner dans le temps.
+    const nextTasks = [...open]
+      .filter((t) => t.due_at)
+      .sort((a, b) => (a.due_at! < b.due_at! ? -1 : a.due_at! > b.due_at! ? 1 : 0))
+      .slice(0, 3)
+      .map((t) => ({ id: t.id, title: t.title, dueAt: t.due_at, overdue: isOverdue(t.due_at, t.status) }));
 
     const todayLabel = now.toLocaleDateString("fr-FR", {
       weekday: "long",
@@ -96,9 +125,11 @@ export function HomeDashboard({
       overdueCount,
       overdueTaskIds,
       todayKey,
-      sundayKey,
+      weekFromKey,
+      weekToKey,
       todayLabel: capitalize(todayLabel),
       greeting,
+      nextTasks,
     };
   }, [tasks, profile.id]);
 
@@ -221,7 +252,7 @@ export function HomeDashboard({
         </Link>
 
         <Link
-          href={`/tasks?dueFrom=${todayKey}&dueAtMost=${sundayKey}`}
+          href={`/tasks?dueFrom=${weekFromKey}&dueAtMost=${weekToKey}`}
           className="flex items-center gap-2.5 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50"
         >
           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
@@ -233,6 +264,8 @@ export function HomeDashboard({
           </span>
         </Link>
       </div>
+
+      <NextTasksList tasks={nextTasks} />
 
       {challenge ? <ChallengeCard challenge={challenge.challenge} progress={challenge.progress} /> : null}
 

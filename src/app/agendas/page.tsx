@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { Topbar } from "@/components/Topbar";
-import { IconCar, IconLeaf } from "@/components/Icons";
+import { IconCar, IconHeart, IconLeaf } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
-// Page d'atterrissage du menu "Agendas" : regroupe les onglets Jardin et
-// Voiture, qui étaient auparavant deux liens de menu séparés (Jardin a été
-// déplacé ici, voir Topbar.tsx/BottomNav.tsx). Simple page de liens plutôt
-// qu'un sous-menu déroulant — aucun composant de ce type n'existe dans le
-// code, et une page reste plus simple à intégrer sans changement dans la
-// bottom nav mobile (4 emplacements).
+// Page d'atterrissage du menu "Agendas" : regroupe les onglets Jardin,
+// Voiture et Santé, qui étaient auparavant des liens de menu séparés
+// (Jardin a été déplacé ici, voir Topbar.tsx/BottomNav.tsx). Simple page de
+// liens plutôt qu'un sous-menu déroulant — aucun composant de ce type
+// n'existe dans le code, et une page reste plus simple à intégrer sans
+// changement dans la bottom nav mobile (4 emplacements).
 const AGENDAS = [
   { href: "/jardin", label: "Jardin", description: "Taille, semis, plantation…", Icon: IconLeaf },
   { href: "/voiture", label: "Voiture", description: "Entretien, révision, contrôle technique…", Icon: IconCar },
+  { href: "/sante", label: "Santé", description: "Visites médicales, dentiste, vaccins…", Icon: IconHeart },
 ];
 
 export default async function AgendasPage() {

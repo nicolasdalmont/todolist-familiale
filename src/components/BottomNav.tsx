@@ -21,7 +21,11 @@ export function BottomNav() {
       href: "/agendas",
       label: "Agendas",
       Icon: IconCalendar,
-      active: pathname.startsWith("/agendas") || pathname.startsWith("/jardin") || pathname.startsWith("/voiture"),
+      active:
+        pathname.startsWith("/agendas") ||
+        pathname.startsWith("/jardin") ||
+        pathname.startsWith("/voiture") ||
+        pathname.startsWith("/sante"),
     },
     { href: "/compte", label: "Compte", Icon: IconUser, active: pathname.startsWith("/compte") },
   ];

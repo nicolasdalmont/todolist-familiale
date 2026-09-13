@@ -298,3 +298,21 @@ export interface CarActivity {
   assignees: Pick<Profile, "id" | "name" | "color">[];
   openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
 }
+
+// Activité récurrente de santé (onglet Santé, migration 007) — voir
+// src/lib/health.ts. Même montage que CarActivity : chaque instance EST une
+// occurrence datée, sa clôture crée une NOUVELLE ligne (l'instance
+// suivante) plutôt que d'avancer un compteur sur celle-ci.
+export interface HealthActivity {
+  id: string;
+  name: string;
+  description: string;
+  dueDate: string; // "YYYY-MM-DD"
+  dayKnown: boolean;
+  recurrence: Recurrence;
+  status: TaskStatus;
+  createdBy: string;
+  createdAt: string;
+  assignees: Pick<Profile, "id" | "name" | "color">[];
+  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+}

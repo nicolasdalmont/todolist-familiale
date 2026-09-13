@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hors ligne — Checkberry</title>
+    <!--
+      Page de secours du service worker (public/sw.js, v5) : affichée pour
+      une navigation complète vers une page jamais visitée en ligne (donc
+      absente du cache), quand l'appareil est hors ligne. Volontairement
+      statique (pas de build Next) : elle doit rester utilisable même si
+      les chunks JS/CSS de l'appli ne sont, eux, pas en cache.
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+          calc(24px + env(safe-area-inset-left));
+        background: #ffffff;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #241a20;
+        text-align: center;
+        box-sizing: border-box;
+      }
+      .card {
+        max-width: 360px;
+      }
+      .icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 20px;
+        color: #867a80;
+        font-size: 14.5px;
+        line-height: 1.5;
+      }
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 12px;
+        background: #d6336c;
+        color: #ffffff;
+        font-size: 14.5px;
+        font-weight: 600;
+        padding: 12px 20px;
+        cursor: pointer;
+      }
+      button:active {
+        background: #a12552;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">📴</div>
+      <h1>Cette page n'est pas encore disponible hors ligne</h1>
+      <p>Vous n'avez pas de connexion, et cette page n'a pas encore été consultée en ligne sur cet appareil.</p>
+      <button type="button" onclick="location.reload()">Réessayer</button>
+    </div>
+  </body>
+</html>

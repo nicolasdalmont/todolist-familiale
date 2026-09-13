@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 
-// Enregistre le service worker pour l'installabilité PWA et le cache de
-// l'app shell. La synchronisation offline avancée (IndexedDB) reste à
-// construire (voir README).
+// Enregistre le service worker pour l'installabilité PWA, le cache de
+// l'app shell et la lecture hors ligne des pages déjà visitées (voir
+// public/sw.js). La synchronisation offline avancée (file d'attente
+// IndexedDB pour les mutations créées hors ligne) reste à construire (voir
+// README).
 //
 // Le rafraîchissement systématique de l'appli à l'ouverture (nouveau
 // déploiement Vercel détecté) est géré par AppUpdateWatcher.tsx, monté à

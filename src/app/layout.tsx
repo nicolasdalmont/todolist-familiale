@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { AppUpdateWatcher } from "@/components/AppUpdateWatcher";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { PendingOverlayProvider } from "@/components/PendingOverlay";
 import { ToastProvider } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="font-sans antialiased">
+        <OfflineBanner />
         <ToastProvider>
           <PendingOverlayProvider>
             <PullToRefresh>{children}</PullToRefresh>

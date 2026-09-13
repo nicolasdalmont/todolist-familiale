@@ -1,7 +1,5 @@
-// Service worker minimal : met en cache l'app shell (icônes + manifest, pour
-// l'installabilité PWA) uniquement. La synchronisation offline avancée
-// (file d'attente IndexedDB des mutations créées hors-ligne) est prévue en
-// phase ultérieure — voir le README du dépôt.
+// Service worker : app shell (icônes + manifest, pour l'installabilité PWA)
+// + notifications push + cache de lecture hors-ligne (pages déjà visitées).
 //
 // v2 (02/09/2026) — bug corrigé : la version précédente mettait en cache
 // TOUTES les requêtes GET (y compris "/", "/tasks", "/tasks/[id]", et les
@@ -22,8 +20,29 @@
 // donc pour purger l'ancien chez les PWA déjà installées.
 // v4 (10/09/2026) : le manifest est désormais généré
 // (/manifest.webmanifest, voir src/app/manifest.ts) — l'URL cachée change.
-const CACHE_NAME = "checkberry-shell-v4";
-const APP_SHELL = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+// v5 (13/09/2026) : lecture hors-ligne a minima. Les pages/données déjà
+// vues en ligne (navigations + requêtes RSC de Next.js) sont maintenant
+// mises en cache en repli — "réseau d'abord, cache si le réseau échoue" —
+// dans un cache séparé de l'app shell, avec un fallback affiché si la page
+// n'a jamais été visitée. Toujours PAS de file d'attente pour les mutations
+// créées hors-ligne (voir README) : uniquement de la consultation.
+const CACHE_NAME = "checkberry-shell-v5";
+const PAGE_CACHE_NAME = "checkberry-pages-v1";
+const STATIC_CACHE_NAME = "checkberry-static-v1";
+const APP_SHELL = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"];
+const ALL_CACHES = [CACHE_NAME, PAGE_CACHE_NAME, STATIC_CACHE_NAME];
+
+// Jamais mis en cache, jamais servi depuis le cache même hors ligne :
+// - /api/* : session, push, cron, export ICS... des endpoints qui doivent
+//   soit toujours refléter l'état réel, soit échouer franchement plutôt que
+//   renvoyer une réponse périmée (ex. /api/version, utilisé par
+//   AppUpdateWatcher.tsx pour détecter un nouveau déploiement).
+// - /login : servir une version en cache pourrait figer un état de flux de
+//   connexion périmé (ex. "définir son mot de passe" alors qu'il l'est déjà,
+//   voir le commentaire "force-dynamic" de cette page).
+function isNeverCache(pathname) {
+  return pathname.startsWith("/api/") || pathname === "/login" || pathname.startsWith("/login/");
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -38,7 +57,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !ALL_CACHES.includes(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -48,27 +67,73 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
   const isShellAsset = APP_SHELL.includes(url.pathname);
 
-  // Toute requête qui n'est pas un des quelques fichiers statiques listés
-  // ci-dessus (pages, données RSC, tout ce qui affiche des tâches) doit
-  // toujours passer par le réseau : ne pas appeler respondWith() laisse le
-  // navigateur gérer la requête normalement, sans jamais consulter le cache.
-  if (!isShellAsset) return;
+  if (isShellAsset) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const network = fetch(request)
+          .then((response) => {
+            if (response && response.status === 200 && response.type === "basic") {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || network;
+      })
+    );
+    return;
+  }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
+  if (isNeverCache(url.pathname)) return;
+
+  // Fichiers statiques Next.js (JS/CSS des chunks buildés) : nommés avec un
+  // hash de contenu, donc immuables — cache d'abord, sans jamais revalider,
+  // pour que les pages déjà vues restent utilisables (et interactives) hors
+  // ligne même après plusieurs jours sans connexion.
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
           if (response && response.status === 200 && response.type === "basic") {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+        });
+      })
+    );
+    return;
+  }
+
+  // Pages et requêtes de données RSC de Next.js : réseau d'abord (jamais de
+  // contenu périmé tant qu'il y a du réseau, cf. le piège corrigé en v2
+  // ci-dessus), repli sur la dernière version mise en cache uniquement si le
+  // réseau échoue (hors ligne). Si la page n'a jamais été visitée en ligne,
+  // repli sur une page de secours pour les navigations complètes.
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === "basic") {
+          const clone = response.clone();
+          caches.open(PAGE_CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (request.mode === "navigate") {
+          const fallback = await caches.match("/offline.html");
+          if (fallback) return fallback;
+        }
+        return Response.error();
+      })
   );
 });
 

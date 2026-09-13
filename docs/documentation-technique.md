@@ -3,8 +3,21 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 13/09/2026. Lot de ce jour (le plus récent
-d'abord) : **bascule tâche → agenda dédié** (6.24) : créer une tâche en
+Dernière mise à jour : 14/09/2026. Lot de ce jour : **activation/
+désactivation individuelle des agendas** (6.26) : un onglet « Réglages »
+permet à l'admin de désactiver Jardin/Voiture/Santé/Finances un par un —
+un agenda désactivé disparaît du menu (menu « Agendas » masqué si les 4
+sont désactivés), ses activités et les tâches de sa catégorie restent en
+base mais ne sont plus affichées, et le formulaire de tâche ne propose
+plus d'y créer une activité (migration `009_agenda_toggles.sql`, à
+appliquer manuellement sur Neon) ; au passage, correctif de l'écran admin
+qui revenait sur l'onglet « Membres » après **toute** action (voir 6.26)
+— l'onglet actif vit désormais dans l'URL plutôt que dans un état de
+composant qui ne survivait pas au `router.refresh()` suivant une
+mutation.
+
+Lot du 13/09/2026 (le plus récent d'abord) : **bascule tâche → agenda
+dédié** (6.24) : créer une tâche en
 catégorie Jardin/Voiture/Santé/Finances propose de créer une activité
 dans l'agenda correspondant à la place, en reprenant la saisie déjà
 faite (titre, description, échéance, récurrence) ; **onglet Finances —
@@ -315,8 +328,10 @@ départ (`achats`, `autre`, `cadeaux`, `enfants`, `famille`, `maison`,
 `vacances`) — `autre` est la catégorie de repli, jamais supprimable.
 
 **`app_settings`** — réglages d'instance, une seule ligne (`id = 1`,
-contrainte `check`) : `reminder_enabled`, `updated_at`. Onglet
-« Réglages » de l'admin (voir 6.9).
+contrainte `check`) : `reminder_enabled`, `jardin_enabled`,
+`voiture_enabled`, `sante_enabled`, `finances_enabled` (ces quatre
+dernières ajoutées par la migration `db/migrations/009_agenda_toggles.sql`
+— voir 6.26), `updated_at`. Onglet « Réglages » de l'admin (voir 6.9).
 
 **`tags`** — libellés libres (`id`, `name` unique, `created_at`), créés à
 la volée depuis le formulaire de tâche, normalisés en minuscules/sans
@@ -923,7 +938,13 @@ autres dans `Topbar.tsx` sur desktop, et remplacé par une entrée
 protégée côté serveur par un `notFound()` sinon, même logique que les
 autres pages restreintes de l'appli — voir 6.1). Cinq onglets
 (`AdminScreen.tsx`, contrôle segmenté) : **Membres**, **Catégories**,
-**Réglages**, **Activité** et **Récompenses**.
+**Réglages**, **Activité** et **Récompenses**. L'onglet actif est porté
+par l'URL (`/admin?tab=...`, `useSearchParams`/`router.replace`) plutôt
+que par un `useState` local — voir le correctif de 6.26 : chaque panneau
+appelle `router.refresh()` après une mutation pour resynchroniser ses
+données serveur, ce qui remettait un `useState` à sa valeur initiale sur
+cette page dynamique et renvoyait sur « Membres » après n'importe quelle
+action, sur n'importe quel onglet.
 
 #### Onglet « Membres » — gestion des comptes (10/09/2026)
 
@@ -988,8 +1009,8 @@ partagent aucune donnée, seulement le même gabarit d'écran et le même jeu
 d'icônes.
 
 **Onglet « Réglages »** (`src/components/SettingsPanel.tsx` /
-`src/lib/settings-actions.ts`, non détaillé ici) : rappel automatique et
-informations d'instance.
+`src/lib/settings-actions.ts`) : rappel automatique, activation
+individuelle des 4 agendas (voir 6.26) et informations d'instance.
 
 #### Onglet « Activité » — statistiques par membre
 
@@ -2028,17 +2049,75 @@ l'échéance (`Time`) à droite — même gabarit visuel que
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
-| `/agendas` | Page de liens vers Jardin, Voiture, Santé, Finances (voir 6.20) — ouverte à tout utilisateur connecté |
-| `/jardin` | Activités récurrentes du jardin, par mois (voir 6.19) — ouverte à tout utilisateur connecté |
-| `/voiture` | Activités récurrentes d'entretien de la voiture, liste chronologique (voir 6.20) — ouverte à tout utilisateur connecté |
-| `/sante` | Activités récurrentes de santé, liste chronologique (voir 6.21) — ouverte à tout utilisateur connecté |
-| `/finances` | Activités récurrentes de finances, liste chronologique (voir 6.23) — ouverte à tout utilisateur connecté |
+| `/agendas` | Page de liens vers Jardin, Voiture, Santé, Finances (voir 6.20) — ouverte à tout utilisateur connecté ; ne liste que les agendas activés, 404 si aucun (voir 6.26) |
+| `/jardin` | Activités récurrentes du jardin, par mois (voir 6.19) — ouverte à tout utilisateur connecté ; 404 si l'agenda est désactivé (voir 6.26) |
+| `/voiture` | Activités récurrentes d'entretien de la voiture, liste chronologique (voir 6.20) — ouverte à tout utilisateur connecté ; 404 si l'agenda est désactivé (voir 6.26) |
+| `/sante` | Activités récurrentes de santé, liste chronologique (voir 6.21) — ouverte à tout utilisateur connecté ; 404 si l'agenda est désactivé (voir 6.26) |
+| `/finances` | Activités récurrentes de finances, liste chronologique (voir 6.23) — ouverte à tout utilisateur connecté ; 404 si l'agenda est désactivé (voir 6.26) |
 | `/compte` | Mon compte : identité, « Modifier mon mot de passe » et activation des notifications (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |
 | `/api/tasks/[id]/calendar` | Fichier `.ics` de la tâche pour l'agenda de l'appareil (voir 6.13) — 404 si l'utilisateur n'a pas `canView` ou si la tâche n'a pas d'échéance |
 | `/api/push/subscribe` | `POST`/`DELETE` : enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) — pas une page, aucune UI |
 | `/api/cron/reminders` | Rappel quotidien d'échéance (Vercel Cron, voir 6.15) — pas une page, aucune UI |
+
+### 6.26 Agendas — activation/désactivation individuelle (14/09/2026)
+
+L'admin peut désormais désactiver Jardin/Voiture/Santé/Finances un par
+un, sans perdre leurs données : onglet **Admin → Réglages**
+(`SettingsPanel.tsx`), un interrupteur par agenda. Registre central dans
+`src/lib/agendas.ts` (`AgendaKey`, `AGENDA_INFO`, `isAgendaEnabled()`,
+`anyAgendaEnabled()`) associant chaque agenda à sa colonne de réglage —
+consulté par tous les points listés ci-dessous plutôt que de dupliquer
+l'association agenda ↔ colonne.
+
+**Stockage.** Quatre colonnes booléennes sur `app_settings` (`id = 1`,
+défaut `true`) : `jardin_enabled`, `voiture_enabled`, `sante_enabled`,
+`finances_enabled` — migration `db/migrations/009_agenda_toggles.sql`, à
+appliquer manuellement sur Neon (`psql "$NEON_DIRECT_URL" -f
+db/migrations/009_agenda_toggles.sql`, comme les migrations précédentes —
+voir 5.3). Tant qu'elle n'est pas appliquée, `getAppSettings()` retourne
+tout activé par défaut (même repli tolérant que pour `reminder_enabled` à
+l'origine) et `setAgendaEnabledAction` renvoie une erreur explicite plutôt
+que de planter sur la colonne manquante.
+
+**Effets d'une désactivation** — rien n'est supprimé, seulement masqué :
+
+- **Menu.** `Topbar.tsx` (devenu `async`, lit `getAppSettings()`) masque
+  le lien « Agendas » si aucun des 4 n'est activé ; `BottomNav.tsx` reçoit
+  `showAgendas` calculé côté serveur dans `src/app/layout.tsx` (devenu
+  `async` pour la même raison) et retire l'onglet « Agendas » du même
+  tableau — les items restants se rééquilibrent d'eux-mêmes (`flex-1`,
+  aucun calcul de largeur à ajuster).
+- **Pages.** `/agendas` ne liste que les agendas activés (`notFound()` si
+  aucun) ; `/jardin`, `/voiture`, `/sante`, `/finances` deviennent
+  chacune une page inexistante (`notFound()`) si leur agenda est
+  désactivé — même traitement que `/admin` pour un compte non-admin (voir
+  6.9), pour ne rien révéler du contenu plutôt que de rediriger.
+- **Tâches.** `getTasks()` (`src/lib/queries.ts`) exclut les tâches dont
+  la catégorie correspond à un agenda désactivé — elles disparaissent de
+  l'accueil et de `/tasks` tant qu'il l'est, sans être supprimées ni
+  perdre leur catégorie.
+- **Formulaire de tâche.** La proposition « créer une activité dans
+  l'agenda dédié plutôt qu'une tâche » (voir 6.24) ne s'affiche plus pour
+  un agenda désactivé ; le bouton de catégorie reste utilisable comme
+  catégorie de tâche ordinaire (`TaskForm.tsx` reçoit `settings` en plus,
+  uniquement en création).
+
+**Fix — l'onglet admin revenait sur « Membres » après toute action
+(même lot).** Découvert en testant ce qui précède : désactiver un agenda
+depuis « Réglages » renvoyait sur l'onglet « Membres ». Cause générale, pas
+spécifique aux agendas — chaque panneau de l'admin (`UserManager`,
+`CategoryManager`, `GardenCategoryManager`, `RewardManager`,
+`SettingsPanel`) appelle `router.refresh()` après une mutation pour
+resynchroniser ses données serveur, et l'onglet actif d'`AdminScreen.tsx`
+était un `useState` local qui ne survivait pas à ce `router.refresh()` sur
+cette page `force-dynamic` — retombant à sa valeur initiale (« Membres »)
+quel que soit l'onglet où l'utilisateur se trouvait et quelle que soit
+l'action déclenchée. Corrigé en faisant porter l'onglet actif par l'URL
+(`/admin?tab=...`, `useSearchParams` + `router.replace(..., { scroll:
+false })`) plutôt que par un état de composant : recalculé à chaque rendu,
+il est immun à ce remount.
 
 Toutes les routes sauf `/login`, `/api/version`, `/api/push/subscribe` et
 `/api/cron/reminders` exigent une session valide (appliqué par le
@@ -2354,7 +2433,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
 | `src/app/admin/page.tsx` | Écran d'administration, réservé au rôle admin — charge membres + stats (voir 6.9) |
-| `src/components/AdminScreen.tsx` | Bascule d'onglets « Membres » / « Activité » de l'écran admin |
+| `src/components/AdminScreen.tsx` | Bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26) |
 | `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
 | `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
 | `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |

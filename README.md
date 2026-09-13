@@ -184,6 +184,12 @@ partagée/privée est appliquée entièrement au niveau applicatif
   compteurs. La tuile « Dues cette semaine » bascule sur la semaine
   suivante dès le dimanche (le reliquat de la semaine en cours est déjà
   compté dans « Aujourd'hui »). Voir la doc technique §6.6 et §6.25.
+- Activation/désactivation des agendas (14/09/2026) : l'admin peut
+  désactiver Jardin/Voiture/Santé/Finances individuellement (onglet Admin
+  → « Réglages »). Un agenda désactivé disparaît du menu (menu « Agendas »
+  masqué si les 4 sont désactivés) ; ses activités et les tâches classées
+  dans sa catégorie restent en base mais ne sont plus affichées tant qu'il
+  est désactivé. Voir la doc technique §6.26.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

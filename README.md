@@ -111,6 +111,8 @@ numérotés, à exécuter à la main sur Neon). Tables : `users`, `tasks`,
 `app_settings`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
 `user_activity_log` (streak personnel), `reward_tiers`,
 `challenge_results`, `reward_achievements` (paliers de récompense),
+`garden_activities`, `garden_activity_assignees`,
+`garden_activity_categories` (activités récurrentes du jardin),
 `notifications`, `push_subscriptions`.
 Aucune notion de policy/Row Level Security côté Neon : l'application se
 connecte en propriétaire de la base (`DATABASE_URL`) ; la visibilité
@@ -143,11 +145,19 @@ partagée/privée est appliquée entièrement au niveau applicatif
   libre négociée en famille (pas de monnaie virtuelle). Suivi en
   attente/donné géré par l'admin ; affiché sur l'accueil une fois atteint.
   Voir la doc technique §6.18.
+- Onglet Jardin (13/09/2026) : activités récurrentes du jardin (taille,
+  semis, plantation…), classées par mois avec un ou plusieurs
+  responsables. Créer/modifier une activité crée/met à jour
+  automatiquement la tâche de sa prochaine période ; clôturer ou
+  supprimer cette tâche génère automatiquement celle de la période
+  suivante. Catégories d'activités (Taille/Semis/Plantation/Autre)
+  gérables depuis Admin → « Catégories », indépendantes des catégories de
+  tâches. Voir la doc technique §6.19.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
-  (Accueil · Tâches · Créer · Compte) et « tirer pour rafraîchir » ; sur
-  desktop, navigation par le bandeau supérieur. Suite d'améliorations UX
-  du 10/09/2026 (24 constats) : voir §6.16.
+  (Accueil · Tâches · Jardin · Compte · Créer) et « tirer pour
+  rafraîchir » ; sur desktop, navigation par le bandeau supérieur. Suite
+  d'améliorations UX du 10/09/2026 (24 constats) : voir §6.16.
 
 ## Ce qui n'est pas encore implémenté
 

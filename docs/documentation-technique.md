@@ -3,7 +3,15 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 10/09/2026. Lots de ce jour : **gestion des
+Dernière mise à jour : 13/09/2026. Lot de ce jour : **onglet Jardin —
+activités récurrentes** (6.19) : nouvel onglet entre Tâches et Admin/
+Compte, activités classées par mois avec responsables, génération et
+régénération automatique de la tâche associée à la clôture/suppression
+(migration `003_garden_activities.sql`), catégories d'activités dédiées
+gérables depuis un second bloc de l'onglet « Catégories » de l'admin
+(migration `004_garden_activity_categories.sql`, voir 6.9).
+
+Lot du 10/09/2026 : **gestion des
 comptes depuis l'écran admin** (6.9 — créer / réinitialiser / supprimer
 un membre, onglet « Membres » ; migration `008_user_management.sql`) et
 **suite d'audit UX complète** (6.16, 24 constats traités) — barre
@@ -189,6 +197,13 @@ sources complémentaires, toutes deux dans `db/` :
      personnel, voir `src/lib/streaks.ts`).
    - `002_reward_tiers.sql` — tables `reward_tiers`, `challenge_results`,
      `reward_achievements` (paliers de récompense, voir 6.18).
+   - `003_garden_activities.sql` — tables `garden_activities`,
+     `garden_activity_assignees`, colonnes `tasks.garden_activity_id` /
+     `garden_occurrence_month` / `garden_occurrence_year` (onglet Jardin,
+     voir 6.19).
+   - `004_garden_activity_categories.sql` — table
+     `garden_activity_categories`, colonne `garden_activities.category`
+     (voir 6.19).
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
@@ -242,6 +257,9 @@ depuis l'application.
 | `category` | text → `categories.slug` | clé étrangère `on delete restrict`, défaut `autre` — voir 6.2 |
 | `created_by` | uuid → `users.id` | |
 | `created_at` | timestamptz | |
+| `garden_activity_id` | uuid → `garden_activities.id`, nullable | `on delete set null` — origine « activité Jardin » (voir 6.19), `null` pour une tâche ordinaire |
+| `garden_occurrence_month` | smallint, nullable | Mois (1-12) de l'occurrence représentée par cette tâche — voir 6.19 |
+| `garden_occurrence_year` | int, nullable | Année de cette occurrence — voir 6.19 |
 
 **`task_assignees`** — table de liaison many-to-many `tasks` ↔ `users`
 (une tâche peut être partagée avec plusieurs personnes), avec une colonne
@@ -331,7 +349,28 @@ partiels (`tier_id, user_id` où `user_id is not null` ; `tier_id` où
 `user_id is null`) rendent l'obtention d'un palier idempotente côté
 insertion — voir 6.18.
 
-15 tables au total. Aucune notion de Row Level Security côté Neon (voir
+**`garden_activities`** — activité récurrente du jardin (`id`, `name`,
+`description`, `months` smallint[] non vide, `category` → `garden_activity_
+categories.slug` (`on delete restrict`, défaut `autre`), `created_by` →
+`users.id`, `created_at`) — voir 6.19 et migrations `003_garden_
+activities.sql` / `004_garden_activity_categories.sql`. `months` porte les
+mois de l'année (1-12) où l'activité récurre, sans notion d'intervalle
+fixe (contrairement à `tasks.recurrence`).
+
+**`garden_activity_assignees`** — table de liaison many-to-many
+`garden_activities` ↔ `users` (les responsables d'une activité), même
+forme que `task_assignees` mais sans colonne `role` (pas de distinction
+éditeur/lecteur pour une activité de jardin) — voir 6.19.
+
+**`garden_activity_categories`** — catégories d'activités de jardin,
+gérables depuis l'admin (`slug` PK, `label`, `icon`, `position`,
+`created_at`) — même forme que `categories` (catégories de tâches),
+axe de classement **indépendant** : n'a aucun lien avec la catégorie
+« jardin » unique portée par les tâches générées. Amorcée avec 4
+catégories de départ (`taille`, `semis`, `plantation`, `autre`) — voir
+6.19 et migration `004_garden_activity_categories.sql`.
+
+19 tables au total. Aucune notion de Row Level Security côté Neon (voir
 section 3) : la sécurité applicative est entièrement gérée par
 `src/lib/access.ts`.
 
@@ -902,6 +941,14 @@ supprimable, ni la dernière catégorie restante). Si la table `categories`
 n'existe pas encore, chaque action renvoie une erreur explicite plutôt
 qu'une erreur Postgres brute (« Applique d'abord la migration 009 »).
 
+**Second bloc, juste en dessous (13/09/2026)** : catégories d'activités
+de jardin (`src/components/GardenCategoryManager.tsx` /
+`src/lib/garden-category-actions.ts`), même mécanique et même
+`requireAdmin()`, mais **table et actions entièrement indépendantes**
+(`garden_activity_categories`, voir 5.2 et 6.19) — les deux gestions ne
+partagent aucune donnée, seulement le même gabarit d'écran et le même jeu
+d'icônes.
+
 **Onglet « Réglages »** (`src/components/SettingsPanel.tsx` /
 `src/lib/settings-actions.ts`, non détaillé ici) : rappel automatique et
 informations d'instance.
@@ -1332,8 +1379,9 @@ modifications les plus visibles :
 **Navigation**
 
 - **Barre d'onglets en bas d'écran sur mobile** (`BottomNav.tsx`, montée
-  une fois dans `layout.tsx`) : Accueil · Tâches · Créer · Compte, avec
-  `aria-current` sur l'onglet actif et `env(safe-area-inset-bottom)`.
+  une fois dans `layout.tsx`) : Accueil · Tâches · Jardin (ajouté le
+  13/09/2026, voir 6.19) · Compte · Créer, avec `aria-current` sur
+  l'onglet actif et `env(safe-area-inset-bottom)`.
   Masquée à partir de `sm` (le desktop garde le bandeau supérieur + le
   bouton flottant, lui devenu `sm:` uniquement). Se retire d'elle-même
   sur `/login`.
@@ -1623,6 +1671,99 @@ déjà méritée.
 - **Admin → Récompenses** (voir 6.9) — configuration des paliers et
   bascule du statut `pending`/`given`, pour tous les membres.
 
+### 6.19 Jardin — activités récurrentes (13/09/2026)
+
+Nouvel onglet **Jardin** (entre Tâches et Admin sur desktop, entre Tâches
+et Compte sur mobile — `IconLeaf`, voir `Topbar.tsx`/`BottomNav.tsx`),
+ouvert à tout utilisateur connecté (pas réservé à l'admin) : gestion des
+activités récurrentes du jardin (taille, tonte, semis, plantation…), sur
+un principe différent de la récurrence des tâches ordinaires.
+
+**Modèle** (`garden_activities`, migrations `003`/`004` — voir 5.2) : une
+activité porte un nom, une description, un ensemble de **mois de l'année**
+(1-12, pas un intervalle fixe comme `tasks.recurrence`), une **catégorie**
+(`taille`/`semis`/`plantation`/`autre` par défaut) et un ou plusieurs
+**responsables** (`garden_activity_assignees`, many-to-many comme
+`task_assignees` mais sans notion éditeur/lecteur).
+
+**Génération de tâche** (`src/lib/garden.ts`, pas de `"use server"` — même
+montage que `rewards.ts`, importé aussi bien par les Server Actions
+dédiées que par `src/lib/actions.ts`) :
+
+- **Création d'une activité** (`createGardenActivityAction`,
+  `src/lib/garden-actions.ts`) : calcule la prochaine période à partir du
+  mois civil courant à Paris (`currentParisYearMonth()` — le mois en
+  cours compte si l'activité y récurre) et crée immédiatement la tâche
+  correspondante — titre/description de l'activité, échéance au 1er du
+  mois concerné à 9h (heure de Paris), catégorie de tâche fixe `jardin`
+  (indépendante de la catégorie d'activité, voir plus bas), assignée aux
+  responsables (+ le créateur de l'activité, toujours ajouté éditeur —
+  même convention que `createTaskAction`).
+- **Modification d'une activité** (`updateGardenActivityAction`) :
+  répercute directement sur la tâche ouverte associée — titre,
+  description et assignés sont **systématiquement réécrits** (l'activité
+  fait autorité, même si la tâche avait été modifiée entre-temps à la
+  main) ; l'échéance n'est recalculée que si le mois de l'occurrence en
+  cours n'appartient plus aux nouvelles périodes.
+- **Clôture ou suppression de la tâche associée** (hooks dans
+  `setStatusAction`/`deleteTaskAction`, `src/lib/actions.ts`) déclenchent
+  `advanceGardenActivity()` : calcule la période **strictement suivante**
+  (jamais celle qui vient de se terminer, y compris si la tâche traînait
+  en retard depuis plusieurs mois) et crée la tâche de cette nouvelle
+  occurrence. Une activité n'a donc **jamais plus d'une tâche ouverte à
+  la fois** (index unique partiel `tasks_garden_open_occurrence_uidx` sur
+  `garden_activity_id` où le statut n'est ni `done` ni `archived`).
+- **Suppression d'une activité** (`deleteGardenActivityAction`) : supprime
+  sa tâche ouverte (pas de nouvelle occurrence à générer, la récurrence
+  s'arrête) ; une tâche déjà clôturée garde son historique
+  (`garden_activity_id` repasse à `null`, `on delete set null`).
+
+**Écran** (`JardinScreen.tsx`, `src/app/jardin/page.tsx`) : liste des
+activités regroupées par mois (Janvier → Décembre) — une activité
+biannuelle apparaît deux fois (une section par mois concerné), mais reste
+la même activité : modifier/supprimer depuis l'une ou l'autre occurrence
+agit sur l'activité entière. Bandeau de 12 pastilles pour sauter
+directement à un mois (même section vide, pratique pour y créer une
+activité). Au chargement, la page défile automatiquement vers le mois
+courant s'il porte une activité, sinon vers le prochain mois qui en porte
+une. Chaque carte affiche un badge de catégorie (icône + couleur +
+libellé, `resolveCategory()`/`categoryIcon()`/`categoryBgColor()` —
+réutilisés tels quels depuis `src/lib/categories.ts`, voir plus bas), les
+avatars des responsables, l'échéance de la tâche en cours, et trois
+actions en icône seule : voir la tâche (`IconChecklist`), modifier
+(`IconPencil`), supprimer (`IconTrash`, nouvelle icône distincte de
+`IconX` qui reste dédiée au retrait d'un item de checklist).
+
+**Catégories d'activités — axe indépendant des catégories de tâches.**
+Une activité de jardin est classée `taille`/`semis`/`plantation`/`autre`
+(table `garden_activity_categories`, migration 004) : ceci **n'affecte
+pas** la catégorie `jardin` unique que porte la tâche générée dans
+l'onglet Tâches (`categories.slug = 'jardin'`, ajoutée par la migration
+003) — deux systèmes de catégories entièrement séparés (tables, actions,
+et permissions distinctes), qui partagent seulement le même jeu d'icônes
+(`CATEGORY_ICON_CHOICES`, `src/lib/categories.ts`) et le même
+gabarit de composant.
+
+La **gestion** de ces catégories (créer/renommer/changer d'icône/
+réordonner/supprimer, `src/components/GardenCategoryManager.tsx`) a
+d'abord vécu dans l'onglet Jardin lui-même (ouverte à tout utilisateur),
+puis a été déplacée le même jour vers un **second bloc de l'onglet
+« Catégories » de l'écran Admin** (voir 6.9), juste après les catégories
+de tâches — sur demande explicite de l'utilisateur, pour co-localiser les
+deux gestions dans le même écran sans les fusionner. Les Server Actions
+(`src/lib/garden-category-actions.ts`) sont donc passées en
+`requireAdmin()` à cette occasion, comme le reste de l'écran Admin (elles
+étaient ouvertes à tout utilisateur tant qu'elles vivaient dans l'onglet
+Jardin) — les activités de jardin elles-mêmes (pas leurs catégories)
+restent, elles, gérables par tout utilisateur depuis l'onglet Jardin.
+
+**Note.** Créer/modifier/supprimer une catégorie (tâches ou jardin) fait
+revenir l'écran Admin sur l'onglet « Membres » au lieu de rester sur
+« Catégories » après le `router.refresh()` qui suit l'action —
+comportement **pré-existant** (reproduit à l'identique sur
+`CategoryManager.tsx`, catégories de tâches, non touché par ce lot),
+laissé tel quel.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -1633,6 +1774,7 @@ déjà méritée.
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
+| `/jardin` | Activités récurrentes du jardin, par mois (voir 6.19) — ouverte à tout utilisateur connecté |
 | `/compte` | Mon compte : identité, « Modifier mon mot de passe » et activation des notifications (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |

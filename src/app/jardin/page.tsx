@@ -1,6 +1,8 @@
+import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getGardenActivities, getGardenActivityCategories } from "@/lib/garden-queries";
-import { getProfiles } from "@/lib/queries";
+import { getAppSettings, getProfiles } from "@/lib/queries";
+import { isAgendaEnabled } from "@/lib/agendas";
 import { currentParisYearMonth } from "@/lib/garden";
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
@@ -11,13 +13,18 @@ export const dynamic = "force-dynamic";
 
 // Onglet Jardin (migration 003) : liste des activités récurrentes du
 // jardin, ouverte à tout membre connecté (pas réservée à l'admin,
-// contrairement à /admin) — voir src/lib/garden-actions.ts.
+// contrairement à /admin) — voir src/lib/garden-actions.ts. Peut être
+// désactivé depuis l'admin (migration 009 — src/lib/agendas.ts) : traité
+// comme une page inexistante plutôt qu'une redirection, même logique que
+// /admin pour un compte non-admin.
 export default async function JardinPage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const profile = await requireUser();
+  const settings = await getAppSettings();
+  if (!isAgendaEnabled(settings, "jardin")) notFound();
 
   const [activities, members, categories] = await Promise.all([
     getGardenActivities(),

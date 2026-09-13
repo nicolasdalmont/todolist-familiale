@@ -4,8 +4,12 @@ import { Avatar } from "./Avatar";
 import { LogoutButton } from "./LogoutButton";
 import { IconBerry } from "./Icons";
 import { APP_NAME } from "@/lib/app-config";
+import { getAppSettings } from "@/lib/queries";
+import { anyAgendaEnabled } from "@/lib/agendas";
 
-export function Topbar({ user }: { user: Profile }) {
+export async function Topbar({ user }: { user: Profile }) {
+  const showAgendas = anyAgendaEnabled(await getAppSettings());
+
   return (
     <header className="pt-safe sticky top-0 z-20 flex min-h-[60px] items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur">
       <div className="flex items-center gap-4">
@@ -25,12 +29,14 @@ export function Topbar({ user }: { user: Profile }) {
         >
           Tâches
         </Link>
-        <Link
-          href="/agendas"
-          className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
-        >
-          Agendas
-        </Link>
+        {showAgendas ? (
+          <Link
+            href="/agendas"
+            className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
+          >
+            Agendas
+          </Link>
+        ) : null}
         {user.role === "admin" ? (
           <Link
             href="/admin"

@@ -9,25 +9,32 @@ import { IconCalendar, IconChecklist, IconHome, IconPlus, IconUser } from "./Ico
 // pouce — tout partait de la barre haute de 60 px. Masquée à partir de
 // `sm` (desktop garde la barre haute + le bouton flottant). Rendue une
 // seule fois, depuis layout.tsx ; se retire elle-même sur l'écran de
-// connexion.
-export function BottomNav() {
+// connexion. `showAgendas` (calculé côté serveur dans layout.tsx à partir
+// des réglages — voir src/lib/agendas.ts) retire l'onglet "Agendas" quand
+// aucun agenda n'est activé ; les items restants se rééquilibrent
+// automatiquement (chacun est en `flex-1`, voir plus bas).
+export function BottomNav({ showAgendas }: { showAgendas: boolean }) {
   const pathname = usePathname();
   if (pathname.startsWith("/login")) return null;
 
   const items = [
     { href: "/", label: "Accueil", Icon: IconHome, active: pathname === "/" },
     { href: "/tasks", label: "Tâches", Icon: IconChecklist, active: pathname.startsWith("/tasks") && pathname !== "/tasks/new" },
-    {
-      href: "/agendas",
-      label: "Agendas",
-      Icon: IconCalendar,
-      active:
-        pathname.startsWith("/agendas") ||
-        pathname.startsWith("/jardin") ||
-        pathname.startsWith("/voiture") ||
-        pathname.startsWith("/sante") ||
-        pathname.startsWith("/finances"),
-    },
+    ...(showAgendas
+      ? [
+          {
+            href: "/agendas",
+            label: "Agendas",
+            Icon: IconCalendar,
+            active:
+              pathname.startsWith("/agendas") ||
+              pathname.startsWith("/jardin") ||
+              pathname.startsWith("/voiture") ||
+              pathname.startsWith("/sante") ||
+              pathname.startsWith("/finances"),
+          },
+        ]
+      : []),
     { href: "/compte", label: "Compte", Icon: IconUser, active: pathname.startsWith("/compte") },
   ];
 

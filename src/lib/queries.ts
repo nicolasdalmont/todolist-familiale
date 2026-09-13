@@ -19,6 +19,7 @@ import type {
   UserStats,
 } from "./types";
 import { canEdit, canView } from "./access";
+import { AGENDA_INFO, AGENDA_KEYS } from "./agendas";
 import { computeBadgeCount } from "./badge";
 import { DEFAULT_CATEGORIES } from "./categories";
 import { dateKeyFromDate, dateKeyFromIso, isOverdue } from "./format";
@@ -38,18 +39,44 @@ export async function getProfile(id: string): Promise<Profile | null> {
   return (rows[0] as unknown as Profile) ?? null;
 }
 
-// Réglages d'instance (table `app_settings`, une ligne — migration 010).
-// Tolère l'absence de la table (migration pas encore jouée) : rappel
-// activé par défaut.
+// Réglages d'instance (table `app_settings`, une ligne — migration 010,
+// colonnes d'agendas ajoutées par la migration 009). Tolère l'absence de
+// la table ou des colonnes (migration pas encore jouée) : tout activé par
+// défaut.
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  reminderEnabled: true,
+  jardinEnabled: true,
+  voitureEnabled: true,
+  santeEnabled: true,
+  financesEnabled: true,
+};
+
 export async function getAppSettings(): Promise<AppSettings> {
   try {
-    const rows = await sql`select reminder_enabled from app_settings where id = 1`;
-    const data = rows[0] as { reminder_enabled: boolean } | undefined;
-    if (!data) return { reminderEnabled: true };
-    return { reminderEnabled: data.reminder_enabled };
+    const rows = await sql`
+      select reminder_enabled, jardin_enabled, voiture_enabled, sante_enabled, finances_enabled
+      from app_settings where id = 1
+    `;
+    const data = rows[0] as
+      | {
+          reminder_enabled: boolean;
+          jardin_enabled: boolean;
+          voiture_enabled: boolean;
+          sante_enabled: boolean;
+          finances_enabled: boolean;
+        }
+      | undefined;
+    if (!data) return DEFAULT_APP_SETTINGS;
+    return {
+      reminderEnabled: data.reminder_enabled,
+      jardinEnabled: data.jardin_enabled,
+      voitureEnabled: data.voiture_enabled,
+      santeEnabled: data.sante_enabled,
+      financesEnabled: data.finances_enabled,
+    };
   } catch (e) {
     console.error("getAppSettings:", e instanceof Error ? e.message : e);
-    return { reminderEnabled: true };
+    return DEFAULT_APP_SETTINGS;
   }
 }
 
@@ -204,13 +231,18 @@ async function attachRelations(tasks: TaskBaseRow[]): Promise<Task[]> {
 // Toute tâche privée à quelqu'un d'autre, ou partagée sans lui, est
 // exclue — c'est ici que la confidentialité "privée par défaut" est
 // appliquée, pas seulement dans l'affichage (voir src/lib/access.ts).
+// Exclut aussi les tâches classées dans la catégorie d'un agenda désactivé
+// (voir src/lib/agendas.ts) : elles restent en base, mais disparaissent des
+// listes tant que l'agenda est désactivé.
 export async function getTasks(userId: string): Promise<Task[]> {
-  const rows = (await sql`
-    select * from tasks order by due_at asc nulls last
-  `) as unknown as TaskBaseRow[];
+  const [rows, settings] = await Promise.all([
+    sql`select * from tasks order by due_at asc nulls last`,
+    getAppSettings(),
+  ]);
+  const disabledCategories = new Set<string>(AGENDA_KEYS.filter((key) => !settings[AGENDA_INFO[key].settingsKey]));
 
-  const tasks = await attachRelations(rows);
-  return tasks.filter((t) => canView(t, userId));
+  const tasks = await attachRelations(rows as unknown as TaskBaseRow[]);
+  return tasks.filter((t) => canView(t, userId) && !disabledCategories.has(t.category));
 }
 
 // Renvoie la tâche si userId a le droit de la voir (créateur ou partagée

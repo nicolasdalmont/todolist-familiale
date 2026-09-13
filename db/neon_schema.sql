@@ -133,6 +133,12 @@ alter table public.tasks
 create table public.app_settings (
   id int primary key default 1 check (id = 1),
   reminder_enabled boolean not null default true,
+  -- Activation individuelle des agendas (migration 009) — voir
+  -- src/lib/agendas.ts.
+  jardin_enabled boolean not null default true,
+  voiture_enabled boolean not null default true,
+  sante_enabled boolean not null default true,
+  finances_enabled boolean not null default true,
   updated_at timestamptz not null default now()
 );
 

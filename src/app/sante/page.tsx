@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getHealthActivities } from "@/lib/health-queries";
-import { getProfiles } from "@/lib/queries";
+import { getAppSettings, getProfiles } from "@/lib/queries";
+import { isAgendaEnabled } from "@/lib/agendas";
 import { parseAgendaActivityPrefill } from "@/lib/format";
 import { Topbar } from "@/components/Topbar";
 import { SanteScreen } from "@/components/SanteScreen";
@@ -11,13 +13,16 @@ export const dynamic = "force-dynamic";
 
 // Onglet Santé (migration 007) : liste des activités récurrentes de santé,
 // ouverte à tout membre connecté (comme Jardin/Voiture) — voir
-// src/lib/health-actions.ts.
+// src/lib/health-actions.ts. Peut être désactivé depuis l'admin
+// (migration 009 — src/lib/agendas.ts), voir jardin/page.tsx.
 export default async function SantePage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const profile = await requireUser();
+  const settings = await getAppSettings();
+  if (!isAgendaEnabled(settings, "sante")) notFound();
 
   const [activities, members] = await Promise.all([getHealthActivities(), getProfiles()]);
   const prefill = parseAgendaActivityPrefill(searchParams);

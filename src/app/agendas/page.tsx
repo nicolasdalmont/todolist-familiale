@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { getAppSettings } from "@/lib/queries";
+import { isAgendaEnabled, type AgendaKey } from "@/lib/agendas";
 import { Topbar } from "@/components/Topbar";
 import { IconCar, IconEuro, IconHeart, IconLeaf } from "@/components/Icons";
 
@@ -11,15 +14,24 @@ export const dynamic = "force-dynamic";
 // page de liens plutôt qu'un sous-menu déroulant — aucun composant de ce
 // type n'existe dans le code, et une page reste plus simple à intégrer sans
 // changement dans la bottom nav mobile (4 emplacements).
-const AGENDAS = [
-  { href: "/jardin", label: "Jardin", description: "Taille, semis, plantation…", Icon: IconLeaf },
-  { href: "/voiture", label: "Voiture", description: "Entretien, révision, contrôle technique…", Icon: IconCar },
-  { href: "/sante", label: "Santé", description: "Visites médicales, dentiste, vaccins…", Icon: IconHeart },
-  { href: "/finances", label: "Finances", description: "Impôts, assurances, abonnements…", Icon: IconEuro },
+//
+// Chaque agenda peut être désactivé individuellement depuis l'admin
+// (migration 009 — voir src/lib/agendas.ts) : on ne liste ici que les
+// agendas activés. Si aucun n'est activé, le lien qui mène à cette page est
+// déjà masqué (Topbar/BottomNav) — un accès direct par l'URL est alors
+// traité comme une page inexistante, plutôt que d'afficher une page vide.
+const AGENDAS: { key: AgendaKey; href: string; label: string; description: string; Icon: typeof IconLeaf }[] = [
+  { key: "jardin", href: "/jardin", label: "Jardin", description: "Taille, semis, plantation…", Icon: IconLeaf },
+  { key: "voiture", href: "/voiture", label: "Voiture", description: "Entretien, révision, contrôle technique…", Icon: IconCar },
+  { key: "sante", href: "/sante", label: "Santé", description: "Visites médicales, dentiste, vaccins…", Icon: IconHeart },
+  { key: "finances", href: "/finances", label: "Finances", description: "Impôts, assurances, abonnements…", Icon: IconEuro },
 ];
 
 export default async function AgendasPage() {
   const profile = await requireUser();
+  const settings = await getAppSettings();
+  const agendas = AGENDAS.filter((a) => isAgendaEnabled(settings, a.key));
+  if (agendas.length === 0) notFound();
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -28,7 +40,7 @@ export default async function AgendasPage() {
         <h2 className="mb-4 mt-1.5 text-lg font-extrabold">Agendas</h2>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {AGENDAS.map(({ href, label, description, Icon }) => (
+          {agendas.map(({ href, label, description, Icon }) => (
             <Link
               key={href}
               href={href}

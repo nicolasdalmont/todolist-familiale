@@ -8,7 +8,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { setFlash } from "@/components/Toast";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { categoryIcon, categoryIconColor, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
-import type { Category, Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
+import { isAgendaEnabled, type AgendaKey } from "@/lib/agendas";
+import type { AppSettings, Category, Profile, ShareRole, Tag, Task, TaskStatus } from "@/lib/types";
 
 // Les trois niveaux d'accès proposés pour chaque membre de la famille
 // (hors créateur, qui a toujours accès complet — voir src/lib/access.ts).
@@ -36,6 +37,7 @@ export function TaskForm({
   categories,
   currentUserId,
   task,
+  settings,
 }: {
   mode: "create" | "edit";
   profiles: Profile[];
@@ -43,6 +45,10 @@ export function TaskForm({
   categories: Category[];
   currentUserId: string;
   task?: Task;
+  // Utilisé uniquement en création, pour ne pas proposer de créer une
+  // activité dans un agenda désactivé (voir AGENDA_CATEGORY_INFO et
+  // src/lib/agendas.ts). Absent en édition (non utilisé).
+  settings?: AppSettings;
 }) {
   const router = useRouter();
   const [, startTransition] = useGlobalTransition();
@@ -226,7 +232,12 @@ export function TaskForm({
         <div role="group" aria-label="Catégorie" className="flex flex-wrap gap-1.5">
           {categories.map((c) => {
             const Icon = categoryIcon(c.icon);
-            const agendaInfo = mode === "create" ? AGENDA_CATEGORY_INFO[c.slug] : undefined;
+            const agendaInfo =
+              mode === "create" &&
+              AGENDA_CATEGORY_INFO[c.slug] &&
+              (!settings || isAgendaEnabled(settings, c.slug as AgendaKey))
+                ? AGENDA_CATEGORY_INFO[c.slug]
+                : undefined;
             return (
               <button
                 key={c.slug}

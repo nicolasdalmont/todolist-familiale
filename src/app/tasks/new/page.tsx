@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getCategories, getProfiles, getTags } from "@/lib/queries";
+import { getAppSettings, getCategories, getProfiles, getTags } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
 import { IconArrowLeft } from "@/components/Icons";
@@ -10,10 +10,11 @@ export const dynamic = "force-dynamic";
 export default async function NewTaskPage() {
   const profile = await requireUser();
 
-  const [profiles, allTags, categories] = await Promise.all([
+  const [profiles, allTags, categories, settings] = await Promise.all([
     getProfiles(),
     getTags(),
     getCategories(),
+    getAppSettings(),
   ]);
 
   return (
@@ -36,6 +37,7 @@ export default async function NewTaskPage() {
           allTags={allTags}
           categories={categories}
           currentUserId={profile.id}
+          settings={settings}
         />
       </main>
     </div>

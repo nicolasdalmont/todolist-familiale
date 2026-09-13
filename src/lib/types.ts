@@ -43,11 +43,18 @@ export interface Tag {
   name: string;
 }
 
-// Réglages d'instance (table `app_settings`, une ligne — migration 010).
-// Voir getAppSettings() dans src/lib/queries.ts et l'onglet « Réglages »
-// de l'écran admin.
+// Réglages d'instance (table `app_settings`, une ligne — migration 010,
+// étendue par la migration 009 pour les agendas). Voir getAppSettings()
+// dans src/lib/queries.ts et l'onglet « Réglages » de l'écran admin.
 export interface AppSettings {
   reminderEnabled: boolean;
+  // Activation individuelle des agendas (voir src/lib/agendas.ts) — un
+  // agenda désactivé disparaît du menu ; ses activités et les tâches
+  // liées restent en base mais ne sont plus affichées.
+  jardinEnabled: boolean;
+  voitureEnabled: boolean;
+  santeEnabled: boolean;
+  financesEnabled: boolean;
 }
 
 export interface Comment {

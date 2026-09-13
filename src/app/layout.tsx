@@ -7,6 +7,8 @@ import { ToastProvider } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { APP_NAME } from "@/lib/app-config";
+import { getAppSettings } from "@/lib/queries";
+import { anyAgendaEnabled } from "@/lib/agendas";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,7 +31,9 @@ export const viewport: Viewport = {
   themeColor: "#D6336C",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const showAgendas = anyAgendaEnabled(await getAppSettings());
+
   return (
     <html lang="fr">
       <body className="font-sans antialiased">
@@ -38,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PendingOverlayProvider>
             <PullToRefresh>{children}</PullToRefresh>
           </PendingOverlayProvider>
-          <BottomNav />
+          <BottomNav showAgendas={showAgendas} />
         </ToastProvider>
         <ServiceWorkerRegister />
         <AppUpdateWatcher />

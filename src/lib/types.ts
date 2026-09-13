@@ -258,3 +258,19 @@ export interface RewardAchievement {
   status: RewardStatus;
   givenAt: string | null;
 }
+
+// Activité récurrente du jardin (migration 003, voir src/lib/garden.ts) —
+// un nom, une description, un ensemble de mois de l'année (`months`, 1-12,
+// triés) et un ou plusieurs responsables. `openTask` est la tâche en cours
+// générée pour cette activité (jamais plus d'une à la fois — voir
+// advanceGardenActivity()), `null` seulement dans un état transitoire.
+export interface GardenActivity {
+  id: string;
+  name: string;
+  description: string;
+  months: number[];
+  createdBy: string;
+  createdAt: string;
+  assignees: Pick<Profile, "id" | "name" | "color">[];
+  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+}

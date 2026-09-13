@@ -18,6 +18,7 @@ import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
 import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
+import { advanceGardenActivity } from "@/lib/garden";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus, Visibility } from "@/lib/types";
 
 // Vérifie les droits d'un utilisateur sur une tâche par son id, sans avoir
@@ -486,7 +487,22 @@ export async function deleteTaskAction(formData: FormData) {
     ).filter((id) => id !== userId);
   }
 
+  // Origine "activité Jardin" (migration 003) : récupérée avant suppression
+  // pour pouvoir avancer l'activité à sa période suivante juste après (voir
+  // advanceGardenActivity(), src/lib/garden.ts) — la suppression d'une tâche
+  // Jardin déclenche la même régénération que sa clôture.
+  const gardenRows = await sql`
+    select garden_activity_id, garden_occurrence_month, garden_occurrence_year from tasks where id = ${taskId}
+  `;
+  const gardenTask = gardenRows[0] as
+    | { garden_activity_id: string | null; garden_occurrence_month: number | null; garden_occurrence_year: number | null }
+    | undefined;
+
   await sql`delete from tasks where id = ${taskId}`;
+
+  if (gardenTask?.garden_activity_id && gardenTask.garden_occurrence_month && gardenTask.garden_occurrence_year) {
+    await advanceGardenActivity(gardenTask.garden_activity_id, gardenTask.garden_occurrence_month, gardenTask.garden_occurrence_year);
+  }
 
   if (recipients.length > 0) {
     const who = await actorName(userId);
@@ -531,6 +547,9 @@ export async function setStatusAction(taskId: string, status: string) {
         visibility: "shared" | "private";
         category: string;
         created_by: string;
+        garden_activity_id: string | null;
+        garden_occurrence_month: number | null;
+        garden_occurrence_year: number | null;
       }
     | undefined;
   if (!task) return;
@@ -606,6 +625,15 @@ export async function setStatusAction(taskId: string, status: string) {
         }
       }
     }
+  }
+
+  // Origine "activité Jardin" (migration 003) : sa clôture avance
+  // l'activité à sa période suivante — voir advanceGardenActivity(),
+  // src/lib/garden.ts. Indépendant du bloc de récurrence ci-dessus : une
+  // tâche Jardin porte toujours recurrence.type = "none" (la récurrence par
+  // périodes est gérée par garden_activities, pas par tasks.recurrence).
+  if (status === "done" && task.garden_activity_id && task.garden_occurrence_month && task.garden_occurrence_year) {
+    await advanceGardenActivity(task.garden_activity_id, task.garden_occurrence_month, task.garden_occurrence_year);
   }
 
   revalidatePath("/");

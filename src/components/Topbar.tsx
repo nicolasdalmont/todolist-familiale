@@ -25,6 +25,12 @@ export function Topbar({ user }: { user: Profile }) {
         >
           Tâches
         </Link>
+        <Link
+          href="/jardin"
+          className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
+        >
+          Jardin
+        </Link>
         {user.role === "admin" ? (
           <Link
             href="/admin"

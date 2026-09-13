@@ -30,6 +30,8 @@ drop table if exists public.notifications cascade;
 drop table if exists public.reward_achievements cascade;
 drop table if exists public.challenge_results cascade;
 drop table if exists public.reward_tiers cascade;
+drop table if exists public.garden_activity_assignees cascade;
+drop table if exists public.garden_activities cascade;
 drop table if exists public.activity_log cascade;
 drop table if exists public.user_activity_log cascade;
 drop table if exists public.checklist_items cascade;
@@ -76,7 +78,13 @@ create table public.tasks (
   created_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz default now(),
   -- Slug de catégorie ; FK ajoutée après la création de public.categories.
-  category text not null default 'autre'
+  category text not null default 'autre',
+  -- Origine "activité Jardin" (migration 003, voir src/lib/garden.ts) —
+  -- "on delete set null" : une tâche déjà clôturée survit à la suppression
+  -- de son activité (juste dépouillée de son origine).
+  garden_activity_id uuid,
+  garden_occurrence_month smallint,
+  garden_occurrence_year int
 );
 
 create table public.task_assignees (
@@ -203,6 +211,31 @@ create table public.reward_achievements (
   given_by uuid references public.users(id) on delete set null
 );
 
+-- Activités récurrentes du jardin (migration 003, voir src/lib/garden.ts) :
+-- un nom, une description, un ensemble de mois de l'année (`months`) et un
+-- ou plusieurs responsables (garden_activity_assignees, many-to-many comme
+-- task_assignees). Distinct de la récurrence des tâches (tasks.recurrence,
+-- à intervalle fixe) : une activité de jardin récurre sur un ensemble de
+-- périodes précises, pas à intervalle régulier.
+create table public.garden_activities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  months smallint[] not null check (array_length(months, 1) > 0),
+  created_by uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.garden_activity_assignees (
+  garden_activity_id uuid not null references public.garden_activities(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  primary key (garden_activity_id, user_id)
+);
+
+alter table public.tasks
+  add constraint tasks_garden_activity_fkey
+  foreign key (garden_activity_id) references public.garden_activities(id) on delete set null;
+
 -- Notifications "À ton attention" par utilisateur.
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -239,6 +272,11 @@ create unique index if not exists reward_achievements_collective_uidx
   on public.reward_achievements(tier_id) where user_id is null;
 create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
 create index if not exists push_subscriptions_user_idx on public.push_subscriptions(user_id);
+-- Une seule tâche "ouverte" par activité de jardin à la fois — voir
+-- advanceGardenActivity() dans src/lib/garden.ts.
+create unique index if not exists tasks_garden_open_occurrence_uidx
+  on public.tasks(garden_activity_id)
+  where garden_activity_id is not null and status not in ('done', 'archived');
 
 -- ---------------------------------------------------------------------
 -- 4. Amorçage minimal
@@ -268,7 +306,8 @@ insert into public.categories (slug, label, icon, position) values
   ('enfants',  'Enfants',  'baby',     3),
   ('famille',  'Famille',  'users',    4),
   ('maison',   'Maison',   'home',     5),
-  ('vacances', 'Vacances', 'sun',      6)
+  ('vacances', 'Vacances', 'sun',      6),
+  ('jardin',   'Jardin',   'leaf',     7)
 on conflict (slug) do nothing;
 
 insert into public.tags (name) values

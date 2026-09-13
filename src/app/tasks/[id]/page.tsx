@@ -76,9 +76,16 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
             <HelpButton title="Détail de la tâche">
               <p>Toutes les infos de la tâche, et selon ton rôle :</p>
               <ul>
-                <li><strong>Assigné(e)</strong> : tu peux changer le statut, modifier la tâche, cocher la checklist et commenter.</li>
+                <li>
+                  <strong>Assigné(e)</strong> : tu peux changer le statut, modifier la tâche, gérer la
+                  checklist (ajouter, cocher, supprimer des items) et commenter.
+                </li>
                 <li><strong>Lecture seule</strong> : tu peux seulement commenter.</li>
               </ul>
+              <p>
+                Un commentaire peut être supprimé par son auteur, ou par le créateur de la tâche (tous
+                les commentaires).
+              </p>
               <p>
                 L&apos;icône calendrier (si la tâche a une échéance) exporte un fichier{" "}
                 <code className="font-mono">.ics</code> pour l&apos;agenda de ton appareil.

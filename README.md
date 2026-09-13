@@ -190,6 +190,12 @@ partagée/privée est appliquée entièrement au niveau applicatif
   masqué si les 4 sont désactivés) ; ses activités et les tâches classées
   dans sa catégorie restent en base mais ne sont plus affichées tant qu'il
   est désactivé. Voir la doc technique §6.26.
+- Aide contextuelle par écran (14/09/2026) : un bouton « ? » en haut à
+  droite de chaque écran principal (Accueil, Tâches, Agendas, Jardin,
+  Voiture, Santé, Finances, Mon compte, Admin, et les trois écrans de
+  tâche) ouvre une bulle expliquant son fonctionnement, sans quitter la
+  page. Dans Admin, le contenu dépend de l'onglet ouvert. Voir la doc
+  technique §6.27.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

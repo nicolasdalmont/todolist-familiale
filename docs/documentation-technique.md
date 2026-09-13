@@ -3,8 +3,14 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 14/09/2026. Lot de ce jour : **activation/
-désactivation individuelle des agendas** (6.26) : un onglet « Réglages »
+Dernière mise à jour : 14/09/2026. Lot de ce jour (le plus récent
+d'abord) : **aide contextuelle par écran** (6.27) : un bouton « ? » calé à
+droite de l'en-tête de chaque écran principal ouvre une bulle expliquant
+son fonctionnement, sans quitter la page (`HelpButton.tsx`) — 12 écrans
+couverts, dont l'Admin (contenu dépendant de l'onglet actif) et les trois
+écrans de tâche (création/édition/détail, avec le détail du partage et de
+la gestion checklist/commentaires) ; puis **activation/désactivation
+individuelle des agendas** (6.26) : un onglet « Réglages »
 permet à l'admin de désactiver Jardin/Voiture/Santé/Finances un par un —
 un agenda désactivé disparaît du menu (menu « Agendas » masqué si les 4
 sont désactivés), ses activités et les tâches de sa catégorie restent en
@@ -2131,6 +2137,50 @@ d'accueil, et la liste a déménagé vers `/tasks` (voir
 `claude/prototype-notes.md` pour l'historique de ce changement et la
 liste des redirections mises à jour en conséquence).
 
+### 6.27 Aide contextuelle par écran (14/09/2026)
+
+Un bouton « ? » (`HelpButton.tsx`), toujours calé à droite de l'en-tête de
+l'écran, ouvre une bulle avec un rappel court de ce que fait l'écran et
+comment s'en servir — sans navigation, sans recharger de données. Composant
+auto-porteur (son propre état ouvert/fermé, `useState` local) : chaque
+appelant se contente de lui passer un `title` et le contenu en `children`,
+même gabarit visuel que `ConfirmDialog.tsx` (fond assombri, carte
+arrondie), simplifié à un seul bouton « Compris » — fermeture aussi au clic
+sur le fond ou à Échap. Icône dédiée `IconHelpCircle`
+(`src/components/Icons.tsx`).
+
+**12 écrans couverts** : Accueil, Tâches, Agendas, Jardin, Voiture, Santé,
+Finances, Mon compte, Admin, et les trois écrans de tâche (Nouvelle tâche,
+Modifier la tâche, Détail de la tâche). Emplacement dans l'en-tête, au cas
+par cas :
+
+- Écrans avec un en-tête « retour + titre » (Jardin/Voiture/Santé/
+  Finances/Mon compte/Nouvelle tâche/Modifier la tâche) : le bouton
+  d'aide est ajouté en fin de ligne (`justify-between`).
+- Accueil (pas d'en-tête classique, une salutation) : ajouté à côté de la
+  salutation.
+- Tâches (pas de titre, une barre de recherche) : ajouté à côté du champ
+  de recherche.
+- Détail de la tâche : ajouté en dernière position du groupe d'icônes
+  déjà présent à droite (export calendrier, modifier).
+- Admin : **contenu dépendant de l'onglet actif** (Membres/Catégories/
+  Réglages/Activité/Récompenses, `HELP_CONTENT` dans `AdminScreen.tsx`),
+  situé sur la même ligne que le titre « Administration » — qui vit
+  désormais dans `AdminScreen.tsx` (retiré du header statique de
+  `src/app/admin/page.tsx`) pour rester à côté de l'aide contextuelle.
+
+**Contenu notable** :
+- Jardin précise qu'une activité cochée sur plusieurs mois apparaît une
+  fois par mois concerné (regroupement par mois de `JardinScreen.tsx`, une
+  même activité listée dans chacun de ses buckets de mois).
+- Détail de la tâche précise que la checklist se **gère** (ajout, coche,
+  suppression d'items, pas seulement cocher) et qui peut supprimer un
+  commentaire (son auteur, ou le créateur de la tâche pour tous).
+- Nouvelle tâche / Modifier la tâche détaillent le partage : « Lecture
+  seule » (voir + commenter) vs « Assigné(e) » (voir, modifier, changer le
+  statut + commenter), le créateur garde toujours un accès complet, et
+  retirer l'accès de quelqu'un à l'édition lui masque aussitôt la tâche.
+
 ## 8. Limites connues et points d'attention
 
 ### 8.1 Fuseau horaire (refonte du 04/09/2026)
@@ -2433,13 +2483,14 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
 | `src/app/admin/page.tsx` | Écran d'administration, réservé au rôle admin — charge membres + stats (voir 6.9) |
-| `src/components/AdminScreen.tsx` | Bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26) |
+| `src/components/AdminScreen.tsx` | Titre + bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26), aide contextuelle par onglet (voir 6.27) |
 | `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
 | `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
 | `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |
 | `src/components/PendingOverlay.tsx` | Gel d'écran global + indicateur de traitement en cours (voir 6.11) |
 | `src/components/Toast.tsx` | Toasts en bas d'écran + `setFlash()` (message qui survit à un redirect serveur) — voir 6.16 |
 | `src/components/ConfirmDialog.tsx` | Boîte de confirmation à la marque (remplace `window.confirm()`) — voir 6.16 |
+| `src/components/HelpButton.tsx` | Bouton « ? » auto-porteur + bulle d'aide contextuelle, même gabarit que `ConfirmDialog.tsx` (voir 6.27) |
 | `src/components/useUndoableDelete.ts` | Hook « supprimer + Annuler » (commentaires, items de checklist) — voir 6.16 |
 | `src/components/BottomNav.tsx` | Barre d'onglets en bas d'écran, mobile uniquement (voir 6.16) |
 | `src/components/CommentThread.tsx` | Fil de commentaires + suppression annulable (auteur ou créateur de la tâche — voir 6.5, 6.16) |

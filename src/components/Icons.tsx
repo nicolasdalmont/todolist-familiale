@@ -387,3 +387,16 @@ export function IconWrench({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Suppression d'un élément entier (activité de jardin, membre…) — distinct
+// de IconX (annuler/retirer un petit item de checklist) : une corbeille
+// signale une action destructive plus lourde.
+export function IconTrash({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M4.5 7h15M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 7l.7 12.1a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9L17.5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}

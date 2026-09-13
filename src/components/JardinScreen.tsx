@@ -11,7 +11,7 @@ import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
 import { GardenCategoryManager } from "@/components/GardenCategoryManager";
-import { IconLeaf, IconPencil, IconPlus, IconTag } from "./Icons";
+import { IconChecklist, IconLeaf, IconPencil, IconPlus, IconTag, IconTrash } from "./Icons";
 
 // Onglet Jardin (voir migration 003 et src/lib/garden.ts) : liste des
 // activités récurrentes du jardin (taille, tonte, semis, plantation…),
@@ -483,14 +483,17 @@ export function JardinScreen({
                             {activity.openTask ? (
                               <Link
                                 href={`/tasks/${activity.openTask.id}`}
-                                className="text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+                                aria-label="Voir la tâche"
+                                title="Voir la tâche"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg text-brand hover:bg-sand"
                               >
-                                Voir la tâche
+                                <IconChecklist className="h-3.5 w-3.5" />
                               </Link>
                             ) : null}
                             <button
                               type="button"
                               aria-label="Modifier"
+                              title="Modifier"
                               onClick={() => {
                                 setEditError(null);
                                 setEditingKey(editingKey === key ? null : key);
@@ -501,10 +504,12 @@ export function JardinScreen({
                             </button>
                             <button
                               type="button"
+                              aria-label="Supprimer"
+                              title="Supprimer"
                               onClick={() => setDeleting(activity)}
-                              className="text-[12px] font-semibold text-red-600 underline-offset-2 hover:underline"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-red-600 hover:bg-sand"
                             >
-                              Supprimer
+                              <IconTrash className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>

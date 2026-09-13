@@ -62,7 +62,9 @@ type FormState = {
   dueDate: string; // "YYYY-MM-DD", valeur du <input type="date">
   dueMonth: string; // "YYYY-MM", valeur du <input type="month">
   recurrenceType: RecurrenceType;
-  recurrenceInterval: number;
+  // "" pendant la frappe (champ vidé pour retaper une nouvelle valeur) —
+  // voir le onChange du champ ci-dessous, jamais soumis tel quel.
+  recurrenceInterval: number | "";
   recurrenceUnit: "days" | "weeks" | "months" | "years";
   assigneeIds: string[];
 };
@@ -202,7 +204,13 @@ function ActivityForm({
               type="number"
               min={1}
               value={state.recurrenceInterval}
-              onChange={(e) => set("recurrenceInterval", Math.max(1, Number(e.target.value) || 1))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                set("recurrenceInterval", raw === "" ? "" : Math.max(1, Math.floor(Number(raw)) || 1));
+              }}
+              onBlur={() => {
+                if (state.recurrenceInterval === "") set("recurrenceInterval", 1);
+              }}
               className="w-full rounded-xl border border-line px-3 py-2.5 text-[14px]"
             />
             <select
@@ -252,7 +260,7 @@ function formStateToFormData(state: FormState): FormData {
   else fd.set("dueMonth", state.dueMonth);
   fd.set("recurrenceType", state.recurrenceType);
   if (state.recurrenceType === "custom") {
-    fd.set("recurrenceInterval", String(state.recurrenceInterval));
+    fd.set("recurrenceInterval", String(state.recurrenceInterval || 1));
     fd.set("recurrenceUnit", state.recurrenceUnit);
   }
   for (const id of state.assigneeIds) fd.append("assignees", id);

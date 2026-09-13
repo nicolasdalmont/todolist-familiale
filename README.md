@@ -167,6 +167,10 @@ partagée/privée est appliquée entièrement au niveau applicatif
   catégories dédiée. Voir la doc technique §6.20.
 - Onglet Santé (13/09/2026) : même principe que Voiture (visites
   médicales, dentiste, vaccins…). Voir la doc technique §6.21.
+- Mode hors ligne — lecture seule (13/09/2026) : les pages déjà visitées
+  en ligne restent consultables sans connexion (bandeau « Hors ligne —
+  dernières données à HH:mm »), avec une page de secours pour une route
+  jamais visitée. Aucune écriture hors ligne. Voir la doc technique §6.22.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour
@@ -176,8 +180,10 @@ partagée/privée est appliquée entièrement au niveau applicatif
 ## Ce qui n'est pas encore implémenté
 
 - Offline-first réel (file d'attente IndexedDB + réconciliation à la
-  reconnexion) — le service worker gère le cache de l'app shell et les
-  notifications push, pas les mutations créées hors-ligne.
+  reconnexion pour les mutations créées hors ligne) — le service worker
+  gère l'app shell, les notifications push et, depuis le 13/09/2026, la
+  **consultation** hors ligne des pages déjà visitées (voir plus haut),
+  mais aucune écriture hors ligne.
 
 ## Développement local
 

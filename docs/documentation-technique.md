@@ -1873,6 +1873,47 @@ border border-line`) a été ajouté en tête des pages Jardin, Voiture et
 Santé, pointant vers `/agendas`, pour revenir à la liste sans repasser par
 la `BottomNav`.
 
+### 6.22 Mode hors ligne — lecture seule (13/09/2026)
+
+À la demande explicite de l'utilisateur, une consultation hors ligne « a
+minima » a été ajoutée, en restant volontairement dans les limites du
+correctif du piège n°4 (8.2) : jamais de contenu périmé tant qu'il y a du
+réseau, uniquement un repli sur la dernière version connue quand il n'y en
+a pas. Aucune écriture hors ligne (voir 8.5, toujours non implémenté).
+
+- **`public/sw.js` (passé en v5).** Pour toute requête `GET` same-origin
+  qui n'est ni un fichier de l'app shell, ni sous `/api/`, ni `/login` :
+  stratégie « réseau d'abord, repli sur le cache si le réseau échoue »
+  (`checkberry-pages-v1`) — la page/donnée RSC est mise à jour dans ce
+  cache à chaque succès réseau, et resservie depuis ce cache uniquement
+  quand `fetch()` rejette (hors ligne). Les chunks buildés sous
+  `/_next/static/` (immuables, nommés par hash de contenu) passent en
+  cache-first (`checkberry-static-v1`) : une fois chargés une fois, ils
+  n'ont plus jamais besoin du réseau. `/api/*` et `/login` restent
+  toujours réseau-only, sans aucun repli — voir la justification en
+  commentaire dans le fichier (un contenu figé y serait soit trompeur,
+  soit dangereux pour le flux de connexion).
+- **`public/offline.html`.** Page de secours statique (pas de build Next,
+  volontairement : elle doit rester utilisable même si les chunks JS/CSS
+  ne sont pas en cache), servie par le service worker pour une navigation
+  complète vers une route jamais visitée en ligne sur cet appareil.
+- **`src/components/OfflineBanner.tsx`.** Bandeau « Hors ligne —
+  dernières données à HH:mm », monté dans `layout.tsx`. `navigator.onLine`
+  seul n'étant pas fiable (reste `true` sur un wifi captif par exemple),
+  la connectivité réelle est vérifiée par un appel à `/api/version`
+  (existant, jamais mis en cache — voir 6.8) ; l'horodatage de la dernière
+  réponse reçue avec succès est gardé en `localStorage` pour survivre à un
+  rechargement.
+- **Nettoyage à la déconnexion.** `src/components/LogoutButton.tsx` vide
+  les caches `checkberry-pages-*`/`checkberry-static-*` (pas l'app shell,
+  qui ne contient aucune donnée personnelle) à la déconnexion : sur un
+  appareil partagé entre plusieurs membres de la famille, sans ce
+  nettoyage les données du compte qui se déconnecte resteraient
+  consultables hors ligne par la personne suivante — un risque de même
+  nature que la faille de confidentialité de 8.4, quoique plus limité
+  (seulement sur un appareil physiquement partagé, et seulement tant que
+  la personne suivante reste hors ligne).
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -1983,7 +2024,11 @@ création, modification ou suppression d'une tâche :
    icônes de l'app shell avaient changé) pour purger l'ancien cache chez
    les utilisateurs déjà installés, et `Cache-Control: no-cache` ajouté
    sur `/sw.js` (`next.config.mjs`) pour que les futures mises à jour du
-   service worker soient détectées sans délai.
+   service worker soient détectées sans délai. Le service worker met de
+   nouveau en cache des pages/données depuis le 13/09/2026 (v5, voir
+   6.22), mais uniquement en repli quand le réseau échoue — jamais comme
+   source servie en priorité, ce qui aurait reproduit exactement ce
+   piège.
 
 Les trois premiers sont spécifiques à Next.js (rendu serveur/CDN et
 navigation React) ; le quatrième vit entièrement dans le navigateur, en
@@ -2049,9 +2094,11 @@ Conservé ici pour mémoire.
 Conformément au phasage du cahier des charges :
 
 - Offline-first réel (file d'attente IndexedDB + réconciliation à la
-  reconnexion) — le service worker (`public/sw.js`) ne gère que le cache
-  de l'app shell (installabilité PWA) et les notifications push (voir
-  6.15), pas les mutations créées hors-ligne.
+  reconnexion pour les mutations créées hors ligne). Depuis le 13/09/2026,
+  le service worker (`public/sw.js`) gère la **consultation** hors ligne
+  des pages déjà visitées en plus de l'app shell et des notifications push
+  (voir 6.22) ; il ne gère toujours aucune écriture hors ligne — créer,
+  modifier ou clôturer quoi que ce soit exige une connexion.
 
 Les **notifications Web Push + pastille d'icône** et l'**interface
 d'administration des comptes** (initialement listées ici) sont désormais
@@ -2194,7 +2241,9 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/app/api/push/subscribe/route.ts` | Enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) |
 | `src/app/api/cron/reminders/route.ts` | Rappel quotidien d'échéance, appelé par Vercel Cron (voir 6.15) |
 | `vercel.json` | Déclare le Cron Job (`/api/cron/reminders`, 1×/jour) |
-| `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) |
+| `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) + cache de lecture hors ligne réseau-d'abord/repli-cache (voir 6.22) |
+| `public/offline.html` | Page de secours statique servie hors ligne pour une route jamais visitée (voir 6.22) |
+| `src/components/OfflineBanner.tsx` | Bandeau « Hors ligne — dernières données à HH:mm » (voir 6.22) |
 | `src/components/ServiceWorkerRegister.tsx` | Enregistrement du service worker + revérification à chaque retour au premier plan |
 | `src/components/AppUpdateWatcher.tsx` | Rafraîchissement automatique à l'ouverture si une nouvelle version est déployée (voir 6.8) |
 | `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |

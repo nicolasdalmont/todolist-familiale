@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AppSettings, Category, Member, RewardAchievement, RewardTier, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
@@ -14,11 +14,37 @@ import { IconBarChart, IconGift, IconSliders, IconTag, IconUsers } from "./Icons
 // des comptes), « Catégories » (catégories de tâches, puis — second bloc —
 // catégories d'activités de jardin, migration 004 : deux gestions
 // indépendantes, deux tables séparées, juste co-localisées dans cet onglet),
-// « Réglages » (rappel + infos d'instance), « Activité » (statistiques par
-// membre) et « Récompenses » (paliers de gamification, migration 002 — voir
-// src/lib/rewards.ts). Réservé au rôle admin, protégé côté serveur dans
-// src/app/admin/page.tsx.
+// « Réglages » (rappel, agendas + infos d'instance), « Activité »
+// (statistiques par membre) et « Récompenses » (paliers de gamification,
+// migration 002 — voir src/lib/rewards.ts). Réservé au rôle admin, protégé
+// côté serveur dans src/app/admin/page.tsx.
 type Tab = "members" | "categories" | "settings" | "activity" | "rewards";
+const TABS: Tab[] = ["members", "categories", "settings", "activity", "rewards"];
+
+// L'onglet actif vit dans l'URL (?tab=...) plutôt que dans un useState :
+// chaque panneau (UserManager, CategoryManager, SettingsPanel, ...) appelle
+// router.refresh() après une mutation pour re-synchroniser ses données
+// serveur, et un useState local ne survit pas à ce refresh sur cette page
+// dynamique (`force-dynamic`) — l'utilisateur se retrouvait renvoyé sur
+// « Membres » après la moindre action, quel que soit l'onglet où il se
+// trouvait. Dériver l'onglet de l'URL le rend immun à ce remount, puisqu'il
+// est recalculé à chaque rendu plutôt que conservé en mémoire.
+function useAdminTab(): [Tab, (tab: Tab) => void] {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const raw = searchParams.get("tab");
+  const tab: Tab = TABS.includes(raw as Tab) ? (raw as Tab) : "members";
+
+  function setTab(next: Tab) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  return [tab, setTab];
+}
 
 export function AdminScreen({
   currentUserId,
@@ -39,7 +65,7 @@ export function AdminScreen({
   rewardTiers: RewardTier[];
   rewardAchievements: RewardAchievement[];
 }) {
-  const [tab, setTab] = useState<Tab>("members");
+  const [tab, setTab] = useAdminTab();
 
   const tabs = [
     { value: "members" as const, label: "Membres", Icon: IconUsers },

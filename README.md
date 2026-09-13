@@ -113,7 +113,9 @@ numérotés, à exécuter à la main sur Neon). Tables : `users`, `tasks`,
 `challenge_results`, `reward_achievements` (paliers de récompense),
 `garden_activities`, `garden_activity_assignees`,
 `garden_activity_categories` (activités récurrentes du jardin),
-`notifications`, `push_subscriptions`.
+`car_activities`, `car_activity_assignees` (activités récurrentes de la
+voiture), `health_activities`, `health_activity_assignees` (activités
+récurrentes de santé), `notifications`, `push_subscriptions`.
 Aucune notion de policy/Row Level Security côté Neon : l'application se
 connecte en propriétaire de la base (`DATABASE_URL`) ; la visibilité
 partagée/privée est appliquée entièrement au niveau applicatif
@@ -145,6 +147,9 @@ partagée/privée est appliquée entièrement au niveau applicatif
   libre négociée en famille (pas de monnaie virtuelle). Suivi en
   attente/donné géré par l'admin ; affiché sur l'accueil une fois atteint.
   Voir la doc technique §6.18.
+- Menu **Agendas** (13/09/2026, `/agendas`) : regroupe les onglets Jardin,
+  Voiture et Santé (liens de menu remplaçant l'ancien lien direct
+  « Jardin »). Chacun a un lien retour vers `/agendas` en tête de page.
 - Onglet Jardin (13/09/2026) : activités récurrentes du jardin (taille,
   semis, plantation…), classées par mois avec un ou plusieurs
   responsables. Créer/modifier une activité crée/met à jour
@@ -153,9 +158,18 @@ partagée/privée est appliquée entièrement au niveau applicatif
   suivante. Catégories d'activités (Taille/Semis/Plantation/Autre)
   gérables depuis Admin → « Catégories », indépendantes des catégories de
   tâches. Voir la doc technique §6.19.
+- Onglet Voiture (13/09/2026) : activités récurrentes d'entretien de la
+  voiture (entretien, révision, contrôle technique, lavage…) — chaque
+  activité est une instance datée avec sa propre récurrence par
+  intervalle (jours/semaines/mois/années), triée chronologiquement.
+  Clôturer l'activité crée automatiquement l'occurrence suivante. Une
+  seule catégorie de tâche fixe (« Voiture »), pas de gestion de
+  catégories dédiée. Voir la doc technique §6.20.
+- Onglet Santé (13/09/2026) : même principe que Voiture (visites
+  médicales, dentiste, vaccins…). Voir la doc technique §6.21.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
-  (Accueil · Tâches · Jardin · Compte · Créer) et « tirer pour
+  (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour
   rafraîchir » ; sur desktop, navigation par le bandeau supérieur. Suite
   d'améliorations UX du 10/09/2026 (24 constats) : voir §6.16.
 

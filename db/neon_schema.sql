@@ -30,6 +30,10 @@ drop table if exists public.notifications cascade;
 drop table if exists public.reward_achievements cascade;
 drop table if exists public.challenge_results cascade;
 drop table if exists public.reward_tiers cascade;
+drop table if exists public.health_activity_assignees cascade;
+drop table if exists public.health_activities cascade;
+drop table if exists public.car_activity_assignees cascade;
+drop table if exists public.car_activities cascade;
 drop table if exists public.garden_activity_assignees cascade;
 drop table if exists public.garden_activities cascade;
 drop table if exists public.garden_activity_categories cascade;
@@ -85,7 +89,12 @@ create table public.tasks (
   -- de son activité (juste dépouillée de son origine).
   garden_activity_id uuid,
   garden_occurrence_month smallint,
-  garden_occurrence_year int
+  garden_occurrence_year int,
+  -- Origine "activité Voiture" (migration 005, voir src/lib/car.ts) et
+  -- "activité Santé" (migration 007, voir src/lib/health.ts) — même
+  -- convention "on delete set null" que garden_activity_id ci-dessus.
+  car_activity_id uuid,
+  health_activity_id uuid
 );
 
 create table public.task_assignees (
@@ -259,6 +268,62 @@ alter table public.tasks
   add constraint tasks_garden_activity_fkey
   foreign key (garden_activity_id) references public.garden_activities(id) on delete set null;
 
+-- Activités récurrentes de la voiture (migration 005, voir
+-- src/lib/car.ts) : contrairement à garden_activities (un ensemble de
+-- mois porté par une ligne persistante), chaque activité voiture EST une
+-- instance datée à part entière (jour+mois+année, ou mois+année si le
+-- jour est inconnu) avec sa propre récurrence par intervalle (même forme
+-- que tasks.recurrence) et un statut ; sa clôture crée une NOUVELLE ligne
+-- (l'instance suivante) plutôt que d'avancer un compteur sur celle-ci.
+create table public.car_activities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  due_date date not null,
+  day_known boolean not null default true,
+  recurrence jsonb not null default '{"type":"none"}',
+  status text not null default 'todo'
+    check (status in ('todo', 'in_progress', 'done', 'archived')),
+  created_by uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.car_activity_assignees (
+  car_activity_id uuid not null references public.car_activities(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  primary key (car_activity_id, user_id)
+);
+
+alter table public.tasks
+  add constraint tasks_car_activity_fkey
+  foreign key (car_activity_id) references public.car_activities(id) on delete set null;
+
+-- Activités récurrentes de santé (migration 007, voir src/lib/health.ts) :
+-- même modèle que car_activities ci-dessus (instance datée à part
+-- entière, pas un ensemble de périodes).
+create table public.health_activities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  due_date date not null,
+  day_known boolean not null default true,
+  recurrence jsonb not null default '{"type":"none"}',
+  status text not null default 'todo'
+    check (status in ('todo', 'in_progress', 'done', 'archived')),
+  created_by uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.health_activity_assignees (
+  health_activity_id uuid not null references public.health_activities(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  primary key (health_activity_id, user_id)
+);
+
+alter table public.tasks
+  add constraint tasks_health_activity_fkey
+  foreign key (health_activity_id) references public.health_activities(id) on delete set null;
+
 -- Notifications "À ton attention" par utilisateur.
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -300,6 +365,14 @@ create index if not exists push_subscriptions_user_idx on public.push_subscripti
 create unique index if not exists tasks_garden_open_occurrence_uidx
   on public.tasks(garden_activity_id)
   where garden_activity_id is not null and status not in ('done', 'archived');
+-- Même principe pour Voiture et Santé — voir advanceCarActivity()/
+-- advanceHealthActivity() (src/lib/car.ts, src/lib/health.ts).
+create unique index if not exists tasks_car_open_occurrence_uidx
+  on public.tasks(car_activity_id)
+  where car_activity_id is not null and status not in ('done', 'archived');
+create unique index if not exists tasks_health_open_occurrence_uidx
+  on public.tasks(health_activity_id)
+  where health_activity_id is not null and status not in ('done', 'archived');
 
 -- ---------------------------------------------------------------------
 -- 4. Amorçage minimal
@@ -330,7 +403,9 @@ insert into public.categories (slug, label, icon, position) values
   ('famille',  'Famille',  'users',    4),
   ('maison',   'Maison',   'home',     5),
   ('vacances', 'Vacances', 'sun',      6),
-  ('jardin',   'Jardin',   'leaf',     7)
+  ('jardin',   'Jardin',   'leaf',     7),
+  ('voiture',  'Voiture',  'car',      8),
+  ('sante',    'Santé',    'heart',    9)
 on conflict (slug) do nothing;
 
 insert into public.garden_activity_categories (slug, label, icon, position) values

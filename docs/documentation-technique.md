@@ -3,9 +3,19 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 13/09/2026. Lot de ce jour : **onglet Jardin —
-activités récurrentes** (6.19) : nouvel onglet entre Tâches et Admin/
-Compte, activités classées par mois avec responsables, génération et
+Dernière mise à jour : 13/09/2026. Lot de ce jour (le plus récent
+d'abord) : **lien retour vers `/agendas`** sur Jardin/Voiture/Santé
+(6.21) ; **onglet Santé — activités récurrentes** (6.21), réplique exacte
+de Voiture (migration `007_health_activities.sql`) ; **onglet Voiture —
+activités récurrentes d'entretien** (6.20) : nouvel onglet, chaque
+activité est une instance datée avec sa propre récurrence par intervalle
+(pas un ensemble de mois comme Jardin), génération/régénération
+automatique de la tâche associée par création d'une nouvelle instance à la
+clôture (migration `005_car_activities.sql`, icône dédiée ajoutée par
+`006_car_category_icon.sql`), menu « Jardin » remplacé par **« Agendas »**
+(`/agendas`, liste Jardin/Voiture/Santé) ; **onglet Jardin — activités
+récurrentes** (6.19) : nouvel onglet entre Tâches et Admin/Compte,
+activités classées par mois avec responsables, génération et
 régénération automatique de la tâche associée à la clôture/suppression
 (migration `003_garden_activities.sql`), catégories d'activités dédiées
 gérables depuis un second bloc de l'onglet « Catégories » de l'admin
@@ -204,6 +214,14 @@ sources complémentaires, toutes deux dans `db/` :
    - `004_garden_activity_categories.sql` — table
      `garden_activity_categories`, colonne `garden_activities.category`
      (voir 6.19).
+   - `005_car_activities.sql` — tables `car_activities`,
+     `car_activity_assignees`, colonne `tasks.car_activity_id`, catégorie
+     de tâche `voiture` (onglet Voiture, voir 6.20).
+   - `006_car_category_icon.sql` — bascule l'icône de la catégorie
+     `voiture` de `wrench` vers `car` (voir 6.20).
+   - `007_health_activities.sql` — tables `health_activities`,
+     `health_activity_assignees`, colonne `tasks.health_activity_id`,
+     catégorie de tâche `sante` (onglet Santé, voir 6.21).
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
@@ -260,6 +278,8 @@ depuis l'application.
 | `garden_activity_id` | uuid → `garden_activities.id`, nullable | `on delete set null` — origine « activité Jardin » (voir 6.19), `null` pour une tâche ordinaire |
 | `garden_occurrence_month` | smallint, nullable | Mois (1-12) de l'occurrence représentée par cette tâche — voir 6.19 |
 | `garden_occurrence_year` | int, nullable | Année de cette occurrence — voir 6.19 |
+| `car_activity_id` | uuid → `car_activities.id`, nullable | `on delete set null` — origine « activité Voiture » (voir 6.20) |
+| `health_activity_id` | uuid → `health_activities.id`, nullable | `on delete set null` — origine « activité Santé » (voir 6.21) |
 
 **`task_assignees`** — table de liaison many-to-many `tasks` ↔ `users`
 (une tâche peut être partagée avec plusieurs personnes), avec une colonne
@@ -1380,8 +1400,9 @@ modifications les plus visibles :
 
 - **Barre d'onglets en bas d'écran sur mobile** (`BottomNav.tsx`, montée
   une fois dans `layout.tsx`) : Accueil · Tâches · Jardin (ajouté le
-  13/09/2026, voir 6.19) · Compte · Créer, avec `aria-current` sur
-  l'onglet actif et `env(safe-area-inset-bottom)`.
+  13/09/2026, voir 6.19 — devenu **Agendas** le même jour, voir 6.20) ·
+  Compte · Créer, avec `aria-current` sur l'onglet actif et
+  `env(safe-area-inset-bottom)`.
   Masquée à partir de `sm` (le desktop garde le bandeau supérieur + le
   bouton flottant, lui devenu `sm:` uniquement). Se retire d'elle-même
   sur `/login`.
@@ -1764,6 +1785,94 @@ comportement **pré-existant** (reproduit à l'identique sur
 `CategoryManager.tsx`, catégories de tâches, non touché par ce lot),
 laissé tel quel.
 
+### 6.20 Voiture — activités récurrentes d'entretien (13/09/2026)
+
+Nouvel onglet **Voiture** (`IconCar`), sur le même principe que Jardin
+(6.19 : ouvert à tout utilisateur connecté, génération/régénération
+automatique de la tâche associée) mais avec un **modèle de données
+différent**. Contrairement à `garden_activities` (un ensemble de mois
+porté par une ligne persistante), chaque **activité voiture EST une
+instance datée** à part entière (jour+mois+année, ou mois+année si le
+jour est inconnu — `day_known`), avec sa propre récurrence par
+**intervalle** (réutilise le type `Recurrence`/`computeNextOccurrence()`
+des tâches ordinaires, pas un modèle bespoke comme Jardin) et son statut.
+
+**Modèle** (`car_activities`, `car_activity_assignees`, migration
+`005_car_activities.sql` — voir 5.2) : nom, description, `due_date`
+(date), `day_known` (booléen), `recurrence` (jsonb, même forme que
+`tasks.recurrence`), `status`, un ou plusieurs responsables.
+
+**Génération de tâche** (`src/lib/car.ts`, pas de `"use server"`, même
+montage que `garden.ts`) : création et modification suivent les mêmes
+règles que Jardin (titre/description/échéance/responsables réécrits à la
+modification, l'activité fait autorité), catégorie de tâche fixe
+`voiture`. La différence est dans la clôture : les hooks
+`setStatusAction`/`deleteTaskAction` (`src/lib/actions.ts`) déclenchent
+`advanceCarActivity()`, qui marque l'activité `done` **et crée une toute
+nouvelle ligne** `car_activities` pour l'occurrence suivante (au lieu
+d'avancer un compteur sur la même ligne comme `advanceGardenActivity()`)
+— sa date est calculée par `computeNextOccurrence()` (`src/lib/format.ts`,
+réutilisé tel quel plutôt que dupliqué). Une activité n'a donc jamais plus
+d'une tâche ouverte à la fois (index unique partiel
+`tasks_car_open_occurrence_uidx`, même principe que Jardin).
+
+**Écran** (`VoitureScreen.tsx`, `src/app/voiture/page.tsx`) : liste
+unique triée chronologiquement (pas de regroupement par mois : chaque
+activité n'apparaît qu'une fois), défilement automatique vers la première
+activité (la plus urgente, ou la plus en retard) au chargement, badge
+« En retard » (`isDateOnlyOverdue()`), formulaire avec case à cocher
+« Jour inconnu » (bascule entre `<input type="date">` et
+`<input type="month">`). Récurrence personnalisée avec une nouvelle unité
+**« années »** (`Recurrence.unit`, ajoutée le même jour dans
+`src/lib/types.ts`/`format.ts`/`TaskForm.tsx`/`VoitureScreen.tsx`, pour
+permettre par exemple un contrôle technique bisannuel). Avatars des
+responsables en vignettes superposées (`-space-x-2` + bordure), style
+ensuite aligné sur Jardin/tâches.
+
+**Catégorie de tâche.** `voiture` — seedée par la migration 005 avec
+l'icône générique `wrench` (partagée avec une catégorie d'activité de
+jardin), puis basculée sur une icône dédiée **`IconCar`** par la migration
+`006_car_category_icon.sql` (ajoutée à `CATEGORY_ICON_CHOICES`,
+`src/lib/categories.ts`). **Pas de système de catégories d'activités
+dédié** comme Jardin (6.19, second axe indépendant) : une seule catégorie
+fixe sur les tâches générées, gérable comme n'importe quelle autre depuis
+Admin → « Catégories » (bloc catégories de tâches).
+
+**Menu « Agendas ».** À cette occasion, le lien de menu « Jardin »
+(`Topbar.tsx` desktop, `BottomNav.tsx` mobile) a été remplacé par
+**« Agendas »**, qui mène vers `/agendas` : une page listant Jardin et
+Voiture (puis Santé, voir 6.21) sous forme de cartes-liens. Choix fait
+plutôt qu'un sous-menu déroulant — aucun composant de ce type n'existait
+dans le code — et la `BottomNav` (4 emplacements fixes) n'a donc pas eu
+besoin d'un emplacement supplémentaire.
+
+### 6.21 Santé — activités récurrentes (13/09/2026)
+
+Nouvel onglet **Santé** (`IconHeart`), réplique exacte du modèle Voiture
+(6.20) sur demande explicite de l'utilisateur : visites médicales,
+dentiste, vaccins… Tables `health_activities`/`health_activity_assignees`,
+colonne `tasks.health_activity_id` (migration
+`007_health_activities.sql`), logique dans `src/lib/health.ts`
+(`HEALTH_CATEGORY_SLUG = "sante"`, `advanceHealthActivity()`), Server
+Actions `src/lib/health-actions.ts`, lecture `src/lib/health-queries.ts`,
+écran `SanteScreen.tsx`, page `src/app/sante/page.tsx` — mêmes
+comportements que Voiture point par point (occurrence datée, récurrence
+par intervalle, une seule tâche ouverte à la fois, écran identique).
+Ajouté à la page `/agendas` aux côtés de Jardin et Voiture.
+
+**Seule différence avec Voiture** : l'icône dédiée existait déjà et
+n'était utilisée par aucune catégorie fixe (`IconHeart`, déjà présente
+dans `CATEGORY_ICON_CHOICES` sous le nom `heart`) — la migration 007 seed
+donc directement la catégorie `sante`/« Santé » avec cette icône, sans
+migration de correction a posteriori (contrairement à Voiture, migration
+006).
+
+**Lien retour vers Agendas.** Le même jour, un lien retour (`IconArrowLeft`,
+même pattern que les pages de détail de tâche — `flex h-9 w-9 ... rounded-xl
+border border-line`) a été ajouté en tête des pages Jardin, Voiture et
+Santé, pointant vers `/agendas`, pour revenir à la liste sans repasser par
+la `BottomNav`.
+
 ## 7. Routes de l'application
 
 | Route | Contenu |
@@ -1774,7 +1883,10 @@ laissé tel quel.
 | `/tasks/new` | Formulaire de création |
 | `/tasks/[id]` | Détail d'une tâche (statut, assignés/lecteurs, tags, checklist, commentaires, icône « Ajouter à mon agenda » si datée) — 404 si l'utilisateur n'a pas `canView` |
 | `/tasks/[id]/edit` | Formulaire de modification — 404 si l'utilisateur n'a pas `canEdit` |
+| `/agendas` | Page de liens vers Jardin, Voiture, Santé (voir 6.20) — ouverte à tout utilisateur connecté |
 | `/jardin` | Activités récurrentes du jardin, par mois (voir 6.19) — ouverte à tout utilisateur connecté |
+| `/voiture` | Activités récurrentes d'entretien de la voiture, liste chronologique (voir 6.20) — ouverte à tout utilisateur connecté |
+| `/sante` | Activités récurrentes de santé, liste chronologique (voir 6.21) — ouverte à tout utilisateur connecté |
 | `/compte` | Mon compte : identité, « Modifier mon mot de passe » et activation des notifications (voir 6.14) |
 | `/admin` | Statistiques par utilisateur (voir 6.9) — 404 si le compte n'a pas le rôle `admin` |
 | `/api/version` | Repère de version pour le rafraîchissement automatique (voir 6.8) — pas une page, aucune UI |

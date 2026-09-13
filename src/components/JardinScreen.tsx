@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Category, GardenActivity, Profile } from "@/lib/types";
 import { createGardenActivityAction, deleteGardenActivityAction, updateGardenActivityAction } from "@/lib/garden-actions";
 import { categoryBgColor, categoryIcon, categoryIconColor, resolveCategory } from "@/lib/categories";
@@ -255,6 +255,7 @@ export function JardinScreen({
   prefill?: { name: string; description: string; month: number | null };
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
@@ -263,6 +264,16 @@ export function JardinScreen({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<GardenActivity | null>(null);
+
+  // Nettoie les paramètres prefill* de l'URL une fois consommés : sinon un
+  // router.refresh() ultérieur (après création de l'activité) les relit et
+  // rouvre le formulaire avec les données de la tâche d'origine.
+  const clearedPrefill = useRef(false);
+  useEffect(() => {
+    if (clearedPrefill.current || !prefill) return;
+    clearedPrefill.current = true;
+    router.replace(pathname, { scroll: false });
+  }, [pathname, prefill, router]);
 
   const buckets = buildOccurrences(activities);
   const anchor = anchorMonth(buckets, currentMonth);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { CarActivity, Profile, Recurrence, RecurrenceType } from "@/lib/types";
 import { createCarActivityAction, deleteCarActivityAction, updateCarActivityAction } from "@/lib/car-actions";
 import { setStatusAction } from "@/lib/actions";
@@ -291,6 +291,7 @@ export function VoitureScreen({
   prefill?: AgendaActivityPrefill;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
@@ -300,6 +301,16 @@ export function VoitureScreen({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<CarActivity | null>(null);
+
+  // Nettoie les paramètres prefill* de l'URL une fois consommés : sinon un
+  // router.refresh() ultérieur (après création de l'activité) les relit et
+  // rouvre le formulaire avec les données de la tâche d'origine.
+  const clearedPrefill = useRef(false);
+  useEffect(() => {
+    if (clearedPrefill.current || !prefill) return;
+    clearedPrefill.current = true;
+    router.replace(pathname, { scroll: false });
+  }, [pathname, prefill, router]);
 
   const filtered = useMemo(
     () => activities.filter((a) => matchesQuery(a, query.trim().toLowerCase())),

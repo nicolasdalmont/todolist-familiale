@@ -9,6 +9,7 @@ import { StatusButtons } from "@/components/StatusButtons";
 import { ChecklistSection } from "@/components/ChecklistSection";
 import { CommentThread } from "@/components/CommentThread";
 import { Time } from "@/components/Time";
+import { HelpButton } from "@/components/HelpButton";
 import { IconArrowLeft, IconCalendar, IconCalendarPlus, IconPencil, IconRepeat, IconTag, IconUser, IconUsers } from "@/components/Icons";
 import { isOverdue, recurrenceLabel } from "@/lib/format";
 import { categoryIcon, categoryIconColor, resolveCategory } from "@/lib/categories";
@@ -72,6 +73,17 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
                 <IconPencil className="h-[18px] w-[18px]" />
               </Link>
             ) : null}
+            <HelpButton title="Détail de la tâche">
+              <p>Toutes les infos de la tâche, et selon ton rôle :</p>
+              <ul>
+                <li><strong>Assigné(e)</strong> : tu peux changer le statut, modifier la tâche, cocher la checklist et commenter.</li>
+                <li><strong>Lecture seule</strong> : tu peux seulement commenter.</li>
+              </ul>
+              <p>
+                L&apos;icône calendrier (si la tâche a une échéance) exporte un fichier{" "}
+                <code className="font-mono">.ics</code> pour l&apos;agenda de ton appareil.
+              </p>
+            </HelpButton>
           </div>
         </div>
 

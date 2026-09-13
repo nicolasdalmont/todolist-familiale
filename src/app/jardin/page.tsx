@@ -65,6 +65,7 @@ export default async function JardinPage({
             <p>Les activités récurrentes du jardin (taille, semis, plantation…), classées par mois.</p>
             <ul>
               <li>Chaque activité a un ou plusieurs responsables.</li>
+              <li>Une activité cochée sur plusieurs mois apparaît une fois par mois concerné.</li>
               <li>Créer ou modifier une activité crée/met à jour automatiquement la tâche de son mois.</li>
               <li>Clôturer ou supprimer cette tâche régénère automatiquement celle du mois suivant.</li>
             </ul>

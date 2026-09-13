@@ -391,6 +391,24 @@ export function IconWrench({ className = "" }: IconProps) {
 // Suppression d'un élément entier (activité de jardin, membre…) — distinct
 // de IconX (annuler/retirer un petit item de checklist) : une corbeille
 // signale une action destructive plus lourde.
+export function IconCar({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M4 16v-3.2a1 1 0 0 1 .1-.44l1.6-3.4A2 2 0 0 1 7.5 8h9a2 2 0 0 1 1.8 1.14l1.7 3.5c.07.13.1.28.1.42V16"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M4 16h16v2a1 1 0 0 1-1 1h-1.5a1 1 0 0 1-1-1v-1H7.5v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M6.5 13h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="7.5" cy="16.2" r="1.1" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="16.5" cy="16.2" r="1.1" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
 export function IconTrash({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">

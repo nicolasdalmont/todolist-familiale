@@ -19,6 +19,7 @@ import { safeNextPath } from "@/lib/nav";
 import { actorName, notifyTaskParticipants, notifyUser } from "@/lib/notifications";
 import { FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import { advanceGardenActivity } from "@/lib/garden";
+import { advanceCarActivity } from "@/lib/car";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus, Visibility } from "@/lib/types";
 
 // Vérifie les droits d'un utilisateur sur une tâche par son id, sans avoir
@@ -492,16 +493,29 @@ export async function deleteTaskAction(formData: FormData) {
   // advanceGardenActivity(), src/lib/garden.ts) — la suppression d'une tâche
   // Jardin déclenche la même régénération que sa clôture.
   const gardenRows = await sql`
-    select garden_activity_id, garden_occurrence_month, garden_occurrence_year from tasks where id = ${taskId}
+    select garden_activity_id, garden_occurrence_month, garden_occurrence_year, car_activity_id from tasks where id = ${taskId}
   `;
   const gardenTask = gardenRows[0] as
-    | { garden_activity_id: string | null; garden_occurrence_month: number | null; garden_occurrence_year: number | null }
+    | {
+        garden_activity_id: string | null;
+        garden_occurrence_month: number | null;
+        garden_occurrence_year: number | null;
+        car_activity_id: string | null;
+      }
     | undefined;
 
   await sql`delete from tasks where id = ${taskId}`;
 
   if (gardenTask?.garden_activity_id && gardenTask.garden_occurrence_month && gardenTask.garden_occurrence_year) {
     await advanceGardenActivity(gardenTask.garden_activity_id, gardenTask.garden_occurrence_month, gardenTask.garden_occurrence_year);
+  }
+
+  // Origine "activité Voiture" (migration 005) : la suppression d'une tâche
+  // Voiture clôt l'activité et déclenche la création de l'instance suivante
+  // — même comportement que Jardin ci-dessus, voir advanceCarActivity()
+  // (src/lib/car.ts).
+  if (gardenTask?.car_activity_id) {
+    await advanceCarActivity(gardenTask.car_activity_id);
   }
 
   if (recipients.length > 0) {
@@ -550,6 +564,7 @@ export async function setStatusAction(taskId: string, status: string) {
         garden_activity_id: string | null;
         garden_occurrence_month: number | null;
         garden_occurrence_year: number | null;
+        car_activity_id: string | null;
       }
     | undefined;
   if (!task) return;
@@ -634,6 +649,16 @@ export async function setStatusAction(taskId: string, status: string) {
   // périodes est gérée par garden_activities, pas par tasks.recurrence).
   if (status === "done" && task.garden_activity_id && task.garden_occurrence_month && task.garden_occurrence_year) {
     await advanceGardenActivity(task.garden_activity_id, task.garden_occurrence_month, task.garden_occurrence_year);
+  }
+
+  // Origine "activité Voiture" (migration 005) : sa clôture clôt l'activité
+  // et crée l'instance suivante si elle est récurrente — voir
+  // advanceCarActivity(), src/lib/car.ts. Indépendant du bloc de récurrence
+  // générique ci-dessus : une tâche Voiture porte toujours
+  // recurrence.type = "none" (la récurrence par intervalle est gérée par
+  // car_activities, pas par tasks.recurrence).
+  if (status === "done" && task.car_activity_id) {
+    await advanceCarActivity(task.car_activity_id);
   }
 
   revalidatePath("/");

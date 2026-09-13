@@ -48,6 +48,15 @@ export function formatDateOnly(iso: string): string {
   });
 }
 
+// Mois + année seuls (ex. "mars 2027") — activité voiture dont le jour est
+// inconnu (onglet Voiture, migration 005). `iso` est une date "YYYY-MM-DD"
+// ou un instant ISO ; seule la partie date compte.
+export function formatMonthYear(iso: string): string {
+  const [y, m] = iso.slice(0, 10).split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, 1, 12));
+  return d.toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
 // « à l'instant / n min / n h / hier / il y a n j » jusqu'à une semaine,
 // puis une date absolue — au-delà, « 47 j » ne veut plus rien dire pour
 // personne (audit UX INC-6). Passé/futur : on ne gère ici que le passé
@@ -70,6 +79,15 @@ export function relativeTime(iso: string): string {
 export function isOverdue(dueAt: string | null, status: TaskStatus): boolean {
   if (!dueAt) return false;
   return new Date(dueAt).getTime() < Date.now() && status !== "done" && status !== "archived";
+}
+
+// Variante date seule (sans heure) — activités voiture (`due_date`,
+// migration 005) : comparaison sur le jour civil à Paris plutôt que sur un
+// instant, sinon une activité "pour aujourd'hui" apparaîtrait en retard
+// dès 00h01.
+export function isDateOnlyOverdue(dueDate: string, status: TaskStatus): boolean {
+  if (status === "done" || status === "archived") return false;
+  return dueDate.slice(0, 10) < dateKeyFromDate(new Date());
 }
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {

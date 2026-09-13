@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconChecklist, IconHome, IconLeaf, IconPlus, IconUser } from "./Icons";
+import { IconCalendar, IconChecklist, IconHome, IconPlus, IconUser } from "./Icons";
 
 // Barre d'onglets en bas d'écran, mobile uniquement (audit UX UX-1) :
 // l'app n'avait aucune navigation principale persistante à portée du
@@ -17,7 +17,12 @@ export function BottomNav() {
   const items = [
     { href: "/", label: "Accueil", Icon: IconHome, active: pathname === "/" },
     { href: "/tasks", label: "Tâches", Icon: IconChecklist, active: pathname.startsWith("/tasks") && pathname !== "/tasks/new" },
-    { href: "/jardin", label: "Jardin", Icon: IconLeaf, active: pathname.startsWith("/jardin") },
+    {
+      href: "/agendas",
+      label: "Agendas",
+      Icon: IconCalendar,
+      active: pathname.startsWith("/agendas") || pathname.startsWith("/jardin") || pathname.startsWith("/voiture"),
+    },
     { href: "/compte", label: "Compte", Icon: IconUser, active: pathname.startsWith("/compte") },
   ];
 

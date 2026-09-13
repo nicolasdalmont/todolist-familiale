@@ -279,3 +279,22 @@ export interface GardenActivity {
   assignees: Pick<Profile, "id" | "name" | "color">[];
   openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
 }
+
+// Activité récurrente de la voiture (onglet Voiture, migration 005) — voir
+// src/lib/car.ts. Contrairement à GardenActivity (une définition
+// persistante portant un ensemble de mois), chaque CarActivity EST une
+// instance datée : sa clôture crée une NOUVELLE ligne (l'instance
+// suivante) plutôt que d'avancer un compteur sur celle-ci.
+export interface CarActivity {
+  id: string;
+  name: string;
+  description: string;
+  dueDate: string; // "YYYY-MM-DD"
+  dayKnown: boolean;
+  recurrence: Recurrence;
+  status: TaskStatus;
+  createdBy: string;
+  createdAt: string;
+  assignees: Pick<Profile, "id" | "name" | "color">[];
+  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+}

@@ -42,8 +42,10 @@ export default async function NewTaskPage() {
               </li>
               <li>La récurrence ne se déclenchera qu&apos;avec une échéance posée.</li>
               <li>
-                Le partage est privé par défaut : choisis « Lecture seule » ou « Assigné(e) » pour
-                chaque personne.
+                Le partage est <strong>privé par défaut</strong> (visible seulement par toi). Pour
+                chaque personne, choisis « Lecture seule » (elle peut voir et commenter) ou
+                « Assigné(e) » (elle peut aussi modifier la tâche et changer son statut). Toi, le
+                créateur ou la créatrice, gardes toujours un accès complet.
               </li>
             </ul>
           </HelpButton>

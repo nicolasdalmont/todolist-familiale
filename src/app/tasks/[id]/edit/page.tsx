@@ -41,9 +41,14 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
             <h2 className="text-lg font-extrabold">Modifier la tâche</h2>
           </div>
           <HelpButton title="Modifier la tâche">
-            <p>Les mêmes champs qu&apos;à la création (titre, description, échéance, catégorie, récurrence, tags, partage).</p>
+            <p>Les mêmes champs qu&apos;à la création (titre, description, échéance, catégorie, récurrence, tags).</p>
             <ul>
               <li>Le statut se change aussi ici (ou depuis l&apos;écran de détail).</li>
+              <li>
+                Le partage peut être changé à tout moment : « Lecture seule » (voir et commenter) ou
+                « Assigné(e) » (voir, modifier et changer le statut) pour chaque personne. Retirer
+                l&apos;accès de quelqu&apos;un lui masque aussitôt la tâche.
+              </li>
               <li>« Supprimer la tâche » est définitif : commentaires et checklist partent avec elle.</li>
             </ul>
           </HelpButton>

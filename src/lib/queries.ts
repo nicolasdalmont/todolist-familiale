@@ -105,11 +105,16 @@ export async function getTags(): Promise<Tag[]> {
 
 // Récupère l'id de chaque tag nommé, en créant ceux qui n'existent pas
 // encore (utilisateur libre de taper un nouveau tag dans le formulaire).
-// Les noms sont normalisés (espaces retirés, minuscules) pour éviter les
-// doublons du type "Maison" / "maison".
+// Les noms sont normalisés (espaces retirés, minuscules, # de tête retiré —
+// le # est déjà ajouté à l'affichage, voir TaskForm.tsx) pour éviter les
+// doublons du type "Maison" / "maison" / "#maison".
 export async function upsertTagIds(names: string[]): Promise<string[]> {
   const normalized = Array.from(
-    new Set(names.map((n) => n.trim().toLowerCase()).filter((n) => n.length > 0))
+    new Set(
+      names
+        .map((n) => n.trim().replace(/^#+/, "").trim().toLowerCase())
+        .filter((n) => n.length > 0)
+    )
   );
   if (normalized.length === 0) return [];
 

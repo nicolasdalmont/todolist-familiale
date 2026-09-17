@@ -96,7 +96,10 @@ export function TaskForm({
   }
 
   function addNewTag() {
-    const name = newTag.trim().toLowerCase();
+    // Le # est déjà ajouté à l'affichage (juste en dessous) : on le retire
+    // si l'utilisateur l'a tapé lui-même, pour ne pas se retrouver avec un
+    // tag "##montag".
+    const name = newTag.trim().replace(/^#+/, "").trim().toLowerCase();
     if (!name) return;
     if (!tagOptions.includes(name)) {
       setTagOptions((prev) => [...prev, name].sort((a, b) => a.localeCompare(b)));

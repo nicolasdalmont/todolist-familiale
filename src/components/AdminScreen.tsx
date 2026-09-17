@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { AppSettings, Category, Member, RewardAchievement, RewardTier, UserStats } from "@/lib/types";
+import type { AppSettings, Category, Member, RewardAchievement, RewardTier, Tag, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
 import { GardenCategoryManager } from "./GardenCategoryManager";
+import { TagManager } from "./TagManager";
 import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
 import { RewardManager } from "./RewardManager";
@@ -68,10 +69,14 @@ const HELP_CONTENT: Record<Tab, { title: string; body: React.ReactNode }> = {
     title: "Catégories",
     body: (
       <>
-        <p>Deux gestions indépendantes, l&apos;une sous l&apos;autre :</p>
+        <p>Trois gestions indépendantes, l&apos;une sous l&apos;autre :</p>
         <ul>
           <li><strong>Catégories de tâches</strong> : nom, icône, ordre — utilisées partout dans l&apos;appli.</li>
           <li><strong>Catégories d&apos;activités de jardin</strong> : propres à l&apos;onglet Jardin, sans lien avec les précédentes.</li>
+          <li>
+            <strong>Tags</strong> : supprimer un tag, ou en fusionner deux (les tâches du premier basculent sur le
+            second, qui disparaît) — pour éviter que la liste ne s&apos;éparpille au fil du temps.
+          </li>
         </ul>
       </>
     ),
@@ -116,6 +121,7 @@ export function AdminScreen({
   members,
   categories,
   gardenCategories,
+  tags,
   settings,
   stats,
   rewardTiers,
@@ -125,6 +131,7 @@ export function AdminScreen({
   members: Member[];
   categories: Category[];
   gardenCategories: Category[];
+  tags: Tag[];
   settings: AppSettings;
   stats: UserStats[];
   rewardTiers: RewardTier[];
@@ -188,6 +195,10 @@ export function AdminScreen({
           <div className="border-t border-line-soft pt-6">
             <h3 className="mb-3 text-sm font-bold">Catégories d&apos;activités de jardin</h3>
             <GardenCategoryManager categories={gardenCategories} />
+          </div>
+          <div className="border-t border-line-soft pt-6">
+            <h3 className="mb-3 text-sm font-bold">Tags</h3>
+            <TagManager tags={tags} />
           </div>
         </div>
       ) : tab === "settings" ? (

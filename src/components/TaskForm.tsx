@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createTaskAction, deleteTaskAction, updateTaskAction } from "@/lib/actions";
 import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOverlay";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SimilarTagsDialog } from "@/components/SimilarTagsDialog";
 import { setFlash } from "@/components/Toast";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { categoryIcon, categoryIconColor, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
@@ -57,20 +58,18 @@ function closeTagThreshold(len: number): number {
   return len <= 4 ? 1 : 2;
 }
 
-// Renvoie le tag existant le plus proche de `name` s'il est à distance
-// tolérée, sinon null (aucun tag suffisamment proche, ou déjà le tag exact).
-function findClosestTag(name: string, existing: string[]): string | null {
-  let best: string | null = null;
-  let bestDistance = Infinity;
-  for (const candidate of existing) {
-    if (candidate === name) continue;
-    const distance = levenshteinDistance(name, candidate);
-    if (distance <= closeTagThreshold(Math.min(name.length, candidate.length)) && distance < bestDistance) {
-      best = candidate;
-      bestDistance = distance;
-    }
-  }
-  return best;
+// Renvoie les tags existants à distance tolérée de `name` (faute de frappe,
+// pluriel...), les plus proches d'abord — peut y en avoir plusieurs (ex :
+// "vacance", "vacances" et "vacances2024" tous proches de "vacanse").
+// Plafonné à 5 pour ne pas proposer une liste sans fin.
+function findCloseTags(name: string, existing: string[]): string[] {
+  return existing
+    .filter((candidate) => candidate !== name)
+    .map((candidate) => ({ candidate, distance: levenshteinDistance(name, candidate) }))
+    .filter(({ candidate, distance }) => distance <= closeTagThreshold(Math.min(name.length, candidate.length)))
+    .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate))
+    .slice(0, 5)
+    .map(({ candidate }) => candidate);
 }
 
 export function TaskForm({
@@ -101,10 +100,11 @@ export function TaskForm({
     categories.find((c) => c.slug === FALLBACK_CATEGORY_SLUG)?.slug ?? categories[0]?.slug ?? FALLBACK_CATEGORY_SLUG;
   const [category, setCategory] = useState(task?.category ?? defaultCategory);
   const [agendaPrompt, setAgendaPrompt] = useState<{ slug: string; label: string; path: string } | null>(null);
-  // Tag proche détecté à la création d'un nouveau tag (voir addNewTag) :
-  // `input` est ce que l'utilisateur a tapé, `match` le tag existant le plus
-  // proche, proposé en alternative avant de créer un quasi-doublon.
-  const [similarTagPrompt, setSimilarTagPrompt] = useState<{ input: string; match: string } | null>(null);
+  // Tag(s) proche(s) détecté(s) à la création d'un nouveau tag (voir
+  // addNewTag) : `input` est ce que l'utilisateur a tapé, `matches` les tags
+  // existants les plus proches (il peut y en avoir plusieurs), proposés en
+  // alternative avant de créer un quasi-doublon.
+  const [similarTagPrompt, setSimilarTagPrompt] = useState<{ input: string; matches: string[] } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const recurrenceIntervalRef = useRef<HTMLInputElement>(null);
@@ -162,11 +162,12 @@ export function TaskForm({
       createNewTag(name);
       return;
     }
-    // Orthographe proche d'un tag existant : on prévient avant de créer un
-    // quasi-doublon, plutôt que de laisser la liste s'éparpiller.
-    const close = findClosestTag(name, tagOptions);
-    if (close) {
-      setSimilarTagPrompt({ input: name, match: close });
+    // Orthographe proche d'un ou plusieurs tags existants : on prévient
+    // avant de créer un quasi-doublon, plutôt que de laisser la liste
+    // s'éparpiller.
+    const close = findCloseTags(name, tagOptions);
+    if (close.length > 0) {
+      setSimilarTagPrompt({ input: name, matches: close });
       return;
     }
     createNewTag(name);
@@ -528,24 +529,19 @@ export function TaskForm({
         />
       ) : null}
 
-      <ConfirmDialog
+      <SimilarTagsDialog
         open={similarTagPrompt !== null}
-        title={similarTagPrompt ? `Tag proche : #${similarTagPrompt.match}` : ""}
-        body={
-          similarTagPrompt
-            ? `#${similarTagPrompt.input} ressemble beaucoup à #${similarTagPrompt.match}, déjà utilisé. Pour éviter les doublons, mieux vaut réutiliser ce tag existant.`
-            : ""
-        }
-        confirmLabel={similarTagPrompt ? `Utiliser #${similarTagPrompt.match}` : ""}
-        cancelLabel={similarTagPrompt ? `Créer #${similarTagPrompt.input} quand même` : ""}
-        onCancel={() => {
+        input={similarTagPrompt?.input ?? ""}
+        matches={similarTagPrompt?.matches ?? []}
+        onUseTag={(name) => {
+          createNewTag(name);
+          setSimilarTagPrompt(null);
+        }}
+        onCreateAnyway={() => {
           if (similarTagPrompt) createNewTag(similarTagPrompt.input);
           setSimilarTagPrompt(null);
         }}
-        onConfirm={() => {
-          if (similarTagPrompt) createNewTag(similarTagPrompt.match);
-          setSimilarTagPrompt(null);
-        }}
+        onCancel={() => setSimilarTagPrompt(null)}
       />
 
       <ConfirmDialog

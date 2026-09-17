@@ -465,6 +465,16 @@ export async function updateTaskAction(formData: FormData) {
   await syncTaskTags(taskId, tagNames);
   await syncChecklistItems(taskId, checklistItems);
 
+  // Ajouter un item de checklist compte comme jour actif du streak
+  // personnel (voir 6.17) — avant ce fichier ne le faisait qu'à la création
+  // d'un item via l'ancienne addChecklistItemAction, jamais à une
+  // modification de tâche en général : on ne le déclenche donc que si au
+  // moins un item réellement nouveau (sans id) a été soumis, pas pour un
+  // simple renommage/suppression.
+  if (checklistItems.some((item) => !item.id)) {
+    await logUserActivity(userId);
+  }
+
   if (visibility === "shared") {
     await logActivity({ taskId, actorId: userId, type: "task_updated", taskTitle: title });
 

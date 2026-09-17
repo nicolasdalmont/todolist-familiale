@@ -4,10 +4,20 @@
 `nicolasdalmont/todolist-familiale`.)*
 
 Dernière mise à jour : 17/09/2026. Lot de ce jour (le plus récent
-d'abord) : **checklist gérable depuis l'édition de la tâche** (6.10) :
-`ChecklistSection.tsx` réutilisée telle quelle au-dessus du formulaire
-d'édition, en plus de l'écran de détail (qui reste inchangé) ; **tags —
-garde-fous anti-doublons** (6.4, 6.9) : impossible de créer un tag
+d'abord) : **checklist — gestion déplacée dans le formulaire de tâche**
+(6.10) : créer/renommer/supprimer un item se fait désormais dans
+`TaskForm.tsx`, juste sous la description, en création comme en édition
+(sérialisé en JSON dans un champ caché, diff explicite côté serveur —
+`syncChecklistItems()` — pour préserver l'état coché des items existants
+plutôt qu'un delete + insert intégral) ; l'écran de détail
+(`ChecklistSection.tsx`, très simplifiée) ne permet plus que de cocher/
+décocher ; `addChecklistItemAction`/`deleteChecklistItemAction`
+supprimées ; au passage, correctif du streak personnel (6.17) — ajouter un
+item de checklist en édition ne comptait plus comme jour actif depuis ce
+déplacement (`updateTaskAction` n'appelait pas `logUserActivity()`),
+rétabli en le déclenchant seulement quand au moins un item réellement
+nouveau est soumis (pas un simple renommage) ; **tags — garde-fous
+anti-doublons** (6.4, 6.9) : impossible de créer un tag
 `#montag` (`#` de tête retiré, client + serveur) ; à la création d'un tag
 à l'orthographe proche d'un ou plusieurs tags existants (distance de
 Levenshtein), `SimilarTagsDialog.tsx` propose de réutiliser un tag
@@ -1121,26 +1131,47 @@ Neon ») plutôt qu'une erreur Postgres brute — même principe que l'onglet
 
 ### 6.10 Checklist par tâche
 
-Chaque tâche peut porter une checklist (sous-tâches à cocher), gérée par
-`ChecklistSection.tsx` — ajout, coche, suppression d'un item — sur le même
-principe que les commentaires mais en plus immédiat (chaque action
-recharge la page via `router.refresh()`, pas de redirection, et
-indépendamment du formulaire de tâche : pas de `<form>` imbriqué).
+Chaque tâche peut porter une checklist (sous-tâches à cocher). Depuis le
+**17/09/2026**, la gestion est scindée entre deux écrans avec des
+responsabilités disjointes — précédemment tout se faisait depuis l'écran
+de détail (ajout/coche/suppression au même endroit), jugé moins logique
+que de la traiter avec le reste du contenu de la tâche :
 
-**Gérable à deux endroits (édition ajoutée le 17/09/2026)** :
-`ChecklistSection` reste affichée sur l'écran de détail (coche au fil de
-l'eau pendant qu'on fait la tâche) **et** au-dessus du formulaire sur
-l'écran d'édition (`src/app/tasks/[id]/edit/page.tsx`), plus logique pour
-la gérer avec le reste du contenu de la tâche. Même composant, deux points
-d'entrée, pas d'état partagé entre les deux (chacun recharge sa propre
-page).
+- **Créer/renommer/supprimer un item** : dans `TaskForm.tsx`, juste sous
+  le champ Description, en création **et** en édition. Chaque item
+  existant est un `<input>` texte directement modifiable (pas de bouton
+  « modifier » séparé — taper dedans suffit) ; un item ajouté est en local
+  jusqu'à l'enregistrement du formulaire, comme les tags (voir 6.4) : pas
+  d'action serveur immédiate possible en création, la tâche n'a pas encore
+  d'id. L'ensemble est sérialisé en JSON dans un champ caché
+  (`name="checklist"`, `{id?, label}[]` — `id` absent pour un item pas
+  encore en base) et traité à l'enregistrement par `syncChecklistItems()`
+  (`src/lib/actions.ts`), appelée par `createTaskAction`/
+  `updateTaskAction` : un **diff explicite**, pas un delete + insert
+  intégral comme `syncTaskTags` — supprime les items retirés, renomme
+  ceux qui ont un id (sans toucher `done`), insère les nouveaux. Un
+  delete + insert aurait réinitialisé l'état coché de tous les items
+  existants à chaque enregistrement de tâche, y compris sans rapport avec
+  la checklist.
+- **Cocher/décocher un item** : uniquement depuis l'écran de détail
+  (`ChecklistSection.tsx`, très simplifiée depuis ce changement — ne
+  contient plus qu'une liste de cases à cocher, plus de formulaire d'ajout
+  ni de bouton supprimer). Optimiste (audit UX UX-4) : la case réagit tout
+  de suite via un état local `overrides`, l'aller-retour serveur
+  (`toggleChecklistItemAction`) se fait en fond, `overrides` est purgé
+  à l'arrivée de `items` rafraîchis. Si la checklist est vide, la section
+  ne s'affiche pas du tout sur cet écran (rien à y faire).
 
-Contrairement aux commentaires (ouverts aux lecteurs pour l'ajout —
-voir 6.5), ajouter/cocher/supprimer un item exige `canEdit` : une
-checklist fait partie du contenu de la tâche, pas d'une discussion
-autour. Un utilisateur qui n'a que `canView` voit la checklist (barre de
-progression + items, cases à cocher désactivées) sans pouvoir la
-modifier ; si elle est vide, la section ne s'affiche même pas pour lui.
+`addChecklistItemAction`/`deleteChecklistItemAction` ont été supprimées
+(devenues inutilisées) ; `toggleChecklistItemAction` reste la seule action
+serveur immédiate côté checklist.
+
+Comme pour les commentaires (voir 6.5), tout ceci — créer/renommer/
+supprimer **et** cocher — exige `canEdit` : une checklist fait partie du
+contenu de la tâche, pas d'une discussion autour. Un utilisateur qui n'a
+que `canView` voit la checklist sur l'écran de détail (cases à cocher
+désactivées) sans pouvoir la modifier, et n'a de toute façon pas accès au
+formulaire d'édition (voir 6.1, `canEdit`).
 
 **Indicateur d'avancement dans la liste** (`TaskCard.tsx`) : dès qu'une
 tâche a au moins un item de checklist, une mini barre de progression et
@@ -1234,9 +1265,15 @@ d'autre ne pourrait de toute façon voir cette activité) :
 | `setStatusAction` | `status_changed` (detail = libellé du nouveau statut) |
 | `addCommentAction` | `comment_added` |
 | `deleteCommentAction` | `comment_deleted` |
-| `addChecklistItemAction` | `checklist_item_added` (detail = libellé de l'item) |
 | `toggleChecklistItemAction` | `checklist_item_checked` / `checklist_item_unchecked` (detail = libellé) |
-| `deleteChecklistItemAction` | `checklist_item_removed` (detail = libellé de l'item, lu avant suppression) |
+
+**`checklist_item_added`/`checklist_item_removed` (17/09/2026)** : plus
+émis depuis que créer/renommer/supprimer un item de checklist se fait dans
+`TaskForm.tsx` (voir 6.10) — ce changement remonte simplement en
+`task_updated` comme les autres champs du formulaire (titre, tags...),
+sans entrée dédiée. Les types restent dans `ActivityType` (`src/lib/
+types.ts`) pour continuer à afficher correctement les entrées déjà
+écrites avant cette date.
 
 Chaque ligne enregistre `task_id`, `actor_id` (l'utilisateur qui a fait
 l'action), `type`, `task_title` (recopié au moment de l'action) et un
@@ -1535,11 +1572,14 @@ modifications les plus visibles :
   ramassé par le provider au montage suivant.
 - **Confirmation de suppression d'une tâche** : `ConfirmDialog.tsx` à la
   marque remplace `window.confirm()`.
-- **Suppression annulable** des commentaires et des items de checklist
-  (`useUndoableDelete.ts`) : l'élément disparaît immédiatement, un toast
-  « … supprimé · Annuler » laisse ~5 s, l'appel serveur n'est envoyé qu'à
-  l'expiration du délai (ou tout de suite si l'écran est quitté avant —
-  flush au démontage).
+- **Suppression annulable** des commentaires (`useUndoableDelete.ts`) :
+  l'élément disparaît immédiatement, un toast « … supprimé · Annuler »
+  laisse ~5 s, l'appel serveur n'est envoyé qu'à l'expiration du délai (ou
+  tout de suite si l'écran est quitté avant — flush au démontage). Les
+  items de checklist utilisaient aussi ce mécanisme jusqu'au 17/09/2026 ;
+  depuis que leur suppression se fait dans le formulaire de tâche (voir
+  6.10), elle n'est plus qu'un retrait d'état local, annulable simplement
+  en quittant le formulaire sans enregistrer.
 - **UI optimiste** pour cocher un item de checklist (`ChecklistSection.tsx`,
   état local `overrides`) : la case réagit sans figer l'écran. Implémenté
   à la main, `useOptimistic` n'existant pas dans React 18.3.
@@ -1605,8 +1645,10 @@ modifications les plus visibles :
 **Cohérence visuelle**
 
 - **Boutons « Ajouter »** harmonisés (INC-2) : plein identique pour
-  l'ajout principal d'un bloc (commentaire, item de checklist), contour
-  pour l'ajout secondaire dans un champ composite (nouveau tag).
+  l'ajout principal d'un bloc (commentaire), contour pour l'ajout
+  secondaire dans un champ composite (nouveau tag, et depuis le
+  17/09/2026 item de checklist — qui a rejoint ce second groupe en
+  déménageant dans le formulaire de tâche, voir 6.10).
 - **État vide unifié** (`EmptyState.tsx`, INC-4) : un seul traitement
   (encadré pointillé, texte centré estompé) pour les sections qui restent
   affichées même vides — liste de tâches, commentaires, checklist,
@@ -1650,10 +1692,19 @@ information privée si cette table venait un jour à être affichée ailleurs
 que sous forme de compte. Actions qui comptent comme « jour actif » :
 créer une tâche (`createTaskAction`), clôturer une tâche
 (`setStatusAction`, seulement vers `done`), ajouter un commentaire
-(`addCommentAction`), ajouter un item de checklist
-(`addChecklistItemAction`), **cocher** un item de checklist
-(`toggleChecklistItemAction`, seulement `done → true` : décocher, qui
-sert à corriger une erreur, ne compte pas).
+(`addCommentAction`), ajouter un item de checklist, **cocher** un item de
+checklist (`toggleChecklistItemAction`, seulement `done → true` :
+décocher, qui sert à corriger une erreur, ne compte pas).
+
+**Ajouter un item de checklist (mis à jour le 17/09/2026)** : comptait via
+l'ancienne `addChecklistItemAction`, appelée à chaque ajout depuis l'écran
+de détail. Depuis que l'ajout se fait dans `updateTaskAction`/
+`createTaskAction` (voir 6.10), `updateTaskAction` appelle
+`logUserActivity()` seulement si au moins un item **sans id** (donc
+réellement nouveau, pas un simple renommage) a été soumis — sinon éditer
+une tâche sans toucher à sa checklist compterait à tort comme un jour
+actif. `createTaskAction`, lui, appelle déjà `logUserActivity()`
+inconditionnellement pour la création de la tâche elle-même.
 
 `computeStreak(activeDays, todayKey)` parcourt les jours en arrière depuis
 aujourd'hui (borné à 400 jours, `MAX_LOOKBACK_DAYS`) : un jour actif
@@ -2226,13 +2277,18 @@ par cas :
 - Jardin précise qu'une activité cochée sur plusieurs mois apparaît une
   fois par mois concerné (regroupement par mois de `JardinScreen.tsx`, une
   même activité listée dans chacun de ses buckets de mois).
-- Détail de la tâche précise que la checklist se **gère** (ajout, coche,
-  suppression d'items, pas seulement cocher) et qui peut supprimer un
-  commentaire (son auteur, ou le créateur de la tâche pour tous).
+- Détail de la tâche précise, depuis le 17/09/2026, que cocher/décocher la
+  checklist reste possible ici mais qu'ajouter/renommer/supprimer un item
+  se fait désormais depuis « Modifier la tâche » (voir 6.10) — et qui peut
+  supprimer un commentaire (son auteur, ou le créateur de la tâche pour
+  tous).
 - Nouvelle tâche / Modifier la tâche détaillent le partage : « Lecture
   seule » (voir + commenter) vs « Assigné(e) » (voir, modifier, changer le
   statut + commenter), le créateur garde toujours un accès complet, et
   retirer l'accès de quelqu'un à l'édition lui masque aussitôt la tâche.
+  Modifier la tâche précise aussi (17/09/2026) que la checklist se gère
+  ici, juste sous la description (ajouter/renommer/supprimer), et que
+  cocher/décocher reste réservé à l'écran de détail.
 
 ## 8. Limites connues et points d'attention
 
@@ -2339,8 +2395,8 @@ Tous les champs de l'appli sont volontairement plus petits que 16px pour
 une densité mobile correcte (13.5-14.5px, classes Tailwind du type
 `text-[13.5px]` sur chaque `<input>`/`<textarea>`/`<select>`).
 
-**Fix, en deux temps** (`src/app/globals.css`, `ChecklistSection.tsx`,
-`CommentForm.tsx`, `TaskForm.tsx`) :
+**Fix, en deux temps** (`src/app/globals.css`, `CommentForm.tsx`,
+`TaskForm.tsx`) :
 
 1. Sous 640px (breakpoint `sm` de Tailwind), tous les champs passent à
    16px via une règle globale dans `globals.css`, pour empêcher le zoom
@@ -2511,7 +2567,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/CategoryManager.tsx` | Onglet « Catégories » de l'admin — liste, création, édition, réordonnancement (voir 6.9) |
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline (dont `IconCalendarPlus` — export agenda) |
 | `src/components/Time.tsx` | Enveloppe `<time datetime>` autour d'une date affichée (voir 6.16) |
-| `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, confirmation de suppression |
+| `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, checklist (créer/renommer/supprimer — voir 6.10), tags (voir 6.4), confirmation de suppression |
 | `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statuts/catégorie/intervalle d'échéance `du…au`/visibilité segmentée/en retard/tags), `aria-pressed` sur les pilules, filtre mémorisé en `sessionStorage` (voir 6.7) |
 | `src/components/HomeDashboard.tsx` | Salutation + compteurs de l'accueil (en retard/aujourd'hui/cette semaine, liens vers un intervalle exact) ; calcule le dédoublonnage des fils et la liste « Partagées avec toi » (voir 6.6, 6.16) |
 | `src/components/NotificationsNudge.tsx` | Bannière unique d'invite à activer les notifications, sur l'accueil (voir 6.16) |
@@ -2539,7 +2595,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/AdminScreen.tsx` | Titre + bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26), aide contextuelle par onglet (voir 6.27) |
 | `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
 | `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
-| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste, suppression annulable (voir 6.10, 6.16) |
+| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste uniquement, ajout/renommage/suppression dans `TaskForm.tsx` (voir 6.10, 6.16) |
 | `src/components/PendingOverlay.tsx` | Gel d'écran global + indicateur de traitement en cours (voir 6.11) |
 | `src/components/Toast.tsx` | Toasts en bas d'écran + `setFlash()` (message qui survit à un redirect serveur) — voir 6.16 |
 | `src/components/ConfirmDialog.tsx` | Boîte de confirmation à la marque (remplace `window.confirm()`) — voir 6.16 |

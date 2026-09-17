@@ -203,8 +203,10 @@ partagée/privée est appliquée entièrement au niveau applicatif
   proches plutôt que d'en créer un quasi-doublon. Admin → « Catégories »
   permet aussi de supprimer un tag ou d'en fusionner deux (les tâches du
   premier basculent sur le second). Voir la doc technique §6.4 et §6.9.
-- Checklist gérable depuis l'édition de la tâche (17/09/2026), en plus de
-  l'écran de détail. Voir la doc technique §6.10.
+- Checklist — gestion déplacée dans le formulaire de tâche (17/09/2026) :
+  ajouter/renommer/supprimer un item se fait depuis la création/édition de
+  la tâche, juste sous la description ; l'écran de détail ne permet plus
+  que de cocher/décocher. Voir la doc technique §6.10.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

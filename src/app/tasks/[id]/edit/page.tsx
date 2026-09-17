@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { getCategories, getProfiles, getTags, getTask } from "@/lib/queries";
 import { Topbar } from "@/components/Topbar";
 import { TaskForm } from "@/components/TaskForm";
-import { ChecklistSection } from "@/components/ChecklistSection";
 import { HelpButton } from "@/components/HelpButton";
 import { IconArrowLeft } from "@/components/Icons";
 import { canEdit } from "@/lib/access";
@@ -51,14 +50,13 @@ export default async function EditTaskPage({ params }: { params: { id: string } 
                 l&apos;accès de quelqu&apos;un lui masque aussitôt la tâche.
               </li>
               <li>
-                La checklist se gère aussi ici (ajouter, cocher, supprimer des items) — comme sur l&apos;écran de
-                détail.
+                La checklist se gère aussi ici, juste sous la description (ajouter, renommer, supprimer des
+                items). Cocher/décocher reste possible seulement depuis l&apos;écran de détail.
               </li>
               <li>« Supprimer la tâche » est définitif : commentaires et checklist partent avec elle.</li>
             </ul>
           </HelpButton>
         </div>
-        <ChecklistSection taskId={task.id} items={task.checklist ?? []} editable />
         <TaskForm
           mode="edit"
           profiles={profiles}

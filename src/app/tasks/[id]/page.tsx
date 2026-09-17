@@ -77,11 +77,15 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
               <p>Toutes les infos de la tâche, et selon ton rôle :</p>
               <ul>
                 <li>
-                  <strong>Assigné(e)</strong> : tu peux changer le statut, modifier la tâche, gérer la
-                  checklist (ajouter, cocher, supprimer des items) et commenter.
+                  <strong>Assigné(e)</strong> : tu peux changer le statut, modifier la tâche, cocher/décocher
+                  la checklist et commenter.
                 </li>
                 <li><strong>Lecture seule</strong> : tu peux seulement commenter.</li>
               </ul>
+              <p>
+                Ajouter, renommer ou supprimer un item de la checklist se fait depuis « Modifier la tâche »,
+                pas ici.
+              </p>
               <p>
                 Un commentaire peut être supprimé par son auteur, ou par le créateur de la tâche (tous
                 les commentaires).

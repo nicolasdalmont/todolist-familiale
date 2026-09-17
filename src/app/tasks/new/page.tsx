@@ -41,6 +41,7 @@ export default async function NewTaskPage() {
                 plutôt une activité dans l&apos;agenda correspondant, en reprenant ta saisie.
               </li>
               <li>La récurrence ne se déclenchera qu&apos;avec une échéance posée.</li>
+              <li>Tu peux préparer une checklist dès maintenant (ajouter des items), juste sous la description.</li>
               <li>
                 Le partage est <strong>privé par défaut</strong> (visible seulement par toi). Pour
                 chaque personne, choisis « Lecture seule » (elle peut voir et commenter) ou

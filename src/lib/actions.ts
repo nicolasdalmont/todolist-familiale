@@ -108,6 +108,50 @@ async function syncTaskTags(taskId: string, tagNames: string[]) {
   }
 }
 
+// Checklist soumise par TaskForm.tsx (champ caché "checklist", encodé en
+// JSON — voir ce fichier) : {id?, label}[], `id` absent pour un item pas
+// encore en base. La création/modification/suppression des items se fait
+// maintenant ici, dans le formulaire de tâche, plutôt qu'à la volée depuis
+// l'écran de détail (voir 6.10) — seul cocher/décocher reste géré à part
+// (toggleChecklistItemAction, ChecklistSection.tsx).
+function parseChecklistItems(formData: FormData): { id?: string; label: string }[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(formData.get("checklist") || "[]"));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      id: typeof item.id === "string" && item.id ? item.id : undefined,
+      label: String(item.label ?? "").trim(),
+    }))
+    .filter((item) => item.label.length > 0);
+}
+
+// Contrairement à syncTaskTags ci-dessus, pas question d'un delete + insert
+// intégral : ça réinitialiserait `done` sur tous les items existants, alors
+// que cocher/décocher (géré à part) doit survivre à un enregistrement du
+// formulaire. Diff explicite à la place : supprime les items retirés,
+// renomme ceux qui ont un id (sans toucher `done`), insère les nouveaux.
+async function syncChecklistItems(taskId: string, items: { id?: string; label: string }[]) {
+  const keepIds = items.filter((i) => i.id).map((i) => i.id as string);
+  if (keepIds.length > 0) {
+    await sql`delete from checklist_items where task_id = ${taskId} and id <> all(${keepIds}::uuid[])`;
+  } else {
+    await sql`delete from checklist_items where task_id = ${taskId}`;
+  }
+  for (const item of items) {
+    if (item.id) {
+      await sql`update checklist_items set label = ${item.label} where id = ${item.id} and task_id = ${taskId}`;
+    } else {
+      await sql`insert into checklist_items (task_id, label) values (${taskId}, ${item.label})`;
+    }
+  }
+}
+
 // Lit le partage soumis par TaskForm.tsx : un champ radio "role-<userId>"
 // par membre de la famille (hors créateur, qui n'est pas dans le
 // formulaire), valant "editor" ou "viewer". Le créateur est toujours
@@ -317,6 +361,7 @@ export async function createTaskAction(formData: FormData) {
   const categoryRaw = String(formData.get("category") || "");
   const category = await resolveCategorySlug(categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
+  const checklistItems = parseChecklistItems(formData);
 
   const shareRoles = parseShareRoles(formData, userId);
   const visibility = computeVisibility(userId, Array.from(shareRoles.keys()));
@@ -336,6 +381,7 @@ export async function createTaskAction(formData: FormData) {
 
   await insertAssignees(task.id, shareRoles);
   await syncTaskTags(task.id, tagNames);
+  await syncChecklistItems(task.id, checklistItems);
   await logUserActivity(userId);
 
   if (visibility === "shared") {
@@ -386,6 +432,7 @@ export async function updateTaskAction(formData: FormData) {
   const categoryRaw = String(formData.get("category") || "");
   const category = await resolveCategorySlug(categoryRaw);
   const tagNames = formData.getAll("tags").map(String);
+  const checklistItems = parseChecklistItems(formData);
 
   // Le créateur original garde toujours l'accès complet, même si la
   // personne qui modifie la tâche est un autre éditeur que lui.
@@ -416,6 +463,7 @@ export async function updateTaskAction(formData: FormData) {
   }
 
   await syncTaskTags(taskId, tagNames);
+  await syncChecklistItems(taskId, checklistItems);
 
   if (visibility === "shared") {
     await logActivity({ taskId, actorId: userId, type: "task_updated", taskTitle: title });
@@ -769,46 +817,11 @@ export async function deleteCommentAction(taskId: string, commentId: string) {
 
 // --- Checklist ------------------------------------------------------
 //
-// Gérée directement depuis l'écran de détail (pas depuis le formulaire de
-// création/modification) — voir src/components/ChecklistSection.tsx.
-// Ajouter/cocher/supprimer un item exige canEdit, comme changer le statut
-// de la tâche (contrairement aux commentaires, ouverts aux lecteurs) : une
-// checklist fait partie du contenu de la tâche, pas d'une discussion
-// autour.
-
-export async function addChecklistItemAction(formData: FormData) {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-
-  const taskId = String(formData.get("taskId"));
-  const label = String(formData.get("label") || "").trim();
-  if (!taskId || !label) return;
-
-  const access = await getTaskAccess(taskId, userId);
-  if (!access.exists || !access.canEdit) return;
-
-  try {
-    await sql`insert into checklist_items (task_id, label) values (${taskId}, ${label})`;
-  } catch (e) {
-    throw new Error(e instanceof Error ? e.message : "Impossible d'ajouter l'item.");
-  }
-
-  await logUserActivity(userId);
-
-  if (access.visibility === "shared") {
-    await logActivity({
-      taskId,
-      actorId: userId,
-      type: "checklist_item_added",
-      taskTitle: access.title ?? "",
-      detail: label,
-    });
-  }
-
-  revalidatePath("/");
-  revalidatePath("/tasks");
-  revalidatePath(`/tasks/${taskId}`);
-}
+// Créer/renommer/supprimer un item se fait désormais depuis le formulaire
+// de tâche (voir syncChecklistItems ci-dessus et TaskForm.tsx, 17/09/2026),
+// pas depuis l'écran de détail. Cocher/décocher (seule action qui reste
+// immédiate, hors formulaire) exige toujours canEdit, comme le reste du
+// contenu de la tâche — voir src/components/ChecklistSection.tsx.
 
 export async function toggleChecklistItemAction(taskId: string, itemId: string, done: boolean) {
   const userId = await getSessionUserId();
@@ -846,35 +859,6 @@ export async function toggleChecklistItemAction(taskId: string, itemId: string, 
       type: done ? "checklist_item_checked" : "checklist_item_unchecked",
       taskTitle: access.title ?? "",
       detail: updated?.label ?? null,
-    });
-  }
-
-  revalidatePath("/");
-  revalidatePath("/tasks");
-  revalidatePath(`/tasks/${taskId}`);
-}
-
-export async function deleteChecklistItemAction(taskId: string, itemId: string) {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-
-  const access = await getTaskAccess(taskId, userId);
-  if (!access.exists || !access.canEdit) return;
-
-  // Le libellé est récupéré avant suppression : il n'existera plus pour le
-  // journal d'activité une fois la ligne supprimée.
-  const itemRows = await sql`select label from checklist_items where id = ${itemId} and task_id = ${taskId}`;
-  const item = itemRows[0] as { label: string } | undefined;
-
-  await sql`delete from checklist_items where id = ${itemId} and task_id = ${taskId}`;
-
-  if (access.visibility === "shared") {
-    await logActivity({
-      taskId,
-      actorId: userId,
-      type: "checklist_item_removed",
-      taskTitle: access.title ?? "",
-      detail: item?.label ?? null,
     });
   }
 

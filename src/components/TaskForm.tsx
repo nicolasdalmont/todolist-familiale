@@ -30,6 +30,49 @@ const AGENDA_CATEGORY_INFO: Record<string, { label: string; path: string }> = {
   finances: { label: "Finances", path: "/finances" },
 };
 
+// Distance d'édition (Levenshtein) entre deux tags, pour repérer une
+// orthographe proche ("boulot" / "boulto", "vacance" / "vacances") à la
+// création d'un nouveau tag — voir addNewTag ci-dessous.
+function levenshteinDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dp: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (let i = 0; i < rows; i++) dp[i][0] = i;
+  for (let j = 0; j < cols; j++) dp[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[rows - 1][cols - 1];
+}
+
+// Seuil toléré selon la longueur du plus court des deux tags comparés : 1
+// caractère d'écart pour un tag court (où un seul caractère change déjà
+// beaucoup le mot), 2 pour un tag plus long (faute de frappe, pluriel...).
+function closeTagThreshold(len: number): number {
+  return len <= 4 ? 1 : 2;
+}
+
+// Renvoie le tag existant le plus proche de `name` s'il est à distance
+// tolérée, sinon null (aucun tag suffisamment proche, ou déjà le tag exact).
+function findClosestTag(name: string, existing: string[]): string | null {
+  let best: string | null = null;
+  let bestDistance = Infinity;
+  for (const candidate of existing) {
+    if (candidate === name) continue;
+    const distance = levenshteinDistance(name, candidate);
+    if (distance <= closeTagThreshold(Math.min(name.length, candidate.length)) && distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 export function TaskForm({
   mode,
   profiles,
@@ -58,6 +101,10 @@ export function TaskForm({
     categories.find((c) => c.slug === FALLBACK_CATEGORY_SLUG)?.slug ?? categories[0]?.slug ?? FALLBACK_CATEGORY_SLUG;
   const [category, setCategory] = useState(task?.category ?? defaultCategory);
   const [agendaPrompt, setAgendaPrompt] = useState<{ slug: string; label: string; path: string } | null>(null);
+  // Tag proche détecté à la création d'un nouveau tag (voir addNewTag) :
+  // `input` est ce que l'utilisateur a tapé, `match` le tag existant le plus
+  // proche, proposé en alternative avant de créer un quasi-doublon.
+  const [similarTagPrompt, setSimilarTagPrompt] = useState<{ input: string; match: string } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const recurrenceIntervalRef = useRef<HTMLInputElement>(null);
@@ -95,17 +142,34 @@ export function TaskForm({
     });
   }
 
+  function createNewTag(name: string) {
+    if (!tagOptions.includes(name)) {
+      setTagOptions((prev) => [...prev, name].sort((a, b) => a.localeCompare(b)));
+    }
+    setSelectedTags((prev) => new Set(prev).add(name));
+    setNewTag("");
+  }
+
   function addNewTag() {
     // Le # est déjà ajouté à l'affichage (juste en dessous) : on le retire
     // si l'utilisateur l'a tapé lui-même, pour ne pas se retrouver avec un
     // tag "##montag".
     const name = newTag.trim().replace(/^#+/, "").trim().toLowerCase();
     if (!name) return;
-    if (!tagOptions.includes(name)) {
-      setTagOptions((prev) => [...prev, name].sort((a, b) => a.localeCompare(b)));
+    // Tag déjà existant (nom exact) : on le sélectionne simplement, pas de
+    // doublon possible (voir aussi upsertTagIds côté serveur).
+    if (tagOptions.includes(name)) {
+      createNewTag(name);
+      return;
     }
-    setSelectedTags((prev) => new Set(prev).add(name));
-    setNewTag("");
+    // Orthographe proche d'un tag existant : on prévient avant de créer un
+    // quasi-doublon, plutôt que de laisser la liste s'éparpiller.
+    const close = findClosestTag(name, tagOptions);
+    if (close) {
+      setSimilarTagPrompt({ input: name, match: close });
+      return;
+    }
+    createNewTag(name);
   }
 
   // Bascule vers la création d'activité dans l'agenda dédié (Jardin/
@@ -463,6 +527,26 @@ export function TaskForm({
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={similarTagPrompt !== null}
+        title={similarTagPrompt ? `Tag proche : #${similarTagPrompt.match}` : ""}
+        body={
+          similarTagPrompt
+            ? `#${similarTagPrompt.input} ressemble beaucoup à #${similarTagPrompt.match}, déjà utilisé. Pour éviter les doublons, mieux vaut réutiliser ce tag existant.`
+            : ""
+        }
+        confirmLabel={similarTagPrompt ? `Utiliser #${similarTagPrompt.match}` : ""}
+        cancelLabel={similarTagPrompt ? `Créer #${similarTagPrompt.input} quand même` : ""}
+        onCancel={() => {
+          if (similarTagPrompt) createNewTag(similarTagPrompt.input);
+          setSimilarTagPrompt(null);
+        }}
+        onConfirm={() => {
+          if (similarTagPrompt) createNewTag(similarTagPrompt.match);
+          setSimilarTagPrompt(null);
+        }}
+      />
 
       <ConfirmDialog
         open={agendaPrompt !== null}

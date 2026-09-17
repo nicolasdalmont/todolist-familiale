@@ -196,6 +196,15 @@ partagée/privée est appliquée entièrement au niveau applicatif
   tâche) ouvre une bulle expliquant son fonctionnement, sans quitter la
   page. Dans Admin, le contenu dépend de l'onglet ouvert. Voir la doc
   technique §6.27.
+- Tags — garde-fous anti-doublons (17/09/2026) : impossible de créer un
+  tag `#montag` (le `#` de tête tapé par erreur est retiré) ; à la
+  création d'un tag à l'orthographe proche d'un tag existant (faute de
+  frappe, pluriel...), une boîte propose de réutiliser l'un des tags
+  proches plutôt que d'en créer un quasi-doublon. Admin → « Catégories »
+  permet aussi de supprimer un tag ou d'en fusionner deux (les tâches du
+  premier basculent sur le second). Voir la doc technique §6.4 et §6.9.
+- Checklist gérable depuis l'édition de la tâche (17/09/2026), en plus de
+  l'écran de détail. Voir la doc technique §6.10.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

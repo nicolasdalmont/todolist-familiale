@@ -3,8 +3,22 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 14/09/2026. Lot de ce jour (le plus récent
-d'abord) : **aide contextuelle par écran** (6.27) : un bouton « ? » calé à
+Dernière mise à jour : 17/09/2026. Lot de ce jour (le plus récent
+d'abord) : **checklist gérable depuis l'édition de la tâche** (6.10) :
+`ChecklistSection.tsx` réutilisée telle quelle au-dessus du formulaire
+d'édition, en plus de l'écran de détail (qui reste inchangé) ; **tags —
+garde-fous anti-doublons** (6.4, 6.9) : impossible de créer un tag
+`#montag` (`#` de tête retiré, client + serveur) ; à la création d'un tag
+à l'orthographe proche d'un ou plusieurs tags existants (distance de
+Levenshtein), `SimilarTagsDialog.tsx` propose de réutiliser un tag
+existant plutôt que d'en créer un quasi-doublon ; troisième bloc de
+l'onglet « Catégories » de l'admin (`TagManager.tsx` /
+`src/lib/tag-actions.ts`) pour supprimer un tag ou en fusionner deux — a
+notamment servi à corriger manuellement un tag `#boulot` créé avant ce
+garde-fou, avec un `#` resté dans le nom en base.
+
+Lot du 14/09/2026 (le plus récent d'abord) : **aide contextuelle par
+écran** (6.27) : un bouton « ? » calé à
 droite de l'en-tête de chaque écran principal ouvre une bulle expliquant
 son fonctionnement, sans quitter la page (`HelpButton.tsx`) — 12 écrans
 couverts, dont l'Admin (contenu dépendant de l'onglet actif) et les trois
@@ -622,11 +636,38 @@ statut qui la déclenche l'est.
 Système de tags libres many-to-many (`tags` + `task_tags`). Dans le
 formulaire de tâche, l'utilisateur coche des tags existants ou tape un
 nouveau nom : `upsertTagIds` (`src/lib/queries.ts`) crée les tags
-manquants (normalisés en minuscules/trim) et renvoie leurs identifiants ;
-`syncTaskTags` (`src/lib/actions.ts`) remplace ensuite l'ensemble des
-tags de la tâche par la sélection courante (delete + insert). Neuf tags
-sont pré-remplis à l'installation (voir 5.1) ; la liste s'enrichit
-librement ensuite.
+manquants (normalisés en minuscules/trim, `#` de tête retiré s'il a été
+tapé) et renvoie leurs identifiants ; `syncTaskTags` (`src/lib/actions.ts`)
+remplace ensuite l'ensemble des tags de la tâche par la sélection courante
+(delete + insert). Neuf tags sont pré-remplis à l'installation (voir 5.1) ;
+la liste s'enrichit librement ensuite.
+
+**Garde-fous contre la prolifération (17/09/2026)**, tous dans
+`TaskForm.tsx` sauf mention contraire :
+
+- **`#` doublé** : le `#` est déjà ajouté à l'affichage des pastilles, donc
+  taper `#montag` dans le champ « Nouveau tag » retirerait normalement le
+  `#` de tête avant normalisation — sinon on se retrouverait avec
+  `##montag`. Même normalisation côté serveur dans `upsertTagIds`, en
+  défense en profondeur.
+- **Tag à l'orthographe proche** : à l'ajout, `findCloseTags()` compare le
+  nom saisi à chaque tag existant par distance de Levenshtein (seuil 1
+  caractère pour un tag court ≤ 4 lettres, 2 sinon — attrape faute de
+  frappe et pluriel, ex. `vacance`/`vacances`). S'il y a au moins un
+  candidat proche, `SimilarTagsDialog.tsx` (variante de `ConfirmDialog.tsx`
+  à N choix, car il peut y avoir plusieurs candidats — ex. `vacance` et
+  `vacances` tous deux proches de `vacanse`) propose : utiliser l'un des
+  tags existants listés, créer le nouveau tag quand même, ou annuler.
+  Plafonné à 5 candidats.
+- **Administration — suppression et fusion** (`TagManager.tsx`, troisième
+  bloc de l'onglet « Catégories » de `/admin`, voir 6.9) :
+  `src/lib/tag-actions.ts` (`deleteTagAction`, `mergeTagsAction`), réservé
+  admin. Supprimer un tag le retire de toutes les tâches (cascade
+  `task_tags`). Fusionner reporte les tâches du tag source sur le tag
+  cible (`insert ... on conflict (task_id, tag_id) do nothing`, pour une
+  tâche qui aurait déjà les deux) puis supprime le tag source — c'est ce
+  mécanisme qui a servi à corriger manuellement `#boulot` (tag créé avant
+  le garde-fou ci-dessus, avec un `#` resté dans le nom en base).
 
 ### 6.5 Commentaires
 
@@ -1014,6 +1055,11 @@ de jardin (`src/components/GardenCategoryManager.tsx` /
 partagent aucune donnée, seulement le même gabarit d'écran et le même jeu
 d'icônes.
 
+**Troisième bloc, tout en bas (17/09/2026)** : gestion des tags
+(`TagManager.tsx` / `src/lib/tag-actions.ts`), voir 6.4 — supprimer un tag
+ou en fusionner deux, seul ménage nécessaire puisque les tags eux-mêmes se
+créent librement depuis `TaskForm.tsx`, sans passage par l'admin.
+
 **Onglet « Réglages »** (`src/components/SettingsPanel.tsx` /
 `src/lib/settings-actions.ts`) : rappel automatique, activation
 individuelle des 4 agendas (voir 6.26) et informations d'instance.
@@ -1075,12 +1121,19 @@ Neon ») plutôt qu'une erreur Postgres brute — même principe que l'onglet
 
 ### 6.10 Checklist par tâche
 
-Chaque tâche peut porter une checklist (sous-tâches à cocher), gérée
-directement depuis l'écran de détail (`ChecklistSection.tsx`) — ajout,
-coche, suppression d'un item — plutôt que depuis le formulaire de
-création/modification, sur le même principe que les commentaires mais en
-plus immédiat (chaque action recharge la page via `router.refresh()`,
-pas de redirection).
+Chaque tâche peut porter une checklist (sous-tâches à cocher), gérée par
+`ChecklistSection.tsx` — ajout, coche, suppression d'un item — sur le même
+principe que les commentaires mais en plus immédiat (chaque action
+recharge la page via `router.refresh()`, pas de redirection, et
+indépendamment du formulaire de tâche : pas de `<form>` imbriqué).
+
+**Gérable à deux endroits (édition ajoutée le 17/09/2026)** :
+`ChecklistSection` reste affichée sur l'écran de détail (coche au fil de
+l'eau pendant qu'on fait la tâche) **et** au-dessus du formulaire sur
+l'écran d'édition (`src/app/tasks/[id]/edit/page.tsx`), plus logique pour
+la gérer avec le reste du contenu de la tâche. Même composant, deux points
+d'entrée, pas d'état partagé entre les deux (chacun recharge sa propre
+page).
 
 Contrairement aux commentaires (ouverts aux lecteurs pour l'ajout —
 voir 6.5), ajouter/cocher/supprimer un item exige `canEdit` : une

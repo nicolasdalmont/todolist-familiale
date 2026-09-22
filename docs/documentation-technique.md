@@ -2303,6 +2303,82 @@ par cas :
   ici, juste sous la description (ajouter/renommer/supprimer), et que
   cocher/décocher reste réservé à l'écran de détail.
 
+### 6.28 Checklist dans les activités d'agenda (22/09/2026)
+
+Les activités de Jardin/Voiture/Santé/Finances peuvent désormais porter
+une checklist, avec le même fonctionnement que pour une tâche (voir
+6.10) : gestion complète (ajouter/renommer/supprimer) dans le formulaire
+de création/modification de l'activité, coche/décoche depuis l'affichage
+de la liste. Voiture/Santé/Finances partagent un code quasi identique
+(`car`/`health`/`finances-{actions,queries}.ts` ne diffèrent que par les
+noms de table, voir 6.20/6.21/6.23) : ce lot a été répliqué à l'identique
+sur les trois, puis adapté à Jardin (modèle différent, par mois — voir
+6.19).
+
+**Pas de nouvelle table.** Une activité s'appuie sur la checklist de sa
+tâche en cours (`openTask`) plutôt que de porter sa propre checklist :
+c'est la même table `checklist_items` que pour les tâches classiques
+(migration 004, voir 5.2), simplement rattachée à une tâche générée par
+une activité. `GardenActivity.openTask`/`CarActivity.openTask`/
+`HealthActivity.openTask`/`FinancesActivity.openTask` (`src/lib/types.ts`)
+portent désormais un champ `checklist: ChecklistItem[]`, peuplé par une
+quatrième requête parallèle dans chaque `get*Activities()`
+(`garden/car/health/finances-queries.ts`), jointe sur
+`checklist_items.task_id = tasks.id`.
+
+**Code partagé.** `parseChecklistItems()`/`syncChecklistItems()`
+(diff explicite préservant `done` sur les items conservés — voir 6.10)
+ont été extraites de `src/lib/actions.ts` vers un nouveau
+`src/lib/checklist.ts` : un fichier `"use server"` n'autorise que des
+exports async, or `parseChecklistItems()` est synchrone — elles ne
+pouvaient donc pas être importées telles quelles dans les quatre
+`*-actions.ts` d'agenda (eux aussi `"use server"`) sans ce détour.
+
+**Édition.** Nouveau composant partagé `ChecklistFieldEditor.tsx`
+(ajout/renommage/suppression, pas de coche), extrait de la section
+checklist de `TaskForm.tsx` — qui l'utilise désormais aussi, à
+comportement inchangé — et réutilisé dans les quatre `ActivityForm`
+(`JardinScreen.tsx`/`VoitureScreen.tsx`/`SanteScreen.tsx`/
+`FinancesScreen.tsx`). Contrôlé (`value`/`onChange`) plutôt que de porter
+son propre état interne : chaque écran reste libre de sa stratégie de
+soumission (champ caché JSON pour `TaskForm.tsx`, `FormData` construite à
+la main pour les écrans d'agenda).
+
+**Affichage.** Chaque carte d'activité affiche `ChecklistSection.tsx`
+(même composant que l'écran de détail d'une tâche, voir 6.10) sous son
+en-tête, quand `openTask.checklist` n'est pas vide — coche/décoche
+optimiste, via `toggleChecklistItemAction` (déjà générique : aucune
+modification nécessaire). `editable` est calculé côté écran
+(`activity.createdBy === currentUserId || activity.assignees.some(...)`),
+transmis en `currentUserId` depuis chaque page serveur
+(`jardin`/`voiture`/`sante`/`finances/page.tsx`) plutôt que recalculé
+côté serveur comme sur l'écran de détail d'une tâche (`canEdit()`,
+`access.ts`) — une activité n'a pas d'assignés typés `ShareRole` comme
+une tâche, seulement une liste plate de responsables.
+
+**Transmission à la tâche créée.**
+
+- **Création d'une activité** : les items saisis (jamais d'`id`, tous
+  nouveaux) sont insérés directement dans la nouvelle tâche via un
+  nouveau paramètre `checklistLabels: string[]` sur
+  `create*OccurrenceTask()` (`garden/car/health/finances.ts`).
+- **Modification d'une activité avec tâche ouverte** : `syncChecklistItems()`
+  synchronise directement la checklist de cette tâche — diff explicite,
+  préserve l'état coché des items conservés, exactement comme pour une
+  tâche (6.10). Cas limite (pas de tâche ouverte, donnée incohérente) :
+  la checklist saisie est transmise à la tâche recréée via
+  `checklistLabels`, comme à la création.
+- **Clôture ou suppression, régénération de l'occurrence suivante**
+  (`advance*Activity()`) : la checklist repart non cochée sur la nouvelle
+  tâche, même logique que la récurrence générique des tâches (6.10, 6.3).
+  Point d'attention : `checklist_items` est en `on delete cascade` sur
+  `tasks`, donc la supprimer *avant* de lire sa checklist (cas
+  `deleteTaskAction`) ne laisserait plus rien à lire. `advance*Activity()`
+  ne relit donc plus elle-même la checklist de la tâche qui se termine —
+  c'est l'appelant (`setStatusAction`/`deleteTaskAction`, `actions.ts`)
+  qui la lit *avant* de clôturer/supprimer la tâche, et la transmet en
+  paramètre.
+
 ## 8. Limites connues et points d'attention
 
 ### 8.1 Fuseau horaire (refonte du 04/09/2026)
@@ -2581,6 +2657,8 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/Icons.tsx` | Jeu d'icônes SVG inline (dont `IconCalendarPlus` — export agenda) |
 | `src/components/Time.tsx` | Enveloppe `<time datetime>` autour d'une date affichée (voir 6.16) |
 | `src/components/TaskForm.tsx` | Formulaire création/modification de tâche, sélecteur de partage, raccourcis d'échéance, checklist (créer/renommer/supprimer — voir 6.10), tags (voir 6.4), confirmation de suppression |
+| `src/lib/checklist.ts` | `parseChecklistItems()`/`syncChecklistItems()` — partagées entre `actions.ts` (tâches) et les Server Actions d'activité d'agenda (voir 6.10, 6.28) |
+| `src/components/ChecklistFieldEditor.tsx` | Édition contrôlée d'une checklist (ajouter/renommer/supprimer, pas la coche) — réutilisée par `TaskForm.tsx` et les formulaires d'activité d'agenda (voir 6.10, 6.28) |
 | `src/components/TaskFilterList.tsx` | Recherche (toujours visible) + volet dépliable "Filtres" replié par défaut (portée/statuts/catégorie/intervalle d'échéance `du…au`/visibilité segmentée/en retard/tags), `aria-pressed` sur les pilules, filtre mémorisé en `sessionStorage` (voir 6.7) |
 | `src/components/HomeDashboard.tsx` | Salutation + compteurs de l'accueil (en retard/aujourd'hui/cette semaine, liens vers un intervalle exact) ; calcule le dédoublonnage des fils et la liste « Partagées avec toi » (voir 6.6, 6.16) |
 | `src/components/NotificationsNudge.tsx` | Bannière unique d'invite à activer les notifications, sur l'accueil (voir 6.16) |
@@ -2608,7 +2686,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/AdminScreen.tsx` | Titre + bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26), aide contextuelle par onglet (voir 6.27) |
 | `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
 | `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
-| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste uniquement, ajout/renommage/suppression dans `TaskForm.tsx` (voir 6.10, 6.16) |
+| `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste uniquement, ajout/renommage/suppression dans `TaskForm.tsx` (voir 6.10, 6.16) ; réutilisée telle quelle sur les cartes d'activité d'agenda (voir 6.28) |
 | `src/components/PendingOverlay.tsx` | Gel d'écran global + indicateur de traitement en cours (voir 6.11) |
 | `src/components/Toast.tsx` | Toasts en bas d'écran + `setFlash()` (message qui survit à un redirect serveur) — voir 6.16 |
 | `src/components/ConfirmDialog.tsx` | Boîte de confirmation à la marque (remplace `window.confirm()`) — voir 6.16 |

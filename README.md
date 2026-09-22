@@ -209,6 +209,12 @@ partagée/privée est appliquée entièrement au niveau applicatif
   ajouter/renommer/supprimer un item se fait depuis la création/édition de
   la tâche, juste sous la description ; l'écran de détail ne permet plus
   que de cocher/décocher. Voir la doc technique §6.10.
+- Checklist dans les activités d'agenda (22/09/2026) : les activités de
+  Jardin/Voiture/Santé/Finances peuvent porter une checklist, avec le même
+  fonctionnement que pour une tâche — gestion complète dans le formulaire
+  de l'activité, coche/décoche depuis la liste. Transmise à la tâche
+  générée ; repart non cochée à chaque nouvelle occurrence. Voir la doc
+  technique §6.28.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

@@ -10,6 +10,8 @@ import { formatDateOnly } from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
+import { ChecklistFieldEditor, type ChecklistDraftItem } from "@/components/ChecklistFieldEditor";
+import { ChecklistSection } from "@/components/ChecklistSection";
 import { IconChecklist, IconPencil, IconPlus, IconTrash } from "./Icons";
 
 // Onglet Jardin (voir migration 003 et src/lib/garden.ts) : liste des
@@ -113,7 +115,14 @@ function AssigneeField({
   );
 }
 
-type FormState = { name: string; description: string; months: number[]; assigneeIds: string[]; category: string };
+type FormState = {
+  name: string;
+  description: string;
+  months: number[];
+  assigneeIds: string[];
+  category: string;
+  checklist: ChecklistDraftItem[];
+};
 
 function CategoryField({
   categories,
@@ -171,10 +180,11 @@ function ActivityForm({
   const [months, setMonths] = useState<number[]>(initial.months);
   const [assigneeIds, setAssigneeIds] = useState<string[]>(initial.assigneeIds);
   const [category, setCategory] = useState(initial.category);
+  const [checklist, setChecklist] = useState<ChecklistDraftItem[]>(initial.checklist);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ name, description, months, assigneeIds, category });
+    onSubmit({ name, description, months, assigneeIds, category, checklist });
   }
 
   return (
@@ -218,6 +228,7 @@ function ActivityForm({
         <span className="mb-1 block text-[12.5px] font-bold">Responsable(s)</span>
         <AssigneeField members={members} value={assigneeIds} onChange={setAssigneeIds} />
       </div>
+      <ChecklistFieldEditor value={checklist} onChange={setChecklist} />
       {error ? <p className="text-[12.5px] font-semibold text-red-600">{error}</p> : null}
       <div className="flex gap-2">
         <button
@@ -244,12 +255,14 @@ export function JardinScreen({
   members,
   categories,
   currentMonth,
+  currentUserId,
   prefill,
 }: {
   activities: GardenActivity[];
   members: Pick<Profile, "id" | "name" | "color">[];
   categories: Category[];
   currentMonth: number;
+  currentUserId: string;
   // Reprise de saisie depuis TaskForm.tsx (voir AGENDA_CATEGORY_INFO) :
   // ouvre directement le formulaire de création avec ces valeurs.
   prefill?: { name: string; description: string; month: number | null };
@@ -298,6 +311,12 @@ export function JardinScreen({
     });
   }
 
+  function checklistToJson(checklist: ChecklistDraftItem[]): string {
+    return JSON.stringify(
+      checklist.map((item) => ({ id: item.id, label: item.label.trim() })).filter((item) => item.label.length > 0)
+    );
+  }
+
   function handleCreate(state: FormState) {
     setCreateError(null);
     const fd = new FormData();
@@ -306,6 +325,7 @@ export function JardinScreen({
     fd.set("category", state.category);
     for (const m of state.months) fd.append("months", String(m));
     for (const id of state.assigneeIds) fd.append("assignees", id);
+    fd.set("checklist", checklistToJson(state.checklist));
     startTransition(async () => {
       const res = await createGardenActivityAction(fd);
       if (res.error) {
@@ -327,6 +347,7 @@ export function JardinScreen({
     fd.set("category", state.category);
     for (const m of state.months) fd.append("months", String(m));
     for (const id of state.assigneeIds) fd.append("assignees", id);
+    fd.set("checklist", checklistToJson(state.checklist));
     startTransition(async () => {
       const res = await updateGardenActivityAction(fd);
       if (res.error) {
@@ -347,8 +368,9 @@ export function JardinScreen({
         months: prefill.month ? [prefill.month] : [],
         assigneeIds: [],
         category: defaultCategory,
+        checklist: [],
       }
-    : { name: "", description: "", months: [], assigneeIds: [], category: defaultCategory };
+    : { name: "", description: "", months: [], assigneeIds: [], category: defaultCategory, checklist: [] };
 
   return (
     <div className="flex flex-col gap-4">
@@ -511,12 +533,28 @@ export function JardinScreen({
                                 months: activity.months,
                                 assigneeIds: activity.assignees.map((a) => a.id),
                                 category: activity.category,
+                                checklist: (activity.openTask?.checklist ?? []).map((item) => ({
+                                  id: item.id,
+                                  label: item.label,
+                                })),
                               }}
                               onSubmit={(state) => handleUpdate(activity, state)}
                               onCancel={() => setEditingKey(null)}
                               submitLabel="Enregistrer"
                               pending={pending}
                               error={editError}
+                            />
+                          </div>
+                        ) : null}
+
+                        {activity.openTask && activity.openTask.checklist.length > 0 ? (
+                          <div className="mt-3 border-t border-line-soft pt-3">
+                            <ChecklistSection
+                              taskId={activity.openTask.id}
+                              items={activity.openTask.checklist}
+                              editable={
+                                activity.createdBy === currentUserId || activity.assignees.some((a) => a.id === currentUserId)
+                              }
                             />
                           </div>
                         ) : null}

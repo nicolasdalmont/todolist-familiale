@@ -56,7 +56,7 @@ export default async function SantePage({
           </HelpButton>
         </div>
 
-        <SanteScreen activities={activities} members={members} prefill={prefill} />
+        <SanteScreen activities={activities} members={members} currentUserId={profile.id} prefill={prefill} />
       </main>
     </div>
   );

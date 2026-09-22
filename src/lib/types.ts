@@ -284,7 +284,11 @@ export interface GardenActivity {
   createdBy: string;
   createdAt: string;
   assignees: Pick<Profile, "id" | "name" | "color">[];
-  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+  // Depuis le 22/09/2026, la checklist d'une activité vit sur la tâche en
+  // cours (checklist_items, task_id = openTask.id) : c'est elle la
+  // référence, recopiée (items non cochés) à chaque nouvelle occurrence —
+  // voir createGardenOccurrenceTask/advanceGardenActivity, src/lib/garden.ts.
+  openTask: { id: string; status: TaskStatus; due_at: string | null; checklist: ChecklistItem[] } | null;
 }
 
 // Activité récurrente de la voiture (onglet Voiture, migration 005) — voir
@@ -303,7 +307,8 @@ export interface CarActivity {
   createdBy: string;
   createdAt: string;
   assignees: Pick<Profile, "id" | "name" | "color">[];
-  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+  // Voir le commentaire équivalent sur GardenActivity.openTask ci-dessus.
+  openTask: { id: string; status: TaskStatus; due_at: string | null; checklist: ChecklistItem[] } | null;
 }
 
 // Activité récurrente de santé (onglet Santé, migration 007) — voir
@@ -321,7 +326,7 @@ export interface HealthActivity {
   createdBy: string;
   createdAt: string;
   assignees: Pick<Profile, "id" | "name" | "color">[];
-  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+  openTask: { id: string; status: TaskStatus; due_at: string | null; checklist: ChecklistItem[] } | null;
 }
 
 // Activité récurrente de finances (onglet Finances, migration 008) — voir
@@ -339,5 +344,5 @@ export interface FinancesActivity {
   createdBy: string;
   createdAt: string;
   assignees: Pick<Profile, "id" | "name" | "color">[];
-  openTask: { id: string; status: TaskStatus; due_at: string | null } | null;
+  openTask: { id: string; status: TaskStatus; due_at: string | null; checklist: ChecklistItem[] } | null;
 }

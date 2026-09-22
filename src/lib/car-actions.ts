@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth";
 import { createCarOccurrenceTask, occurrenceDueAtIso } from "@/lib/car";
+import { parseChecklistItems, syncChecklistItems } from "@/lib/checklist";
 import type { Recurrence, RecurrenceType } from "@/lib/types";
 
 // Gestion des activités récurrentes de la voiture (onglet Voiture,
@@ -61,6 +62,7 @@ export async function createCarActivityAction(formData: FormData): Promise<Resul
   const recurrence = parseRecurrence(formData);
   const assigneeIds = parseAssigneeIds(formData);
   if (assigneeIds.length === 0) return { error: "Sélectionne au moins un responsable." };
+  const checklistLabels = parseChecklistItems(formData).map((i) => i.label);
 
   let activity: { id: string } | undefined;
   try {
@@ -82,7 +84,8 @@ export async function createCarActivityAction(formData: FormData): Promise<Resul
 
   await createCarOccurrenceTask(
     { id: activity.id, name, description, createdBy: userId, dueDate: parsedDate.dueDate, dayKnown: parsedDate.dayKnown },
-    assigneeIds
+    assigneeIds,
+    checklistLabels
   );
 
   revalidate();
@@ -106,6 +109,7 @@ export async function updateCarActivityAction(formData: FormData): Promise<Resul
   const recurrence = parseRecurrence(formData);
   const assigneeIds = parseAssigneeIds(formData);
   if (assigneeIds.length === 0) return { error: "Sélectionne au moins un responsable." };
+  const checklistItems = parseChecklistItems(formData);
 
   const existingRows = await sql`select id, created_by from car_activities where id = ${activityId}`;
   const existing = existingRows[0] as { id: string; created_by: string } | undefined;
@@ -147,12 +151,15 @@ export async function updateCarActivityAction(formData: FormData): Promise<Resul
       insert into task_assignees (task_id, user_id, role)
       select ${openTask.id}, u, 'editor' from unnest(${editorIds}::uuid[]) as u
     `;
+
+    await syncChecklistItems(openTask.id, checklistItems);
   } else {
     // Cas limite (pas de tâche ouverte, ex. donnée incohérente) : on en
     // recrée une plutôt que de laisser l'activité sans tâche associée.
     await createCarOccurrenceTask(
       { id: activityId, name, description, createdBy: existing.created_by, dueDate: parsedDate.dueDate, dayKnown: parsedDate.dayKnown },
-      assigneeIds
+      assigneeIds,
+      checklistItems.map((i) => i.label)
     );
   }
 

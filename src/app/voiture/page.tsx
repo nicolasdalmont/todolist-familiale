@@ -56,7 +56,7 @@ export default async function VoiturePage({
           </HelpButton>
         </div>
 
-        <VoitureScreen activities={activities} members={members} prefill={prefill} />
+        <VoitureScreen activities={activities} members={members} currentUserId={profile.id} prefill={prefill} />
       </main>
     </div>
   );

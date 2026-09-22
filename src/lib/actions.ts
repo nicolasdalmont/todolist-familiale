@@ -22,6 +22,7 @@ import { advanceGardenActivity } from "@/lib/garden";
 import { advanceCarActivity } from "@/lib/car";
 import { advanceHealthActivity } from "@/lib/health";
 import { advanceFinancesActivity } from "@/lib/finances";
+import { parseChecklistItems, syncChecklistItems } from "@/lib/checklist";
 import type { ActivityType, Recurrence, ShareRole, TaskStatus, Visibility } from "@/lib/types";
 
 // Vérifie les droits d'un utilisateur sur une tâche par son id, sans avoir
@@ -105,50 +106,6 @@ async function syncTaskTags(taskId: string, tagNames: string[]) {
   await sql`delete from task_tags where task_id = ${taskId}`;
   if (tagIds.length) {
     await sql`insert into task_tags (task_id, tag_id) select ${taskId}, unnest(${tagIds}::uuid[])`;
-  }
-}
-
-// Checklist soumise par TaskForm.tsx (champ caché "checklist", encodé en
-// JSON — voir ce fichier) : {id?, label}[], `id` absent pour un item pas
-// encore en base. La création/modification/suppression des items se fait
-// maintenant ici, dans le formulaire de tâche, plutôt qu'à la volée depuis
-// l'écran de détail (voir 6.10) — seul cocher/décocher reste géré à part
-// (toggleChecklistItemAction, ChecklistSection.tsx).
-function parseChecklistItems(formData: FormData): { id?: string; label: string }[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(String(formData.get("checklist") || "[]"));
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-    .map((item) => ({
-      id: typeof item.id === "string" && item.id ? item.id : undefined,
-      label: String(item.label ?? "").trim(),
-    }))
-    .filter((item) => item.label.length > 0);
-}
-
-// Contrairement à syncTaskTags ci-dessus, pas question d'un delete + insert
-// intégral : ça réinitialiserait `done` sur tous les items existants, alors
-// que cocher/décocher (géré à part) doit survivre à un enregistrement du
-// formulaire. Diff explicite à la place : supprime les items retirés,
-// renomme ceux qui ont un id (sans toucher `done`), insère les nouveaux.
-async function syncChecklistItems(taskId: string, items: { id?: string; label: string }[]) {
-  const keepIds = items.filter((i) => i.id).map((i) => i.id as string);
-  if (keepIds.length > 0) {
-    await sql`delete from checklist_items where task_id = ${taskId} and id <> all(${keepIds}::uuid[])`;
-  } else {
-    await sql`delete from checklist_items where task_id = ${taskId}`;
-  }
-  for (const item of items) {
-    if (item.id) {
-      await sql`update checklist_items set label = ${item.label} where id = ${item.id} and task_id = ${taskId}`;
-    } else {
-      await sql`insert into checklist_items (task_id, label) values (${taskId}, ${item.label})`;
-    }
   }
 }
 
@@ -566,10 +523,29 @@ export async function deleteTaskAction(formData: FormData) {
       }
     | undefined;
 
+  // Checklist de la tâche à transmettre (non cochée) à l'occurrence
+  // suivante — lue avant la suppression ci-dessous : checklist_items est en
+  // "on delete cascade" sur tasks, il n'y aurait plus rien à lire après.
+  const isAgendaActivity =
+    !!gardenTask?.garden_activity_id ||
+    !!gardenTask?.car_activity_id ||
+    !!gardenTask?.health_activity_id ||
+    !!gardenTask?.finances_activity_id;
+  let activityChecklistLabels: string[] = [];
+  if (isAgendaActivity) {
+    const checklistRows = await sql`select label from checklist_items where task_id = ${taskId}`;
+    activityChecklistLabels = (checklistRows as { label: string }[]).map((r) => r.label);
+  }
+
   await sql`delete from tasks where id = ${taskId}`;
 
   if (gardenTask?.garden_activity_id && gardenTask.garden_occurrence_month && gardenTask.garden_occurrence_year) {
-    await advanceGardenActivity(gardenTask.garden_activity_id, gardenTask.garden_occurrence_month, gardenTask.garden_occurrence_year);
+    await advanceGardenActivity(
+      gardenTask.garden_activity_id,
+      gardenTask.garden_occurrence_month,
+      gardenTask.garden_occurrence_year,
+      activityChecklistLabels
+    );
   }
 
   // Origine "activité Voiture" (migration 005) : la suppression d'une tâche
@@ -577,20 +553,20 @@ export async function deleteTaskAction(formData: FormData) {
   // — même comportement que Jardin ci-dessus, voir advanceCarActivity()
   // (src/lib/car.ts).
   if (gardenTask?.car_activity_id) {
-    await advanceCarActivity(gardenTask.car_activity_id);
+    await advanceCarActivity(gardenTask.car_activity_id, activityChecklistLabels);
   }
 
   // Origine "activité Santé" (migration 007) : même comportement que
   // Voiture ci-dessus, voir advanceHealthActivity() (src/lib/health.ts).
   if (gardenTask?.health_activity_id) {
-    await advanceHealthActivity(gardenTask.health_activity_id);
+    await advanceHealthActivity(gardenTask.health_activity_id, activityChecklistLabels);
   }
 
   // Origine "activité Finances" (migration 008) : même comportement que
   // Voiture/Santé ci-dessus, voir advanceFinancesActivity()
   // (src/lib/finances.ts).
   if (gardenTask?.finances_activity_id) {
-    await advanceFinancesActivity(gardenTask.finances_activity_id);
+    await advanceFinancesActivity(gardenTask.finances_activity_id, activityChecklistLabels);
   }
 
   if (recipients.length > 0) {
@@ -719,13 +695,31 @@ export async function setStatusAction(taskId: string, status: string) {
     }
   }
 
+  // Checklist de la tâche qui se clôt, à transmettre (non cochée) à
+  // l'occurrence suivante — voir les blocs "Origine activité" ci-dessous et
+  // le commentaire sur advanceGardenActivity (src/lib/garden.ts). Une seule
+  // lecture, réutilisée par celui des quatre blocs qui s'applique (une
+  // tâche n'a jamais qu'une seule origine d'activité à la fois).
+  const isAgendaActivity =
+    !!task.garden_activity_id || !!task.car_activity_id || !!task.health_activity_id || !!task.finances_activity_id;
+  let activityChecklistLabels: string[] = [];
+  if (status === "done" && isAgendaActivity) {
+    const checklistRows = await sql`select label from checklist_items where task_id = ${taskId}`;
+    activityChecklistLabels = (checklistRows as { label: string }[]).map((r) => r.label);
+  }
+
   // Origine "activité Jardin" (migration 003) : sa clôture avance
   // l'activité à sa période suivante — voir advanceGardenActivity(),
   // src/lib/garden.ts. Indépendant du bloc de récurrence ci-dessus : une
   // tâche Jardin porte toujours recurrence.type = "none" (la récurrence par
   // périodes est gérée par garden_activities, pas par tasks.recurrence).
   if (status === "done" && task.garden_activity_id && task.garden_occurrence_month && task.garden_occurrence_year) {
-    await advanceGardenActivity(task.garden_activity_id, task.garden_occurrence_month, task.garden_occurrence_year);
+    await advanceGardenActivity(
+      task.garden_activity_id,
+      task.garden_occurrence_month,
+      task.garden_occurrence_year,
+      activityChecklistLabels
+    );
   }
 
   // Origine "activité Voiture" (migration 005) : sa clôture clôt l'activité
@@ -735,7 +729,7 @@ export async function setStatusAction(taskId: string, status: string) {
   // recurrence.type = "none" (la récurrence par intervalle est gérée par
   // car_activities, pas par tasks.recurrence).
   if (status === "done" && task.car_activity_id) {
-    await advanceCarActivity(task.car_activity_id);
+    await advanceCarActivity(task.car_activity_id, activityChecklistLabels);
   }
 
   // Origine "activité Santé" (migration 007) : sa clôture clôt l'activité
@@ -743,7 +737,7 @@ export async function setStatusAction(taskId: string, status: string) {
   // advanceHealthActivity(), src/lib/health.ts. Même logique que Voiture
   // ci-dessus.
   if (status === "done" && task.health_activity_id) {
-    await advanceHealthActivity(task.health_activity_id);
+    await advanceHealthActivity(task.health_activity_id, activityChecklistLabels);
   }
 
   // Origine "activité Finances" (migration 008) : sa clôture clôt
@@ -751,7 +745,7 @@ export async function setStatusAction(taskId: string, status: string) {
   // advanceFinancesActivity(), src/lib/finances.ts. Même logique que
   // Voiture/Santé ci-dessus.
   if (status === "done" && task.finances_activity_id) {
-    await advanceFinancesActivity(task.finances_activity_id);
+    await advanceFinancesActivity(task.finances_activity_id, activityChecklistLabels);
   }
 
   revalidatePath("/");

@@ -7,8 +7,7 @@ import { FormPendingBridge, useGlobalTransition } from "@/components/PendingOver
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SimilarTagsDialog } from "@/components/SimilarTagsDialog";
 import { setFlash } from "@/components/Toast";
-import { EmptyState } from "@/components/EmptyState";
-import { IconChecklist, IconX } from "@/components/Icons";
+import { ChecklistFieldEditor } from "@/components/ChecklistFieldEditor";
 import { dueDatePreset, toDatetimeLocalValue, STATUS_LABELS } from "@/lib/format";
 import { categoryIcon, categoryIconColor, FALLBACK_CATEGORY_SLUG } from "@/lib/categories";
 import { isAgendaEnabled, type AgendaKey } from "@/lib/agendas";
@@ -123,13 +122,13 @@ export function TaskForm({
   // ET edit) — contrairement aux autres mutations de la tâche, il n'y a pas
   // encore de taskId en création, donc pas d'action serveur immédiate
   // possible par item comme avant. `id` absent = item pas encore en base ;
-  // `syncChecklistItems` (src/lib/actions.ts) fait le diff à l'enregistrement
-  // via le champ caché JSON ci-dessous. Cocher/décocher reste réservé à
-  // l'écran de détail (ChecklistSection.tsx) : pas de champ `done` ici.
+  // `syncChecklistItems` (src/lib/checklist.ts) fait le diff à
+  // l'enregistrement via le champ caché JSON ci-dessous. Cocher/décocher
+  // reste réservé à l'écran de détail (ChecklistSection.tsx) : pas de champ
+  // `done` ici.
   const [checklistItems, setChecklistItems] = useState<{ id?: string; label: string }[]>(() =>
     (task?.checklist ?? []).map((item) => ({ id: item.id, label: item.label }))
   );
-  const [newChecklistLabel, setNewChecklistLabel] = useState("");
 
   // Le créateur (celui qui crée la tâche, ou son créateur d'origine en
   // modification) a toujours un accès complet et n'apparaît pas dans la
@@ -185,21 +184,6 @@ export function TaskForm({
       return;
     }
     createNewTag(name);
-  }
-
-  function addChecklistItem() {
-    const label = newChecklistLabel.trim();
-    if (!label) return;
-    setChecklistItems((prev) => [...prev, { label }]);
-    setNewChecklistLabel("");
-  }
-
-  function renameChecklistItem(index: number, label: string) {
-    setChecklistItems((prev) => prev.map((item, i) => (i === index ? { ...item, label } : item)));
-  }
-
-  function removeChecklistItem(index: number) {
-    setChecklistItems((prev) => prev.filter((_, i) => i !== index));
   }
 
   // Bascule vers la création d'activité dans l'agenda dédié (Jardin/
@@ -279,58 +263,7 @@ export function TaskForm({
       </div>
 
       <div className="mb-4">
-        <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-bold">
-          <IconChecklist className="h-3.5 w-3.5 text-ink-muted" /> Checklist
-        </label>
-        {checklistItems.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {checklistItems.map((item, index) => (
-              <li key={item.id ?? `new-${index}`} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item.label}
-                  onChange={(e) => renameChecklistItem(index, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.preventDefault();
-                  }}
-                  className="flex-1 rounded-xl border border-line px-3 py-2 text-[13.5px] outline-none focus:border-brand"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeChecklistItem(index)}
-                  aria-label={`Supprimer « ${item.label} »`}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sand hover:text-ink"
-                >
-                  <IconX className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState>Aucun item pour l&apos;instant.</EmptyState>
-        )}
-        <div className="mt-2 flex items-start gap-2">
-          <input
-            type="text"
-            value={newChecklistLabel}
-            onChange={(e) => setNewChecklistLabel(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addChecklistItem();
-              }
-            }}
-            placeholder="Ajouter un item..."
-            className="flex-1 rounded-xl border border-line px-3 py-2.5 text-[13.5px] outline-none focus:border-brand"
-          />
-          <button
-            type="button"
-            onClick={addChecklistItem}
-            className="shrink-0 rounded-xl border border-line bg-surface px-4 py-2.5 text-[13px] font-bold text-ink-muted"
-          >
-            Ajouter
-          </button>
-        </div>
+        <ChecklistFieldEditor value={checklistItems} onChange={setChecklistItems} />
         <input
           type="hidden"
           name="checklist"

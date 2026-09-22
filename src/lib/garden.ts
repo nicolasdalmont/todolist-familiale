@@ -65,12 +65,16 @@ export function occurrenceDueAtIso(year: number, month: number): string {
 // est toujours ajouté comme éditeur (même convention que createTaskAction
 // dans src/lib/actions.ts : il garde l'accès même s'il n'est pas
 // responsable désigné), les responsables reçoivent une notification s'ils
-// ne sont pas eux-mêmes le créateur.
+// ne sont pas eux-mêmes le créateur. `checklistLabels` (22/09/2026) : la
+// checklist de l'occurrence précédente (ou saisie au formulaire de
+// création), recopiée non cochée — voir syncChecklistItems pour la mise à
+// jour d'une checklist déjà en base (activité modifiée avec tâche ouverte).
 export async function createGardenOccurrenceTask(
   activity: { id: string; name: string; description: string; createdBy: string },
   assigneeIds: string[],
   year: number,
-  month: number
+  month: number,
+  checklistLabels: string[] = []
 ): Promise<void> {
   const dueAt = occurrenceDueAtIso(year, month);
   const visibility = computeVisibility(activity.createdBy, assigneeIds);
@@ -96,6 +100,13 @@ export async function createGardenOccurrenceTask(
     select ${task.id}, u, 'editor' from unnest(${editorIds}::uuid[]) as u
   `;
 
+  if (checklistLabels.length > 0) {
+    await sql`
+      insert into checklist_items (task_id, label)
+      select ${task.id}, u from unnest(${checklistLabels}::text[]) as u
+    `;
+  }
+
   await Promise.all(
     assigneeIds
       .filter((id) => id !== activity.createdBy)
@@ -116,11 +127,16 @@ export async function createGardenOccurrenceTask(
 // `finishedYear` sont ceux de l'occurrence qui vient de se terminer
 // (garden_occurrence_month/year de la tâche) : la période suivante est
 // calculée à partir de là, jamais du jour courant, pour rester correcte
-// même si la tâche traînait en retard depuis plusieurs mois.
+// même si la tâche traînait en retard depuis plusieurs mois. `checklistLabels`
+// (22/09/2026) : la checklist de la tâche qui vient de se terminer, à
+// fournir par l'appelant (et non relue ici) — deleteTaskAction supprime la
+// tâche, donc sa checklist (on delete cascade), avant d'appeler cette
+// fonction ; il n'y aurait donc plus rien à lire à ce stade.
 export async function advanceGardenActivity(
   gardenActivityId: string,
   finishedMonth: number,
-  finishedYear: number
+  finishedYear: number,
+  checklistLabels: string[] = []
 ): Promise<void> {
   const activityRows = await sql`
     select id, name, description, months, created_by
@@ -142,6 +158,7 @@ export async function advanceGardenActivity(
     { id: activity.id, name: activity.name, description: activity.description, createdBy: activity.created_by },
     assigneeIds,
     next.year,
-    next.month
+    next.month,
+    checklistLabels
   );
 }

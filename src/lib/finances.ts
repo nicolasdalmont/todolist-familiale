@@ -52,8 +52,16 @@ type FinancesActivitySeed = {
 // créant l'instance suivante après clôture/suppression). Le créateur de
 // l'activité est toujours ajouté comme éditeur (même convention que
 // createHealthOccurrenceTask, src/lib/health.ts), les responsables reçoivent
-// une notification s'ils ne sont pas eux-mêmes le créateur.
-export async function createFinancesOccurrenceTask(activity: FinancesActivitySeed, assigneeIds: string[]): Promise<void> {
+// une notification s'ils ne sont pas eux-mêmes le créateur. `checklistLabels`
+// (22/09/2026) : la checklist de l'occurrence précédente (ou saisie au
+// formulaire de création), recopiée non cochée — voir syncChecklistItems
+// pour la mise à jour d'une checklist déjà en base (activité modifiée avec
+// tâche ouverte).
+export async function createFinancesOccurrenceTask(
+  activity: FinancesActivitySeed,
+  assigneeIds: string[],
+  checklistLabels: string[] = []
+): Promise<void> {
   const dueAt = occurrenceDueAtIso(activity.dueDate, activity.dayKnown);
   const visibility = computeVisibility(activity.createdBy, assigneeIds);
 
@@ -78,6 +86,13 @@ export async function createFinancesOccurrenceTask(activity: FinancesActivitySee
     select ${task.id}, u, 'editor' from unnest(${editorIds}::uuid[]) as u
   `;
 
+  if (checklistLabels.length > 0) {
+    await sql`
+      insert into checklist_items (task_id, label)
+      select ${task.id}, u from unnest(${checklistLabels}::text[]) as u
+    `;
+  }
+
   await Promise.all(
     assigneeIds
       .filter((id) => id !== activity.createdBy)
@@ -98,8 +113,15 @@ export async function createFinancesOccurrenceTask(activity: FinancesActivitySee
 // deleteTaskAction (src/lib/actions.ts) quand la tâche porte un
 // finances_activity_id, et directement depuis l'écran Finances pour
 // clôturer une activité (via setStatusAction(task.id, "done"), qui retombe
-// ici).
-export async function advanceFinancesActivity(financesActivityId: string): Promise<void> {
+// ici). `checklistLabels` (22/09/2026) : la checklist de la tâche qui vient
+// de se terminer, à fournir par l'appelant (et non relue ici) —
+// deleteTaskAction supprime la tâche, donc sa checklist (on delete
+// cascade), avant d'appeler cette fonction ; il n'y aurait donc plus rien à
+// lire à ce stade.
+export async function advanceFinancesActivity(
+  financesActivityId: string,
+  checklistLabels: string[] = []
+): Promise<void> {
   const rows = await sql`
     select id, name, description, to_char(due_date, 'YYYY-MM-DD') as due_date, day_known, recurrence, created_by
     from finances_activities
@@ -152,6 +174,7 @@ export async function advanceFinancesActivity(financesActivityId: string): Promi
       dueDate: next,
       dayKnown: activity.day_known,
     },
-    assigneeIds
+    assigneeIds,
+    checklistLabels
   );
 }

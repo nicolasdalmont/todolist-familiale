@@ -78,6 +78,7 @@ export default async function JardinPage({
           members={members}
           categories={categories}
           currentMonth={month}
+          currentUserId={profile.id}
           prefill={prefill}
         />
       </main>

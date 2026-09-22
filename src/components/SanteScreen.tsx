@@ -16,6 +16,8 @@ import {
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/Avatar";
+import { ChecklistFieldEditor, type ChecklistDraftItem } from "@/components/ChecklistFieldEditor";
+import { ChecklistSection } from "@/components/ChecklistSection";
 import { IconCheck, IconChecklist, IconPencil, IconPlus, IconSearch, IconTrash } from "./Icons";
 
 // Onglet Santé (voir migration 007 et src/lib/health.ts) : liste des
@@ -72,6 +74,7 @@ type FormState = {
   recurrenceInterval: number | "";
   recurrenceUnit: "days" | "weeks" | "months" | "years";
   assigneeIds: string[];
+  checklist: ChecklistDraftItem[];
 };
 
 function activityToFormState(activity: HealthActivity): FormState {
@@ -85,6 +88,7 @@ function activityToFormState(activity: HealthActivity): FormState {
     recurrenceInterval: activity.recurrence?.interval ?? 2,
     recurrenceUnit: activity.recurrence?.unit ?? "weeks",
     assigneeIds: activity.assignees.map((a) => a.id),
+    checklist: (activity.openTask?.checklist ?? []).map((item) => ({ id: item.id, label: item.label })),
   };
 }
 
@@ -98,6 +102,7 @@ const EMPTY_FORM: FormState = {
   recurrenceInterval: 2,
   recurrenceUnit: "weeks",
   assigneeIds: [],
+  checklist: [],
 };
 
 function ActivityForm({
@@ -235,6 +240,7 @@ function ActivityForm({
         <span className="mb-1 block text-[12.5px] font-bold">Responsable(s)</span>
         <AssigneeField members={members} value={state.assigneeIds} onChange={(ids) => set("assigneeIds", ids)} />
       </div>
+      <ChecklistFieldEditor value={state.checklist} onChange={(items) => set("checklist", items)} />
       {error ? <p className="text-[12.5px] font-semibold text-red-600">{error}</p> : null}
       <div className="flex gap-2">
         <button
@@ -269,6 +275,12 @@ function formStateToFormData(state: FormState): FormData {
     fd.set("recurrenceUnit", state.recurrenceUnit);
   }
   for (const id of state.assigneeIds) fd.append("assignees", id);
+  fd.set(
+    "checklist",
+    JSON.stringify(
+      state.checklist.map((item) => ({ id: item.id, label: item.label.trim() })).filter((item) => item.label.length > 0)
+    )
+  );
   return fd;
 }
 
@@ -281,10 +293,12 @@ function matchesQuery(activity: HealthActivity, query: string): boolean {
 export function SanteScreen({
   activities,
   members,
+  currentUserId,
   prefill,
 }: {
   activities: HealthActivity[];
   members: Pick<Profile, "id" | "name" | "color">[];
+  currentUserId: string;
   // Reprise de saisie depuis TaskForm.tsx (voir AGENDA_CATEGORY_INFO) :
   // ouvre directement le formulaire de création avec ces valeurs.
   prefill?: AgendaActivityPrefill;
@@ -512,6 +526,16 @@ export function SanteScreen({
                     </button>
                   </div>
                 </div>
+
+                {activity.openTask && activity.openTask.checklist.length > 0 ? (
+                  <div className="mt-3 border-t border-line-soft pt-3">
+                    <ChecklistSection
+                      taskId={activity.openTask.id}
+                      items={activity.openTask.checklist}
+                      editable={activity.createdBy === currentUserId || activity.assignees.some((a) => a.id === currentUserId)}
+                    />
+                  </div>
+                ) : null}
 
                 {editingId === activity.id ? (
                   <div className="mt-3 border-t border-line-soft pt-3">

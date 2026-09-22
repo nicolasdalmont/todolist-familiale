@@ -56,7 +56,7 @@ export default async function FinancesPage({
           </HelpButton>
         </div>
 
-        <FinancesScreen activities={activities} members={members} prefill={prefill} />
+        <FinancesScreen activities={activities} members={members} currentUserId={profile.id} prefill={prefill} />
       </main>
     </div>
   );

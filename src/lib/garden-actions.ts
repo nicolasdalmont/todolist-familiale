@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth";
 import { createGardenOccurrenceTask, currentParisYearMonth, nextGardenOccurrence, occurrenceDueAtIso } from "@/lib/garden";
 import { FALLBACK_GARDEN_CATEGORY_SLUG } from "@/lib/garden-categories";
+import { parseChecklistItems, syncChecklistItems } from "@/lib/checklist";
 
 // Gestion des activités récurrentes du jardin (onglet Jardin, migration
 // 003) — ouverte à tout utilisateur connecté, pas réservée à l'admin
@@ -58,6 +59,7 @@ export async function createGardenActivityAction(formData: FormData): Promise<Re
   const assigneeIds = parseAssigneeIds(formData);
   if (assigneeIds.length === 0) return { error: "Sélectionne au moins un responsable." };
   const category = await resolveGardenCategorySlug(String(formData.get("category") || ""));
+  const checklistLabels = parseChecklistItems(formData).map((i) => i.label);
 
   let activity: { id: string } | undefined;
   try {
@@ -79,7 +81,13 @@ export async function createGardenActivityAction(formData: FormData): Promise<Re
 
   const { year, month } = currentParisYearMonth();
   const next = nextGardenOccurrence(months, year, month, false);
-  await createGardenOccurrenceTask({ id: activity.id, name, description, createdBy: userId }, assigneeIds, next.year, next.month);
+  await createGardenOccurrenceTask(
+    { id: activity.id, name, description, createdBy: userId },
+    assigneeIds,
+    next.year,
+    next.month,
+    checklistLabels
+  );
 
   revalidate();
   return { ok: true };
@@ -102,6 +110,7 @@ export async function updateGardenActivityAction(formData: FormData): Promise<Re
   const assigneeIds = parseAssigneeIds(formData);
   if (assigneeIds.length === 0) return { error: "Sélectionne au moins un responsable." };
   const category = await resolveGardenCategorySlug(String(formData.get("category") || ""));
+  const checklistItems = parseChecklistItems(formData);
 
   const existingRows = await sql`select id, created_by from garden_activities where id = ${activityId}`;
   const existing = existingRows[0] as { id: string; created_by: string } | undefined;
@@ -162,6 +171,8 @@ export async function updateGardenActivityAction(formData: FormData): Promise<Re
       insert into task_assignees (task_id, user_id, role)
       select ${openTask.id}, u, 'editor' from unnest(${editorIds}::uuid[]) as u
     `;
+
+    await syncChecklistItems(openTask.id, checklistItems);
   } else {
     // Cas limite (pas de tâche ouverte, ex. donnée incohérente) : on en
     // recrée une pour la prochaine période plutôt que de laisser
@@ -172,7 +183,8 @@ export async function updateGardenActivityAction(formData: FormData): Promise<Re
       { id: activityId, name, description, createdBy: existing.created_by },
       assigneeIds,
       next.year,
-      next.month
+      next.month,
+      checklistItems.map((i) => i.label)
     );
   }
 

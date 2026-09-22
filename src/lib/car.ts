@@ -52,7 +52,15 @@ type CarActivitySeed = {
 // l'activité est toujours ajouté comme éditeur (même convention que
 // createGardenOccurrenceTask, src/lib/garden.ts), les responsables
 // reçoivent une notification s'ils ne sont pas eux-mêmes le créateur.
-export async function createCarOccurrenceTask(activity: CarActivitySeed, assigneeIds: string[]): Promise<void> {
+// `checklistLabels` (22/09/2026) : la checklist de l'occurrence précédente
+// (ou saisie au formulaire de création), recopiée non cochée — voir
+// syncChecklistItems pour la mise à jour d'une checklist déjà en base
+// (activité modifiée avec tâche ouverte).
+export async function createCarOccurrenceTask(
+  activity: CarActivitySeed,
+  assigneeIds: string[],
+  checklistLabels: string[] = []
+): Promise<void> {
   const dueAt = occurrenceDueAtIso(activity.dueDate, activity.dayKnown);
   const visibility = computeVisibility(activity.createdBy, assigneeIds);
 
@@ -77,6 +85,13 @@ export async function createCarOccurrenceTask(activity: CarActivitySeed, assigne
     select ${task.id}, u, 'editor' from unnest(${editorIds}::uuid[]) as u
   `;
 
+  if (checklistLabels.length > 0) {
+    await sql`
+      insert into checklist_items (task_id, label)
+      select ${task.id}, u from unnest(${checklistLabels}::text[]) as u
+    `;
+  }
+
   await Promise.all(
     assigneeIds
       .filter((id) => id !== activity.createdBy)
@@ -96,8 +111,12 @@ export async function createCarOccurrenceTask(activity: CarActivitySeed, assigne
 // + sa tâche). Appelé depuis setStatusAction/deleteTaskAction
 // (src/lib/actions.ts) quand la tâche porte un car_activity_id, et
 // directement depuis l'écran Voiture pour clôturer une activité (via
-// setStatusAction(task.id, "done"), qui retombe ici).
-export async function advanceCarActivity(carActivityId: string): Promise<void> {
+// setStatusAction(task.id, "done"), qui retombe ici). `checklistLabels`
+// (22/09/2026) : la checklist de la tâche qui vient de se terminer, à
+// fournir par l'appelant (et non relue ici) — deleteTaskAction supprime la
+// tâche, donc sa checklist (on delete cascade), avant d'appeler cette
+// fonction ; il n'y aurait donc plus rien à lire à ce stade.
+export async function advanceCarActivity(carActivityId: string, checklistLabels: string[] = []): Promise<void> {
   const rows = await sql`
     select id, name, description, to_char(due_date, 'YYYY-MM-DD') as due_date, day_known, recurrence, created_by
     from car_activities
@@ -150,6 +169,7 @@ export async function advanceCarActivity(carActivityId: string): Promise<void> {
       dueDate: next,
       dayKnown: activity.day_known,
     },
-    assigneeIds
+    assigneeIds,
+    checklistLabels
   );
 }

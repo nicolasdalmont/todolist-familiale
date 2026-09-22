@@ -6,12 +6,15 @@ import { dateKeyFromDate, dateKeyFromIso, formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-// Rappel quotidien des tâches dues aujourd'hui (jour civil de l'appli —
-// voir src/lib/timezone.ts), déclenché une fois par jour par Vercel Cron
-// (voir vercel.json). Peut être coupé depuis l'onglet « Réglages » de
-// l'admin (app_settings.reminder_enabled, migration 010) sans redéployer.
-// L'heure du déclenchement, elle, est le `schedule` du cron (Vercel Hobby
-// ne permet pas plus d'un déclenchement par jour). Notifie chaque participant
+// Rappel quotidien des tâches dues aujourd'hui ou demain (jour civil de
+// l'appli — voir src/lib/timezone.ts), déclenché une fois par jour par
+// Vercel Cron (voir vercel.json). Peut être coupé depuis l'onglet
+// « Réglages » de l'admin (app_settings.reminder_enabled, migration 010)
+// sans redéployer. L'heure du déclenchement, elle, est le `schedule` du
+// cron (Vercel Hobby ne permet pas plus d'un déclenchement par jour — pas
+// de rappel « 1h avant l'échéance » possible sans passer par un
+// déclencheur externe plus fréquent ; décision utilisateur du 22/09/2026 :
+// on s'en tient à la veille + le jour même). Notifie chaque participant
 // (créateur + assigné(e)s — notifyTaskParticipants(), src/lib/
 // notifications.ts, in-app + push), y compris sur une tâche privée : ce
 // n'est pas l'action d'un autre membre dont on informe les participants,
@@ -20,7 +23,9 @@ export const dynamic = "force-dynamic";
 // Un garde-fou évite un doublon si Vercel retentait l'appel le même jour :
 // on ne notifie une tâche que si aucune notification "due_soon" n'a déjà
 // été créée pour elle dans les dernières 20h (marge large plutôt qu'un
-// calcul de minuit civil, le cron ne tournant qu'une fois par jour).
+// calcul de minuit civil, le cron ne tournant qu'une fois par jour — cette
+// même marge sépare naturellement le rappel de la veille de celui du jour
+// même, envoyés à ~24h d'intervalle).
 //
 // Protégée par CRON_SECRET (voir src/middleware.ts, /api/cron exclu de la
 // vérification de session — comme /api/version et /api/push, ceci n'est
@@ -39,6 +44,9 @@ export async function GET(request: Request) {
   }
 
   const todayKey = dateKeyFromDate(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = dateKeyFromDate(tomorrow);
 
   let tasks: { id: string; title: string; due_at: string }[];
   try {
@@ -53,25 +61,38 @@ export async function GET(request: Request) {
   }
 
   const dueToday = tasks.filter((t) => dateKeyFromIso(t.due_at) === todayKey);
+  const dueTomorrow = tasks.filter((t) => dateKeyFromIso(t.due_at) === tomorrowKey);
   const recentCutoff = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
 
-  let notified = 0;
-  for (const task of dueToday) {
+  async function remindOnce(task: { id: string; title: string; due_at: string }, title: string) {
     const alreadySentRows = await sql`
       select count(*)::int as n from notifications
       where task_id = ${task.id} and type = 'due_soon' and created_at >= ${recentCutoff}
     `;
     const alreadySent = (alreadySentRows[0] as { n: number } | undefined)?.n ?? 0;
-    if (alreadySent > 0) continue;
+    if (alreadySent > 0) return false;
 
     await notifyTaskParticipants({
       taskId: task.id,
       type: "due_soon",
-      title: `« ${task.title} » échoit aujourd'hui`,
+      title,
       body: `Échéance : ${formatDate(task.due_at)}`,
     });
-    notified++;
+    return true;
   }
 
-  return NextResponse.json({ ok: true, dueToday: dueToday.length, notified });
+  let notified = 0;
+  for (const task of dueTomorrow) {
+    if (await remindOnce(task, `« ${task.title} » échoit demain`)) notified++;
+  }
+  for (const task of dueToday) {
+    if (await remindOnce(task, `« ${task.title} » échoit aujourd'hui`)) notified++;
+  }
+
+  return NextResponse.json({
+    ok: true,
+    dueToday: dueToday.length,
+    dueTomorrow: dueTomorrow.length,
+    notified,
+  });
 }

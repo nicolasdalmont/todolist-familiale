@@ -9,7 +9,7 @@ import { StreakBadge } from "@/components/Badge";
 import { AccountPasswordForm } from "@/components/AccountPasswordForm";
 import { NotificationsToggle } from "@/components/NotificationsToggle";
 import { HelpButton } from "@/components/HelpButton";
-import { IconArrowLeft, IconBarChart } from "@/components/Icons";
+import { IconArrowLeft, IconBarChart, IconBulb } from "@/components/Icons";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export default async function AccountPage() {
               <li>Activer les notifications push de cet appareil.</li>
               <li>Modifier ton mot de passe.</li>
             </ul>
-            <p>Sur mobile, l&apos;accès à l&apos;espace admin (si tu es administrateur) est aussi ici.</p>
+            <p>Sur mobile, l&apos;accès à la boîte à idées, et à l&apos;espace admin (si tu es administrateur), est aussi ici.</p>
           </HelpButton>
         </div>
 
@@ -58,6 +58,22 @@ export default async function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* La barre d'onglets du bas ne porte pas d'entrée « Idées » (pour
+            ne pas surcharger les 5 emplacements déjà pris) : sur mobile,
+            elle est accessible ici, ouverte à tous (pas réservée à l'admin,
+            contrairement au bloc suivant). Sur desktop, le bandeau
+            supérieur s'en charge (Topbar.tsx) — d'où le sm:hidden. */}
+        <Link
+          href="/idees"
+          className="mb-4 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-sm hover:border-brand/50 sm:hidden"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-dark">
+            <IconBulb className="h-4 w-4" />
+          </span>
+          <span className="text-sm font-bold">Idées</span>
+          <IconArrowLeft className="ml-auto h-4 w-4 rotate-180 text-ink-muted" />
+        </Link>
 
         {/* La barre d'onglets du bas ne porte pas d'entrée « Admin » (rare,
             réservée) : sur mobile, elle est accessible ici. Sur desktop, le

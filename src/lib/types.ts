@@ -329,6 +329,20 @@ export interface HealthActivity {
   openTask: { id: string; status: TaskStatus; due_at: string | null; checklist: ChecklistItem[] } | null;
 }
 
+// Boîte à idées (onglet Idées, migration 010) — suggestion d'amélioration
+// en texte libre, voir src/lib/ideas-queries.ts. "created" : proposée,
+// "processed" : prise en compte/en cours, "done" : réalisée.
+export type IdeaStatus = "created" | "processed" | "done";
+
+export interface Idea {
+  id: string;
+  content: string;
+  status: IdeaStatus;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+
 // Activité récurrente de finances (onglet Finances, migration 008) — voir
 // src/lib/finances.ts. Même montage que HealthActivity/CarActivity : chaque
 // instance EST une occurrence datée, sa clôture crée une NOUVELLE ligne

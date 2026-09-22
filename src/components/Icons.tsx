@@ -451,3 +451,19 @@ export function IconHelpCircle({ className = "" }: IconProps) {
     </svg>
   );
 }
+
+// Onglet Idées (boîte à idées, migration 010).
+export function IconBulb({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M9 18h6M10 21h4M8.5 14.5A5.5 5.5 0 1 1 15.5 14.5c-.9.9-1.5 1.6-1.5 2.5h-4c0-.9-.6-1.6-1.5-2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12 3.5v1.3M5 8.3l1 .9M19 8.3l-1 .9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}

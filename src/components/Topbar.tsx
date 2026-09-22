@@ -37,6 +37,12 @@ export async function Topbar({ user }: { user: Profile }) {
             Agendas
           </Link>
         ) : null}
+        <Link
+          href="/idees"
+          className="hidden text-[13px] font-semibold text-ink-muted hover:text-ink sm:block"
+        >
+          Idées
+        </Link>
         {user.role === "admin" ? (
           <Link
             href="/admin"

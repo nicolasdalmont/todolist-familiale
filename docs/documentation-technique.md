@@ -1485,7 +1485,7 @@ push, ni pastille), ça n'apparaît plus que dans « Activité du jour » (voir
 | `task_shared` | `createTaskAction` (partage) / `updateTaskAction` (personne nouvellement ajoutée) | les personnes ajoutées |
 | `task_deleted` | `deleteTaskAction` sur une tâche partagée | créateur + assigné(e)s, sauf l'auteur — notif sans lien (`task_id = null`, la tâche n'existe plus) |
 | `comment_added` | `addCommentAction` sur une tâche partagée | participants sauf l'auteur |
-| `due_soon` | `/api/cron/reminders` (Vercel Cron, 1×/jour) — tâche `todo`/`in_progress` dont l'échéance tombe aujourd'hui (jour civil de Paris) | créateur + assigné(e)s, **y compris sur une tâche privée** |
+| `due_soon` | `/api/cron/reminders` (Vercel Cron, 1×/jour) — tâche `todo`/`in_progress` dont l'échéance tombe aujourd'hui **ou demain** (jour civil de Paris) | créateur + assigné(e)s, **y compris sur une tâche privée** |
 
 Les types `task_updated` et `status_changed` restent définis (des
 notifications antérieures non lues peuvent encore en porter) mais ne sont
@@ -1496,17 +1496,30 @@ plus **émis**. `notifyTaskParticipants()` n'est donc plus appelé que par
 … »), envoyé à chaque personne avec qui la tâche est partagée dès sa
 création — pas de type `task_created` distinct.
 
-**Rappel d'échéance** (`src/app/api/cron/reminders/route.ts`, 04/09/2026) :
-route déclenchée une fois par jour par **Vercel Cron** (`vercel.json`,
-`0 7 * * *` — 07:00 UTC, ≈ 8-9h à Paris selon la saison), protégée par
-`CRON_SECRET` (Vercel l'ajoute automatiquement en en-tête `Authorization`
-à ses appels). Contrairement aux autres types, elle notifie **même le
-créateur d'une tâche privée** : ce n'est pas l'action d'un tiers dont on
-informe des participants, mais un rappel adressé à chacun. Un garde-fou
-(pas de nouveau `due_soon` pour la même tâche dans les 20h précédentes)
-évite un doublon si Vercel retentait l'appel. Exclue du middleware
-d'authentification (voir 3), comme `/api/version` et `/api/push` : elle
-n'est jamais appelée par un navigateur.
+**Rappel d'échéance** (`src/app/api/cron/reminders/route.ts`, 04/09/2026,
+étendu le 22/09/2026) : route déclenchée une fois par jour par **Vercel
+Cron** (`vercel.json`, `0 7 * * *` — 07:00 UTC, ≈ 8-9h à Paris selon la
+saison), protégée par `CRON_SECRET` (Vercel l'ajoute automatiquement en
+en-tête `Authorization` à ses appels). À chaque passage, deux lots sont
+notifiés séparément (titre différent, même type `due_soon`) : les tâches
+dont l'échéance tombe **demain** (« … échoit demain ») puis celles dont
+elle tombe **aujourd'hui** (« … échoit aujourd'hui »). Contrairement aux
+autres types, elle notifie **même le créateur d'une tâche privée** : ce
+n'est pas l'action d'un tiers dont on informe des participants, mais un
+rappel adressé à chacun. Un garde-fou (pas de nouveau `due_soon` pour la
+même tâche dans les 20h précédentes) évite un doublon si Vercel retentait
+l'appel ; cette même marge sépare naturellement le rappel de la veille de
+celui du jour même, envoyés à ~24h d'intervalle par des passages de cron
+distincts. Exclue du middleware d'authentification (voir 3), comme
+`/api/version` et `/api/push` : elle n'est jamais appelée par un
+navigateur.
+
+Un rappel « 1h avant l'échéance » a été envisagé (22/09/2026) mais
+abandonné : **Vercel Hobby limite le cron à un déclenchement par jour**,
+insuffisant pour viser une heure précise sans déclencheur externe plus
+fréquent (GitHub Actions, upgrade Vercel Pro, service tiers type
+cron-job.org/Upstash QStash) — décision utilisateur de s'en tenir à la
+veille + le jour même plutôt que d'ajouter cette dépendance.
 
 **Lecture / affichage** (`AttentionFeed.tsx`) : `getMyNotifications()`
 (`src/lib/queries.ts`) ne renvoie **que les notifications non lues** (30

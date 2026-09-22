@@ -133,7 +133,9 @@ partagée/privée est appliquée entièrement au niveau applicatif
   jour » (ce que fait la famille) — plus « Partagées avec toi » (les
   tâches où tu es en lecture seule). Notifications push web (opt-in par
   appareil, écran « Mon compte ») + rappel d'échéance quotidien (Vercel
-  Cron). Voir la doc technique §6.15 et §6.16.
+  Cron, veille + jour même — pas de rappel « 1h avant », Vercel Hobby ne
+  permettant qu'un déclenchement par jour). Voir la doc technique §6.15 et
+  §6.16.
 - Export d'une tâche datée vers le calendrier de l'appareil (fichier
   `.ics`). Voir §6.13.
 - Gamification (12/09/2026, en test) : streak personnel (jours actifs

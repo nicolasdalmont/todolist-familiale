@@ -215,6 +215,14 @@ partagée/privée est appliquée entièrement au niveau applicatif
   de l'activité, coche/décoche depuis la liste. Transmise à la tâche
   générée ; repart non cochée à chaque nouvelle occurrence. Voir la doc
   technique §6.28.
+- Onglet Idées (22/09/2026, `/idees`) : boîte à idées familiale — à
+  l'image de la fonctionnalité équivalente sur mabedetheque (autre projet
+  de l'utilisateur), adaptée au modèle multi-utilisateur de cette appli.
+  Formulaire de saisie libre, filtre et changement de statut (Proposée /
+  En cours / Réalisée), suppression avec confirmation ; ouvert à toute la
+  famille, pas réservé à l'admin. Accessible depuis le bandeau supérieur
+  sur desktop et depuis « Mon compte » sur mobile (pas dans la barre
+  d'onglets du bas, déjà pleine). Voir la doc technique §6.29.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

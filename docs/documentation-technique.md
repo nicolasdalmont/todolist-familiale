@@ -3,9 +3,25 @@
 *(anciennement « To-Do List Familiale » ; dépôt GitHub toujours
 `nicolasdalmont/todolist-familiale`.)*
 
-Dernière mise à jour : 17/09/2026. Lot de ce jour (le plus récent
-d'abord) : **checklist — gestion déplacée dans le formulaire de tâche**
-(6.10) : créer/renommer/supprimer un item se fait désormais dans
+Dernière mise à jour : 22/09/2026. Lot de ce jour (le plus récent
+d'abord) : **Idées — boîte à idées familiale** (6.29) : nouvel onglet
+`/idees`, à l'image de la fonctionnalité équivalente sur mabedetheque
+(autre projet de l'utilisateur) — formulaire de saisie libre, filtre et
+changement de statut (Proposée/En cours/Réalisée), suppression avec
+confirmation, adapté au modèle multi-utilisateur de cette appli (toute
+idée est visible et modifiable par toute la famille, pas de propriétaire
+exclusif comme sur mabedetheque qui est mono-utilisateur avec RLS) ;
+nouvelle table `ideas` (migration `010_ideas.sql`), pas rattaché au
+système de bascule des agendas (6.26) — fonctionnalité permanente, pas
+une activité récurrente familiale ; accessible depuis le bandeau
+supérieur (desktop) et depuis « Mon compte » (mobile, barre d'onglets du
+bas déjà pleine). Avant ça, même semaine : **checklist dans les
+activités d'agenda** (6.28) et **rappel de la veille de l'échéance d'une
+tâche** (6.15), tous deux du 22/09/2026.
+
+Lot du 17/09/2026 (le plus récent d'abord) : **checklist — gestion
+déplacée dans le formulaire de tâche** (6.10) : créer/renommer/supprimer
+un item se fait désormais dans
 `TaskForm.tsx`, juste sous la description, en création comme en édition
 (sérialisé en JSON dans un champ caché, diff explicite côté serveur —
 `syncChecklistItems()` — pour préserver l'état coché des items existants
@@ -2266,13 +2282,13 @@ arrondie), simplifié à un seul bouton « Compris » — fermeture aussi au cli
 sur le fond ou à Échap. Icône dédiée `IconHelpCircle`
 (`src/components/Icons.tsx`).
 
-**12 écrans couverts** : Accueil, Tâches, Agendas, Jardin, Voiture, Santé,
-Finances, Mon compte, Admin, et les trois écrans de tâche (Nouvelle tâche,
-Modifier la tâche, Détail de la tâche). Emplacement dans l'en-tête, au cas
-par cas :
+**13 écrans couverts** : Accueil, Tâches, Agendas, Jardin, Voiture, Santé,
+Finances, Idées (ajouté le 22/09/2026, voir 6.29), Mon compte, Admin, et
+les trois écrans de tâche (Nouvelle tâche, Modifier la tâche, Détail de
+la tâche). Emplacement dans l'en-tête, au cas par cas :
 
 - Écrans avec un en-tête « retour + titre » (Jardin/Voiture/Santé/
-  Finances/Mon compte/Nouvelle tâche/Modifier la tâche) : le bouton
+  Finances/Idées/Mon compte/Nouvelle tâche/Modifier la tâche) : le bouton
   d'aide est ajouté en fin de ligne (`justify-between`).
 - Accueil (pas d'en-tête classique, une salutation) : ajouté à côté de la
   salutation.
@@ -2378,6 +2394,46 @@ une tâche, seulement une liste plate de responsables.
   c'est l'appelant (`setStatusAction`/`deleteTaskAction`, `actions.ts`)
   qui la lit *avant* de clôturer/supprimer la tâche, et la transmet en
   paramètre.
+
+### 6.29 Idées — boîte à idées familiale (22/09/2026)
+
+Nouvel onglet **Idées** (`IconBulb`, voir `Topbar.tsx`) : boîte à idées
+ouverte à toute la famille, à l'image de la fonctionnalité équivalente
+sur mabedetheque (autre projet de l'utilisateur, `app/ideas/page.tsx`) —
+formulaire de saisie libre, liste triée par date de création
+décroissante, filtre par statut, suppression avec confirmation.
+
+**Table `ideas`** (migration `010_ideas.sql`, à appliquer manuellement
+sur Neon) : `content` (texte libre), `status` (`created`/`processed`/
+`done`, affichés « Proposée »/« En cours »/« Réalisée »), `created_by`
+(→ `users.id`), `created_at`. Contrairement à mabedetheque (mono-
+utilisateur, une politique RLS par `owner_id`), pas de propriétaire
+exclusif ici : toute idée est visible et modifiable par tout membre de la
+famille, comme pour les tâches — `src/lib/ideas-queries.ts` /
+`src/lib/ideas-actions.ts` ne filtrent donc jamais par utilisateur, à la
+différence des Server Actions équivalentes de mabedetheque.
+
+**Écran** (`IdeesScreen.tsx`, `src/app/idees/page.tsx`) : un formulaire
+de création (`createIdeaAction`) au-dessus de chips de filtre par statut
+(Toutes/Proposée/En cours/Réalisée, état purement client), puis la liste
+filtrée — chaque carte affiche le contenu, l'auteur, la date relative
+(`Time`), un `<select>` de statut (`setIdeaStatusAction`, tout membre
+peut faire avancer n'importe quelle idée) et un bouton de suppression
+(`deleteIdeaAction` derrière `ConfirmDialog`, même moule que
+`TagManager.tsx`).
+
+**Pas rattaché au système de bascule des agendas** (6.26,
+`src/lib/agendas.ts`) : Idées n'est pas une activité récurrente
+familiale au sens de Jardin/Voiture/Santé/Finances, mais une
+fonctionnalité permanente comme Tâches — pas d'entrée dans
+`agenda_toggles`, jamais masquée depuis l'admin.
+
+**Navigation.** Pas d'entrée dans la barre d'onglets du bas (déjà
+pleine à 5 emplacements avec le bouton « Créer », voir 6.16) : lien
+desktop dans le bandeau supérieur (`Topbar.tsx`, à côté de « Tâches »/
+« Agendas »), lien mobile depuis « Mon compte » (`/compte`) — même
+gabarit visuel que le bloc « Espace admin » qui y vit déjà, mais ouvert à
+tous, pas réservé à l'admin.
 
 ## 8. Limites connues et points d'attention
 

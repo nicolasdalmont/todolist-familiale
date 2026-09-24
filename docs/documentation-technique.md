@@ -2679,6 +2679,12 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 
 ## 10. Workflow de développement et de déploiement
 
+> Ce qui suit décrit le déploiement de **cette** instance (production
+> actuelle, celle de l'utilisateur). Pour déployer une instance
+> **indépendante** (donner l'application à quelqu'un d'autre pour son
+> propre usage familial), voir le guide dédié
+> `docs/deploiement.md` — pas à pas, sans prérequis technique.
+
 - **Copie de travail locale, Claude commit/push lui-même** (flux actuel).
   Une session Claude Code clone le dépôt (public depuis le 03/09/2026),
   modifie le code localement, vérifie (voir ci-dessous), puis exécute

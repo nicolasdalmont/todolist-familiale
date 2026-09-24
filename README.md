@@ -5,6 +5,11 @@ Application web responsive de gestion de tâches partagées en famille
 `todolist-familiale`) — Next.js (App Router) + Neon (Postgres serverless)
 + Vercel (hébergement).
 
+> **Envie de déployer sa propre instance pour sa propre famille ?** Voir
+> [`docs/deploiement.md`](docs/deploiement.md) — guide pas à pas, aucune
+> connaissance technique requise. Le reste de ce README s'adresse à
+> quelqu'un qui développe sur le projet.
+
 Ce dépôt est développé par Claude Code depuis une copie locale : lecture,
 modification, vérification (`tsc`/`build`) et `git commit`/`push` directs
 sur `main`, chaque push déclenchant un déploiement Vercel production (voir

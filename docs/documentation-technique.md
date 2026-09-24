@@ -290,10 +290,21 @@ sources complémentaires, toutes deux dans `db/` :
    - `007_health_activities.sql` — tables `health_activities`,
      `health_activity_assignees`, colonne `tasks.health_activity_id`,
      catégorie de tâche `sante` (onglet Santé, voir 6.21).
+   - `008_finances_activities.sql` — tables `finances_activities`,
+     `finances_activity_assignees`, colonne `tasks.finances_activity_id`,
+     catégorie de tâche `finances` avec icône `euro` (onglet Finances,
+     voir 6.23).
+   - `009_agenda_toggles.sql` — colonnes `app_settings.jardin_enabled` /
+     `voiture_enabled` / `sante_enabled` / `finances_enabled`
+     (activation/désactivation des agendas, voir 6.26).
+   - `010_ideas.sql` — table `ideas` (onglet Idées, voir 6.29).
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
-   parallèle pour rester le reflet fidèle de la structure.
+   parallèle pour rester le reflet fidèle de la structure — **à jour
+   jusqu'à la migration 010 inclue au 24/09/2026** : un déploiement neuf
+   n'a besoin que de `neon_schema.sql`, pas de rejouer ces dix fichiers
+   un par un.
 
 **Le contenu (les lignes) n'est pas versionné ici** : `neon_schema.sql`
 ne sème qu'un compte `Admin` de secours (mot de passe temporaire
@@ -460,21 +471,48 @@ axe de classement **indépendant** : n'a aucun lien avec la catégorie
 catégories de départ (`taille`, `semis`, `plantation`, `autre`) — voir
 6.19 et migration `004_garden_activity_categories.sql`.
 
-19 tables au total. Aucune notion de Row Level Security côté Neon (voir
-section 3) : la sécurité applicative est entièrement gérée par
-`src/lib/access.ts`.
+**`car_activities`** — activité récurrente de voiture (`id`, `name`,
+`description`, `due_date` date, `day_known` boolean, `recurrence` jsonb
+même forme que `tasks.recurrence`, `status`, `created_by` → `users.id`,
+`created_at`) — voir 6.20 et migration `005_car_activities.sql`.
+Contrairement à `garden_activities` (un ensemble de mois porté par une
+ligne persistante), chaque activité voiture **est** une instance datée à
+part entière : sa clôture crée une nouvelle ligne (l'occurrence suivante)
+plutôt que d'avancer un compteur sur celle-ci.
+
+**`car_activity_assignees`** — table de liaison many-to-many
+`car_activities` ↔ `users`, même forme que `garden_activity_assignees` —
+voir 6.20.
+
+**`health_activities`** / **`health_activity_assignees`** — même modèle
+exactement que `car_activities` / `car_activity_assignees` ci-dessus,
+pour les activités de santé — voir 6.21 et migration
+`007_health_activities.sql`.
+
+**`finances_activities`** / **`finances_activity_assignees`** — même
+modèle exactement que `car_activities` / `car_activity_assignees`
+ci-dessus, pour les activités de finances — voir 6.23 et migration
+`008_finances_activities.sql`.
+
+**`ideas`** — une idée de la boîte à idées familiale (`id`, `content`,
+`status` (`created`/`processed`/`done`), `created_by` → `users.id`,
+`created_at`) — voir 6.29 et migration `010_ideas.sql`. Pas de
+`visibility`/partage : ouverte à toute la famille, comme `activity_log`
+pour une tâche partagée.
+
+26 tables au total (mises à jour au fil des migrations 001 à 010 — voir
+5.1). Aucune notion de Row Level Security côté Neon (voir section 3) : la
+sécurité applicative est entièrement gérée par `src/lib/access.ts`.
 
 ### 5.3 Script de reconstruction intégrale (`db/neon_schema.sql`, migration Neon du 11/09/2026)
 
-Ce script est **complet et exécutable tel quel** : il recrée les 15 tables
-actuelles (`users`, `tasks`, `task_assignees`, `comments`, `categories`,
-`app_settings`, `tags`, `task_tags`, `checklist_items`, `activity_log`,
-`user_activity_log`, `reward_tiers`, `challenge_results`,
-`reward_achievements`, `notifications`, `push_subscriptions`), les index de
-`activity_log`, `user_activity_log`, `reward_achievements`, `notifications` et
-`push_subscriptions`, et sème un compte administrateur de secours
-(`Admin`, mot de passe temporaire `bonjour2026`), la ligne unique
-`app_settings`, les 7 catégories de départ et les 9 tags de départ.
+Ce script est **complet et exécutable tel quel** : il recrée les 26 tables
+actuelles (voir la liste détaillée en 5.2 — inclut désormais les
+activités de jardin/voiture/santé/finances et les idées, migrations 001 à
+010 comprises), tous leurs index, et sème un compte administrateur de
+secours (`Admin`, mot de passe temporaire `bonjour2026`), la ligne unique
+`app_settings`, les 10 catégories de départ (dont `finances`, icône
+dédiée `euro`) et les 9 tags de départ.
 **À n'utiliser qu'en cas de sinistre** (base perdue/corrompue, nouvel
 environnement de secours) : c'est un reset complet (`drop table ...
 cascade`) qui ne doit jamais être rejoué sur la base en fonctionnement
@@ -490,9 +528,12 @@ clés PK/FK et leurs `on delete` (`on delete cascade` pour
 `task_assignees`/`comments`/`task_tags`/`checklist_items` et
 `activity_log.task_id`, `on delete set null` pour
 `activity_log.actor_id` — comportement documenté en 5.2 et 6.12),
-augmentée des tables ajoutées depuis (`categories`, `app_settings`,
-`user_activity_log`). Deux écarts par rapport à un Postgres géré par un
-fournisseur comme Supabase, documentés en tête du script :
+augmentée des 16 tables ajoutées depuis (`categories`, `app_settings`,
+`user_activity_log`, `reward_tiers`/`challenge_results`/
+`reward_achievements`, les activités jardin/voiture/santé/finances et
+leurs tables d'assignation, `garden_activity_categories`, `ideas`). Deux
+écarts par rapport à un Postgres géré par un fournisseur comme Supabase,
+documentés en tête du script :
 
 1. **Extension `pgcrypto` déclarée explicitement** (`create extension if
    not exists pgcrypto`) pour `gen_random_uuid()` — native en PG13+ donc
@@ -2670,7 +2711,8 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
   réexécutant `db/neon_schema.sql`, qui est un reset destructeur pour la
   base en fonctionnement normal (voir 5.1). Penser à répercuter chaque
   migration dans `neon_schema.sql` pour qu'il reste le reflet fidèle de
-  la structure. Migrations à ce jour : `001_user_activity_log.sql`.
+  la structure — voir la liste des migrations en 5.1 (`001` à `010` au
+  24/09/2026, toutes répercutées).
   (Historique pré-Neon, non maintenu depuis le 11/09/2026 :
   `supabase/migrations/` `001_categories_and_tags.sql` à
   `009_categories.sql` — voir 5.1.)

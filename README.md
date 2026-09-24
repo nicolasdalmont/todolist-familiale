@@ -103,19 +103,24 @@ variable est définie sur le projet ; à générer une fois
 
 ## Schéma de base de données
 
-Structure complète et à jour : `db/neon_schema.sql` (exécutable, réservé
-à la reconstruction d'un environnement — voir la documentation technique
-§5.3). Évolutions postérieures : `db/migrations/` (scripts additifs
-numérotés, à exécuter à la main sur Neon). Tables : `users`, `tasks`,
-`task_assignees` (partage multiple, avec rôle), `comments`, `categories`,
-`app_settings`, `tags`/`task_tags`, `checklist_items`, `activity_log`,
+Structure complète et à jour : `db/neon_schema.sql` — **à jour de toutes
+les migrations** (voir la documentation technique §5.3) : un déploiement
+neuf n'a besoin que de ce seul script, exécuté une fois (SQL Editor Neon
+ou `psql "$DATABASE_URL" -f db/neon_schema.sql`) ; `db/migrations/`
+(scripts additifs numérotés) ne sert qu'à faire évoluer une base **déjà
+déployée**, une par une au fil des mises à jour du code, pas pour un
+premier déploiement. Tables : `users`, `tasks`, `task_assignees` (partage
+multiple, avec rôle), `comments`, `categories`, `app_settings`,
+`tags`/`task_tags`, `checklist_items`, `activity_log`,
 `user_activity_log` (streak personnel), `reward_tiers`,
 `challenge_results`, `reward_achievements` (paliers de récompense),
 `garden_activities`, `garden_activity_assignees`,
 `garden_activity_categories` (activités récurrentes du jardin),
 `car_activities`, `car_activity_assignees` (activités récurrentes de la
 voiture), `health_activities`, `health_activity_assignees` (activités
-récurrentes de santé), `notifications`, `push_subscriptions`.
+récurrentes de santé), `finances_activities`,
+`finances_activity_assignees` (activités récurrentes de finances),
+`ideas` (boîte à idées), `notifications`, `push_subscriptions`.
 Aucune notion de policy/Row Level Security côté Neon : l'application se
 connecte en propriétaire de la base (`DATABASE_URL`) ; la visibilité
 partagée/privée est appliquée entièrement au niveau applicatif

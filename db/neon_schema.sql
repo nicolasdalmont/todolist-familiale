@@ -9,9 +9,15 @@
 --     Neon en propriétaire de la base (DATABASE_URL), exempté de RLS. La
 --     base n'est jamais jointe depuis le navigateur (accès 100 % serveur
 --     via src/lib/db.ts). Rien à protéger par policy.
---   - tout le reste est identique : les 12 tables, les contraintes CHECK
---     (statuts/visibilité en text+check, pas d'enum de type), les clés
---     PK/FK avec leurs ON DELETE, les index, l'amorçage.
+--   - tout le reste est identique : toutes les tables (voir liste en
+--     section 2), les contraintes CHECK (statuts/visibilité en
+--     text+check, pas d'enum de type), les clés PK/FK avec leurs ON
+--     DELETE, les index, l'amorçage.
+--
+-- Ce script reflète l'état cumulé de toutes les migrations de
+-- db/migrations/ (001 à 010 au 24/09/2026) : un déploiement neuf n'a besoin
+-- que de ce seul fichier, pas de rejouer les migrations une par une (voir
+-- README.md et docs/documentation-technique.md §5.3/§10).
 --
 -- À exécuter une fois sur le projet Neon (SQL Editor du dashboard, ou
 --   psql "$NEON_DIRECT_URL" -f db/neon_schema.sql).
@@ -25,11 +31,14 @@ create extension if not exists pgcrypto;
 -- 1. Suppression préalable (ordre inverse des dépendances)
 -- ---------------------------------------------------------------------
 
+drop table if exists public.ideas cascade;
 drop table if exists public.push_subscriptions cascade;
 drop table if exists public.notifications cascade;
 drop table if exists public.reward_achievements cascade;
 drop table if exists public.challenge_results cascade;
 drop table if exists public.reward_tiers cascade;
+drop table if exists public.finances_activity_assignees cascade;
+drop table if exists public.finances_activities cascade;
 drop table if exists public.health_activity_assignees cascade;
 drop table if exists public.health_activities cascade;
 drop table if exists public.car_activity_assignees cascade;
@@ -90,11 +99,13 @@ create table public.tasks (
   garden_activity_id uuid,
   garden_occurrence_month smallint,
   garden_occurrence_year int,
-  -- Origine "activité Voiture" (migration 005, voir src/lib/car.ts) et
-  -- "activité Santé" (migration 007, voir src/lib/health.ts) — même
+  -- Origine "activité Voiture" (migration 005, voir src/lib/car.ts),
+  -- "activité Santé" (migration 007, voir src/lib/health.ts) et
+  -- "activité Finances" (migration 008, voir src/lib/finances.ts) — même
   -- convention "on delete set null" que garden_activity_id ci-dessus.
   car_activity_id uuid,
-  health_activity_id uuid
+  health_activity_id uuid,
+  finances_activity_id uuid
 );
 
 create table public.task_assignees (
@@ -330,6 +341,32 @@ alter table public.tasks
   add constraint tasks_health_activity_fkey
   foreign key (health_activity_id) references public.health_activities(id) on delete set null;
 
+-- Activités récurrentes de finances (migration 008, voir
+-- src/lib/finances.ts) : même modèle que car_activities/health_activities
+-- ci-dessus (instance datée à part entière, pas un ensemble de périodes).
+create table public.finances_activities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text not null default '',
+  due_date date not null,
+  day_known boolean not null default true,
+  recurrence jsonb not null default '{"type":"none"}',
+  status text not null default 'todo'
+    check (status in ('todo', 'in_progress', 'done', 'archived')),
+  created_by uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table public.finances_activity_assignees (
+  finances_activity_id uuid not null references public.finances_activities(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  primary key (finances_activity_id, user_id)
+);
+
+alter table public.tasks
+  add constraint tasks_finances_activity_fkey
+  foreign key (finances_activity_id) references public.finances_activities(id) on delete set null;
+
 -- Notifications "À ton attention" par utilisateur.
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -350,6 +387,19 @@ create table public.push_subscriptions (
   p256dh text not null,
   auth text not null,
   user_agent text,
+  created_at timestamptz not null default now()
+);
+
+-- Boîte à idées familiale (migration 010, onglet Idées, voir
+-- src/lib/ideas-queries.ts et src/lib/ideas-actions.ts) : une suggestion en
+-- texte libre avec un statut de suivi, ouverte à toute la famille (pas de
+-- owner_id/visibilité, comme les tâches).
+create table public.ideas (
+  id uuid primary key default gen_random_uuid(),
+  content text not null,
+  status text not null default 'created'
+    check (status in ('created', 'processed', 'done')),
+  created_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
 
@@ -379,6 +429,11 @@ create unique index if not exists tasks_car_open_occurrence_uidx
 create unique index if not exists tasks_health_open_occurrence_uidx
   on public.tasks(health_activity_id)
   where health_activity_id is not null and status not in ('done', 'archived');
+create unique index if not exists tasks_finances_open_occurrence_uidx
+  on public.tasks(finances_activity_id)
+  where finances_activity_id is not null and status not in ('done', 'archived');
+create index if not exists ideas_status_idx on public.ideas(status);
+create index if not exists ideas_created_by_idx on public.ideas(created_by);
 
 -- ---------------------------------------------------------------------
 -- 4. Amorçage minimal
@@ -411,7 +466,8 @@ insert into public.categories (slug, label, icon, position) values
   ('vacances', 'Vacances', 'sun',      6),
   ('jardin',   'Jardin',   'leaf',     7),
   ('voiture',  'Voiture',  'car',      8),
-  ('sante',    'Santé',    'heart',    9)
+  ('sante',    'Santé',    'heart',    9),
+  ('finances', 'Finances', 'euro',     10)
 on conflict (slug) do nothing;
 
 insert into public.garden_activity_categories (slug, label, icon, position) values

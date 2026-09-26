@@ -2330,6 +2330,60 @@ desktop dans le bandeau supérieur (`Topbar.tsx`, à côté de « Tâches »/
 gabarit visuel que le bloc « Espace admin » qui y vit déjà, mais ouvert à
 tous, pas réservé à l'admin.
 
+### 6.30 Widget iPhone (Scriptable, 26/09/2026)
+
+Widget d'écran d'accueil non natif, via l'app tierce **Scriptable**
+(script `scriptable/family-todolist-widget.js`, à coller dans l'app —
+pas de build ni de dépendance dans ce dépôt Next.js). Affiche, pour un
+seul profil fixe : streak, nombre de tâches du jour et en retard, sur un
+fond reprenant le logo checkberry en filigrane.
+
+**Endpoint dédié** `src/app/api/widget/route.ts` — lecture seule,
+protégé par un jeton séparé (`WIDGET_TOKEN` en en-tête
+`Authorization: Bearer …`), jamais le cookie de session principal : un
+jeton qui vit dans une app tierce sur le téléphone doit être révocable
+indépendamment (en changeant `WIDGET_TOKEN`) sans déconnecter personne,
+et ne donner accès en lecture qu'à un seul profil (`WIDGET_PROFILE_ID`)
+plutôt qu'un accès complet à l'appli — même principe que `CRON_SECRET`
+pour `/api/cron/reminders` (voir 6.15). Exclu du contrôle de session par
+`src/middleware.ts` pour la même raison que `/api/cron`. Reprend
+exactement les règles de calcul de l'écran d'accueil (`canEdit()`/
+`isOverdue()`, streak sur 400 jours glissants — voir 6.6, 6.17).
+
+**Design actuel : un seul profil.** `WIDGET_TOKEN`/`WIDGET_PROFILE_ID`
+sont des variables d'environnement globales au déploiement Vercel (pas
+par utilisateur) — un seul widget/profil possible en l'état. Plusieurs
+membres nécessiteraient d'étendre l'endpoint à plusieurs paires
+token→profil (`WIDGET_TOKEN_1`/`WIDGET_PROFILE_ID_1`, etc.), pas encore
+fait (décision utilisateur du 26/09/2026 : un seul profil pour le
+moment).
+
+**Rendu du widget, entièrement en pixels.** Le script dessine tout le
+contenu (fond, filigrane du logo, texte) via `DrawContext` plutôt qu'en
+empilant des `WidgetStack` : le centrage de deux compteurs côte à côte
+via des piles imbriquées (largeurs fixes, `centerAlignContent()`) s'est
+révélé peu fiable une fois testé sur l'appareil malgré une largeur
+explicite — dessiner chaque élément à des coordonnées fixes lève
+l'ambiguïté. Le filigrane du logo (`icons/icon-192.png`, chargé par
+URL) est éclairci en superposant un rectangle semi-transparent de la
+couleur de fond par-dessus l'image dessinée à pleine opacité :
+`DrawContext` n'expose pas de réglage d'opacité pour `drawImageInRect()`,
+cette superposition produit le même résultat visuel.
+
+**Limite du tap : pas de PWA en plein écran.** `widget.url` ouvre
+`APP_URL` dans Safari au tap — iOS n'a pas d'API pour relancer une PWA
+déjà installée en mode standalone depuis un widget (ni depuis Shortcuts
+ou une autre app tierce) ; seul un vrai widget WidgetKit natif (app
+Swift à part, hors de ce dépôt) pourrait le faire.
+
+**Rafraîchissement non garanti.** `w.refreshAfterDate` (~30 min) n'est
+qu'une indication minimale ("pas avant ceci") — WidgetKit reste seul
+maître du rythme réel, selon un budget quotidien qu'il ajuste lui-même
+(fréquence de consultation, batterie…), comme pour tout widget tiers
+sur iOS. Adapté à des compteurs qui évoluent lentement (tâches du jour,
+retard) ; pas à une donnée qui doit refléter la seconde qui vient de
+s'écouler.
+
 ## 8. Limites connues et points d'attention
 
 ### 8.1 Fuseau horaire (refonte du 04/09/2026)
@@ -2660,3 +2714,5 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `supabase/recreate_full_schema.sql` | **Historique, non maintenu depuis le 11/09/2026** — équivalent Supabase de `db/neon_schema.sql` (voir 5.1), conservé pour référence/rollback jusqu'à la Phase 6 |
 | `supabase/migrations/` | **Historique, non maintenu depuis le 11/09/2026** — évolutions additives appliquées du temps de Supabase |
 | `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée (données reprises telles quelles par la migration Neon), à ne pas rejouer (voir 8.1) |
+| `src/app/api/widget/route.ts` | Endpoint lecture seule pour le widget iPhone, protégé par `WIDGET_TOKEN`/`WIDGET_PROFILE_ID` (voir 6.30) |
+| `scriptable/family-todolist-widget.js` | Script à coller dans l'app Scriptable — rendu du widget en pixels via `DrawContext` (voir 6.30) |

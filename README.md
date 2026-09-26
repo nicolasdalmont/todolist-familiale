@@ -80,6 +80,14 @@ VAPID_SUBJECT=
 CRON_SECRET=
 ```
 
+Facultatif, uniquement pour le widget iPhone (voir §6.30 de la doc
+technique) :
+
+```
+WIDGET_TOKEN=
+WIDGET_PROFILE_ID=
+```
+
 `DATABASE_URL` est la chaîne de connexion **pooled** Neon (dashboard Neon
 → Connection Details, host en `...-pooler...`) — strictement secrète,
 jamais exposée au navigateur. Une rotation du mot de passe Neon invalide
@@ -226,6 +234,11 @@ partagée/privée est appliquée entièrement au niveau applicatif
   famille, pas réservé à l'admin. Accessible depuis le bandeau supérieur
   sur desktop et depuis « Mon compte » sur mobile (pas dans la barre
   d'onglets du bas, déjà pleine). Voir la doc technique §6.29.
+- Widget iPhone (26/09/2026, `scriptable/family-todolist-widget.js`) :
+  widget d'écran d'accueil non natif, via l'app tierce Scriptable —
+  streak, tâches du jour et en retard d'un seul profil fixe, lu par un
+  endpoint dédié (`/api/widget`, jeton séparé du cookie de session).
+  Voir la doc technique §6.30.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

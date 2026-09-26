@@ -72,7 +72,12 @@ export const config = {
   // /api/session exclu : /api/session/end efface le cookie et redirige
   // vers /login — le faire passer par le middleware, qui verrait encore un
   // JWT signé valide, le renverrait vers `/` et empêcherait le nettoyage.
+  //
+  // /api/widget exclu de même : appelée par le widget iPhone (Scriptable,
+  // voir scriptable/family-todolist-widget.js) depuis en dehors de tout
+  // navigateur, sans cookie de session — elle s'authentifie elle-même via
+  // WIDGET_TOKEN (voir src/app/api/widget/route.ts).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.webmanifest|sw.js|api/version|api/push|api/cron|api/session).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|icon.png|icons|manifest.webmanifest|sw.js|api/version|api/push|api/cron|api/session|api/widget).*)",
   ],
 };

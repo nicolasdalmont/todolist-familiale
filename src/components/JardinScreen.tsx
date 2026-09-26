@@ -19,8 +19,8 @@ import { IconChecklist, IconPencil, IconPlus, IconTrash } from "./Icons";
 // affichées une fois par mois concerné (une activité biannuelle apparaît
 // donc deux fois, mais reste la même activité — les actions modifier/
 // supprimer portent toujours sur l'activité entière, jamais sur une seule
-// occurrence). Même moule de formulaire que RewardManager.tsx/
-// CategoryManager.tsx (src/components/).
+// occurrence). Même moule de formulaire que CategoryManager.tsx
+// (src/components/).
 
 const MONTH_NAMES = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",

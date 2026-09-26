@@ -9,7 +9,7 @@ import { APP_TIMEZONE } from "./timezone";
 // importé aussi bien par src/lib/garden-actions.ts (création/modification/
 // suppression d'une activité) que par src/lib/actions.ts (setStatusAction/
 // deleteTaskAction, pour avancer à la période suivante quand la tâche
-// générée est clôturée ou supprimée) — même montage que src/lib/rewards.ts.
+// générée est clôturée ou supprimée).
 
 export const GARDEN_CATEGORY_SLUG = "jardin";
 

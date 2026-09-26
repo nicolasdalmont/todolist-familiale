@@ -14,8 +14,8 @@ import { IconPlus, IconTrash } from "@/components/Icons";
 // fonctionnalité équivalente sur mabedetheque (autre projet de
 // l'utilisateur) : formulaire de saisie libre, liste triée par date de
 // création décroissante, filtrage par statut, changement de statut via
-// select, suppression via ConfirmDialog. Même moule que TagManager.tsx /
-// RewardManager.tsx pour la structure Server Action + toast + router.refresh().
+// select, suppression via ConfirmDialog. Même moule que TagManager.tsx
+// pour la structure Server Action + toast + router.refresh().
 
 const STATUS_ORDER: IdeaStatus[] = ["created", "processed", "done"];
 

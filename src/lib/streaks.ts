@@ -2,9 +2,8 @@ import { addDaysToKey, dateKeyFromDate, dayKeyToNoonUtc, mondayOfWeek } from "./
 
 // Streak personnel — voir src/components/Badge.tsx (StreakBadge) et
 // getUserActiveDays() dans src/lib/queries.ts pour la donnée source.
-// Fonction pure, sans DB, sur le même principe que src/lib/challenges.ts :
-// la donnée brute (jours actifs) est chargée côté serveur, le calcul se
-// fait ici.
+// Fonction pure, sans DB : la donnée brute (jours actifs) est chargée côté
+// serveur, le calcul se fait ici.
 
 // Borne de sécurité sur le nombre de jours parcourus en arrière — évite
 // une boucle infinie et plafonne le streak affichable. Largement

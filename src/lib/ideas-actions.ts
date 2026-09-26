@@ -9,7 +9,7 @@ import type { IdeaStatus } from "@/lib/types";
 // Gestion de la boîte à idées (onglet Idées, migration 010) — ouverte à
 // tout utilisateur connecté, pas réservée à l'admin : au même titre que
 // les tâches, toute la famille peut proposer une idée et faire avancer son
-// statut. Même moule que src/lib/reward-actions.ts (Result { error?, ok? },
+// statut. Même moule que src/lib/garden-actions.ts (Result { error?, ok? },
 // FormData en entrée pour la création).
 
 type Result = { error?: string; ok?: boolean };

@@ -435,9 +435,9 @@ export async function updateTaskAction(formData: FormData) {
   if (visibility === "shared") {
     await logActivity({ taskId, actorId: userId, type: "task_updated", taskTitle: title });
 
-    // Défi familial "Sans dernière minute" (src/lib/challenges.ts) : trace
-    // chaque changement d'échéance sur une tâche partagée, en plus du
-    // task_updated générique ci-dessus.
+    // Trace chaque changement d'échéance sur une tâche partagée, en plus du
+    // task_updated générique ci-dessus (affiché dans le fil "Activité du
+    // jour", voir ActivityFeed.tsx).
     if ((access.dueAt ?? null) !== dueAt) {
       await logActivity({
         taskId,

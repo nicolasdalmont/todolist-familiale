@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import type { ActivityLogEntry, ChallengeProgress, NotificationItem, Profile, RewardAchievement, Task, WeeklyChallenge } from "@/lib/types";
+import type { ActivityLogEntry, NotificationItem, Profile, Task } from "@/lib/types";
 import { computeBadgeCount } from "@/lib/badge";
 import { addDaysToKey, dateKeyFromDate, dateKeyFromIso, isOverdue, upcomingSunday } from "@/lib/format";
 import { APP_TIMEZONE } from "@/lib/timezone";
@@ -10,10 +10,8 @@ import { canEdit } from "@/lib/access";
 import { ActivityFeed } from "./ActivityFeed";
 import { AttentionFeed } from "./AttentionFeed";
 import { StreakBadge } from "./Badge";
-import { ChallengeCard } from "./ChallengeCard";
 import { NextTasksList } from "./NextTasksList";
 import { NotificationsNudge } from "./NotificationsNudge";
-import { RewardsBoard } from "./RewardsBoard";
 import { SharedWithYouFeed } from "./SharedWithYouFeed";
 import { HelpButton } from "./HelpButton";
 import { IconAlertTriangle, IconArrowLeft, IconCalendar } from "./Icons";
@@ -27,17 +25,13 @@ export function HomeDashboard({
   tasks,
   activity,
   notifications,
-  challenge,
   streak,
-  achievements,
 }: {
   profile: Profile;
   tasks: Task[];
   activity: ActivityLogEntry[];
   notifications: NotificationItem[];
-  challenge: { challenge: WeeklyChallenge; progress: ChallengeProgress } | null;
   streak: number;
-  achievements: RewardAchievement[];
 }) {
   const {
     todayCount,
@@ -278,10 +272,6 @@ export function HomeDashboard({
       </div>
 
       <NextTasksList tasks={nextTasks} />
-
-      {challenge ? <ChallengeCard challenge={challenge.challenge} progress={challenge.progress} /> : null}
-
-      <RewardsBoard achievements={achievements} />
 
       <NotificationsNudge />
 

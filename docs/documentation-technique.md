@@ -274,7 +274,8 @@ sources complémentaires, toutes deux dans `db/` :
    - `001_user_activity_log.sql` — table `user_activity_log` (streak
      personnel, voir `src/lib/streaks.ts`).
    - `002_reward_tiers.sql` — tables `reward_tiers`, `challenge_results`,
-     `reward_achievements` (paliers de récompense, voir 6.18).
+     `reward_achievements` (paliers de récompense) — **supprimées par la
+     migration 011 ci-dessous**, fichier conservé pour l'historique.
    - `003_garden_activities.sql` — tables `garden_activities`,
      `garden_activity_assignees`, colonnes `tasks.garden_activity_id` /
      `garden_occurrence_month` / `garden_occurrence_year` (onglet Jardin,
@@ -298,12 +299,15 @@ sources complémentaires, toutes deux dans `db/` :
      `voiture_enabled` / `sante_enabled` / `finances_enabled`
      (activation/désactivation des agendas, voir 6.26).
    - `010_ideas.sql` — table `ideas` (onglet Idées, voir 6.29).
+   - `011_drop_reward_tiers.sql` — supprime `reward_tiers`,
+     `challenge_results`, `reward_achievements` (défis familiaux et
+     paliers de récompense retirés, streak personnel conservé).
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
    parallèle pour rester le reflet fidèle de la structure — **à jour
-   jusqu'à la migration 010 inclue au 24/09/2026** : un déploiement neuf
-   n'a besoin que de `neon_schema.sql`, pas de rejouer ces dix fichiers
+   jusqu'à la migration 011 inclue au 26/09/2026** : un déploiement neuf
+   n'a besoin que de `neon_schema.sql`, pas de rejouer ces onze fichiers
    un par un.
 
 **Le contenu (les lignes) n'est pas versionné ici** : `neon_schema.sql`
@@ -431,25 +435,6 @@ partagée, contrairement à `activity_log` ci-dessus (jamais pour une
 tâche privée) — voir `src/lib/streaks.ts` et migration
 `db/migrations/001_user_activity_log.sql`.
 
-**`reward_tiers`** — paliers de récompense configurés par l'admin (`id`,
-`scope` : `individual` \| `collective`, `metric` : `streak_days` \|
-`challenges_completed`, `threshold`, `reward_label` texte libre,
-`active`, `created_at`) — voir 6.18 et migration
-`db/migrations/002_reward_tiers.sql`.
-
-**`challenge_results`** — résultat figé d'une semaine de défi une fois
-celle-ci terminée (`week_start` date, PK, `success`, `computed_at`) :
-permet de compter les défis réussis cumulés (palier collectif) sans
-recalculer indéfiniment le passé à partir de `activity_log` — voir 6.18.
-
-**`reward_achievements`** — un palier atteint (`id`, `tier_id` →
-`reward_tiers.id`, `user_id` → `users.id` nullable — `null` pour un
-palier collectif, toute la famille —, `achieved_at`, `status` : `pending`
-\| `given`, `given_at`, `given_by` → `users.id`). Deux index uniques
-partiels (`tier_id, user_id` où `user_id is not null` ; `tier_id` où
-`user_id is null`) rendent l'obtention d'un palier idempotente côté
-insertion — voir 6.18.
-
 **`garden_activities`** — activité récurrente du jardin (`id`, `name`,
 `description`, `months` smallint[] non vide, `category` → `garden_activity_
 categories.slug` (`on delete restrict`, défaut `autre`), `created_by` →
@@ -500,16 +485,16 @@ ci-dessus, pour les activités de finances — voir 6.23 et migration
 `visibility`/partage : ouverte à toute la famille, comme `activity_log`
 pour une tâche partagée.
 
-26 tables au total (mises à jour au fil des migrations 001 à 010 — voir
+23 tables au total (mises à jour au fil des migrations 001 à 011 — voir
 5.1). Aucune notion de Row Level Security côté Neon (voir section 3) : la
 sécurité applicative est entièrement gérée par `src/lib/access.ts`.
 
 ### 5.3 Script de reconstruction intégrale (`db/neon_schema.sql`, migration Neon du 11/09/2026)
 
-Ce script est **complet et exécutable tel quel** : il recrée les 26 tables
+Ce script est **complet et exécutable tel quel** : il recrée les 23 tables
 actuelles (voir la liste détaillée en 5.2 — inclut désormais les
 activités de jardin/voiture/santé/finances et les idées, migrations 001 à
-010 comprises), tous leurs index, et sème un compte administrateur de
+011 comprises), tous leurs index, et sème un compte administrateur de
 secours (`Admin`, mot de passe temporaire `bonjour2026`), la ligne unique
 `app_settings`, les 10 catégories de départ (dont `finances`, icône
 dédiée `euro`) et les 9 tags de départ.
@@ -528,9 +513,8 @@ clés PK/FK et leurs `on delete` (`on delete cascade` pour
 `task_assignees`/`comments`/`task_tags`/`checklist_items` et
 `activity_log.task_id`, `on delete set null` pour
 `activity_log.actor_id` — comportement documenté en 5.2 et 6.12),
-augmentée des 16 tables ajoutées depuis (`categories`, `app_settings`,
-`user_activity_log`, `reward_tiers`/`challenge_results`/
-`reward_achievements`, les activités jardin/voiture/santé/finances et
+augmentée des 13 tables ajoutées depuis (`categories`, `app_settings`,
+`user_activity_log`, les activités jardin/voiture/santé/finances et
 leurs tables d'assignation, `garden_activity_categories`, `ideas`). Deux
 écarts par rapport à un Postgres géré par un fournisseur comme Supabase,
 documentés en tête du script :
@@ -788,10 +772,8 @@ contrairement à la suppression d'une tâche entière.
 Message de bienvenue (« Bonjour / Bonsoir, {Prénom} » selon l'heure de
 Paris — voir 6.16 — + date du jour), trois tuiles cliquables
 (`HomeDashboard.tsx`), la liste **« Prochaines tâches à faire »**
-(`NextTasksList.tsx` — voir plus bas), puis, dans l'ordre : la carte
-« Défi de la semaine » (`ChallengeCard`, voir 6.17, conditionnelle), le
-tableau des paliers de récompense atteints (`RewardsBoard`, voir 6.18),
-la bannière d'invite aux notifications (`NotificationsNudge`, voir 6.16,
+(`NextTasksList.tsx` — voir plus bas), puis, dans l'ordre : la bannière
+d'invite aux notifications (`NotificationsNudge`, voir 6.16,
 conditionnelle), le fil **« À ton attention »** (`AttentionFeed.tsx` —
 voir 6.15, affiché seulement s'il y a au moins une notification non
 lue), le fil **« Partagées avec toi »** (`SharedWithYouFeed.tsx` — voir
@@ -1050,9 +1032,9 @@ ci-dessus ne porte, lui, que sur le *code*.
 autres dans `Topbar.tsx` sur desktop, et remplacé par une entrée
 « Espace admin » sur `/compte` en mobile — voir 6.16 ; page elle-même
 protégée côté serveur par un `notFound()` sinon, même logique que les
-autres pages restreintes de l'appli — voir 6.1). Cinq onglets
+autres pages restreintes de l'appli — voir 6.1). Quatre onglets
 (`AdminScreen.tsx`, contrôle segmenté) : **Membres**, **Catégories**,
-**Réglages**, **Activité** et **Récompenses**. L'onglet actif est porté
+**Réglages** et **Activité**. L'onglet actif est porté
 par l'URL (`/admin?tab=...`, `useSearchParams`/`router.replace`) plutôt
 que par un `useState` local — voir le correctif de 6.26 : chaque panneau
 appelle `router.refresh()` après une mutation pour resynchroniser ses
@@ -1166,25 +1148,6 @@ fois où la personne a ouvert une page de l'appli.
 
 `last_login_at` reste `NULL` pour les comptes jamais vus depuis
 l'application de la migration 003 — affiché comme "Jamais vu".
-
-#### Onglet « Récompenses » — paliers de gamification (12/09/2026)
-
-`src/components/RewardManager.tsx` ; Server Actions de
-`src/lib/reward-actions.ts` (`createRewardTierAction`,
-`toggleRewardTierActiveAction`, `setRewardAchievementStatusAction`),
-chacune précédée de `requireAdmin()`. Détail fonctionnel complet en 6.18 —
-ici, juste l'écran : formulaire de création d'un palier (un seul menu
-« Type de palier » combinant portée + métrique — `individual_streak` ou
-`collective_challenges` — plutôt que deux champs séparés, les deux seules
-combinaisons ayant un sens produit), seuil, récompense en texte libre ;
-liste des paliers configurés avec bouton activer/désactiver ; liste des
-paliers **atteints** (tous membres) avec bouton « Marquer donné » /
-« Annuler », qui bascule `reward_achievements.status` entre `pending` et
-`given` (et horodate/attribue `given_at`/`given_by`). Si les tables de la
-migration 002 n'existent pas encore, chaque action renvoie une erreur
-explicite (« Applique d'abord la migration 002_reward_tiers.sql sur
-Neon ») plutôt qu'une erreur Postgres brute — même principe que l'onglet
-« Catégories » pour la migration 009.
 
 ### 6.10 Checklist par tâche
 
@@ -1744,12 +1707,12 @@ modifications les plus visibles :
 - `IconCalendarPlus` distincte pour l'export agenda sur l'écran de détail,
   pour ne plus réutiliser l'icône d'échéance avec deux sens différents.
 
-### 6.17 Gamification — streaks et défi de la semaine (12/09/2026)
+### 6.17 Streak personnel (12/09/2026)
 
-Premier lot de gamification, en deux volets indépendants : un **streak
-personnel** (assiduité individuelle) et un **défi familial hebdomadaire**
-(objectif collectif sur les tâches partagées). Test en conditions réelles
-jusqu'à ~20/09/2026.
+Gamification limitée au **streak personnel** (assiduité individuelle) —
+les défis familiaux hebdomadaires et les paliers de récompense testés en
+même temps ont été retirés (26/09/2026), après la phase de test réel, le
+streak restant seul.
 
 **Streak personnel** (`src/lib/streaks.ts`, `computeStreak()`) — jours
 consécutifs d'activité de l'utilisateur, **toutes tâches confondues,
@@ -1801,116 +1764,6 @@ recalculant `computeStreak()` à partir de `getUserActiveDays()`
   `queries.ts`), donnant à la famille une vue d'ensemble plutôt que
   chacun ne voyant que le sien.
 
-**Défi familial hebdomadaire** (`src/lib/challenges.ts`,
-`ChallengeCard.tsx` sur l'écran d'accueil) — un objectif collectif par
-semaine (lundi-dimanche, Paris), calculé à partir des **tâches
-partagées** et du journal d'activité **uniquement** (jamais des tâches
-privées d'un membre). `WEEKLY_CHALLENGES` est une liste **fixe, rédigée à
-l'avance** (pas de génération dynamique) : 9 semaines, du 14/09 au
-15/11/2026 (« Rentrée sereine », « Zéro retard », « Équipe complète », «
-On papote », « Créateurs actifs », « Grand ménage », « Check-list en
-béton », « Sans dernière minute », « Le combo final ») ; `null` hors de
-cette période. `getCurrentChallenge(todayKey)` sélectionne l'entrée dont
-la semaine couvre aujourd'hui.
-
-Chaque défi porte une `metric` typée (`ChallengeMetric`,
-`src/lib/types.ts`), évaluée par `evaluateMetric()`/`evaluateChallenge()`
-à partir de trois sources chargées côté serveur (`src/app/page.tsx`) :
-l'activité de la semaine (`getFamilyWeekActivity()`), un instantané des
-tâches partagées (`getSharedTasksSnapshot()`) et, seulement si la métrique
-en a besoin (`challengeNeedsMembers()`, évite une requête `getProfiles()`
-pour rien la plupart des semaines), la liste des membres du foyer. Types
-de métrique : `activity_count` (compter des lignes `activity_log` d'un
-type donné, avec dédoublonnage par tâche optionnel — ex. « 10 tâches
-complétées »), `distinct_active_days` (jours distincts avec au moins une
-activité d'un type donné), `zero_overdue_shared` (aucune tâche partagée
-en retard, calculé sur l'instantané, pas sur l'activité),
-`full_team_daily_completion` (chaque membre a clôturé au moins une tâche
-chaque jour déjà écoulé de la semaine), et `combo` (plusieurs métriques,
-réussi seulement si toutes le sont — utilisé pour le défi final).
-
-`ChallengeCard.tsx` est purement présentationnel : la progression arrive
-déjà calculée (`ChallengeProgress` — `current`/`target`/`success`/`label`,
-plus `parts[]` pour un `combo`, un sous-composant `ProgressBar` par
-partie). Affiche titre, description, jours restants dans la semaine (ou
-« Réussi ✅ »), et une ou plusieurs barres de progression.
-
-### 6.18 Paliers de récompense (12/09/2026)
-
-Deuxième lot de gamification, en complément direct de 6.17 : un **palier**
-est un seuil configuré par l'admin (onglet « Récompenses », voir 6.9) sur
-le streak personnel ou les défis familiaux réussis cumulés, associé à une
-**récompense en texte libre** — pas de monnaie virtuelle ni de catalogue
-imposé, la récompense elle-même (sortie, argent de poche…) est négociée en
-famille, hors appli. Choix produit : motiver des adolescents à utiliser
-l'appli pour s'organiser plutôt qu'à accumuler un score abstrait.
-
-**Deux portées** (`RewardScope`, `src/lib/types.ts`) :
-
-- **`individual`** — palier sur `streak_days` : le streak personnel de
-  **chaque** utilisateur (voir 6.17) est comparé au seuil ; atteint,
-  l'obtention est propre à cette personne.
-- **`collective`** — palier sur `challenges_completed` : le nombre de
-  défis familiaux **réussis cumulés** (toute la saison des 9 semaines) est
-  comparé au seuil ; atteint, l'obtention concerne toute la famille
-  (`user_id` `null` dans `reward_achievements`).
-
-**Calcul et persistance** (`src/lib/rewards.ts`), appelés
-inconditionnellement à chaque rendu de l'Accueil (`settleRewards()` dans
-`src/app/page.tsx`) — contrairement au bloc `challenge` du même fichier,
-qui ne s'exécute que dans les 9 semaines couvertes par `WEEKLY_CHALLENGES`
-(voir 6.17) : une semaine de défi peut se terminer même hors de cette
-période, et le streak, lui, est recalculé tous les jours de toute façon.
-
-1. **`settleEndedChallengeWeeks()`** — fige dans `challenge_results` le
-   résultat de chaque semaine de `WEEKLY_CHALLENGES` déjà terminée
-   (`weekEnd < todayKey`) et pas encore enregistrée, en rejouant
-   `evaluateChallenge()` (voir 6.17) avec une fenêtre d'activité **bornée**
-   des deux côtés (`getFamilyWeekActivity(sinceIso, untilIso)` — le
-   paramètre `untilIso` a été ajouté à cette fonction spécifiquement pour
-   ce cas d'usage ; l'appel du bloc `challenge` de la semaine en cours,
-   lui, continue de ne passer que `sinceIso`, comportement inchangé).
-   Nécessaire pour compter les défis réussis cumulés sans recalculer
-   indéfiniment le passé.
-
-   **Limite assumée** : `getSharedTasksSnapshot()`, utilisé par la
-   métrique `zero_overdue_shared`, reflète l'état **actuel** des tâches
-   partagées, pas leur état à la fin de la semaine passée — une tâche
-   rouverte depuis fausserait rétroactivement le résultat. Acceptable car
-   l'Accueil est visité quotidiennement par la famille : une semaine est
-   réglée dans les heures qui suivent sa fin, pas des mois après.
-
-2. **`settleCollectiveAchievements()`** — compte les succès dans
-   `challenge_results` (`countSuccessfulChallenges()`), puis pour chaque
-   palier collectif actif dont le seuil est atteint, insère (si absente)
-   une ligne dans `reward_achievements` avec `user_id = null`.
-
-3. **`settleIndividualAchievements(userId, streak)`** — même logique pour
-   les paliers individuels, à partir du streak déjà calculé par l'appelant
-   (pas de requête dupliquée) : insère (si absente) une ligne par palier
-   individuel actif dont le seuil est atteint.
-
-L'idempotence de ces insertions repose sur deux **index uniques partiels**
-sur `reward_achievements` (voir 5.2) plutôt qu'une contrainte
-`unique(tier_id, user_id)` : Postgres ne considère pas deux `NULL` comme
-égaux, une contrainte simple aurait laissé passer des doublons pour un
-même palier collectif. Un palier une fois obtenu le reste, même si le
-streak retombe ensuite sous le seuil — cohérent avec une récompense réelle
-déjà méritée.
-
-**Affichage** :
-
-- **Accueil** (`RewardsBoard.tsx`, sous `ChallengeCard`) — liste des
-  paliers atteints, collectifs d'abord puis ceux de l'utilisateur courant
-  (filtrage fait côté serveur dans `src/app/page.tsx`, à partir de la même
-  `getRewardAchievements()` que l'admin). N'affiche rien si la liste est
-  vide, même logique que `StreakBadge` en 6.17. Chaque ligne montre le
-  libellé de récompense, « Toute la famille » ou le prénom, et une pastille
-  de statut (`RewardStatusBadge`, `src/components/Badge.tsx` : « En
-  attente » / « Reçu 🎁 »).
-- **Admin → Récompenses** (voir 6.9) — configuration des paliers et
-  bascule du statut `pending`/`given`, pour tous les membres.
-
 ### 6.19 Jardin — activités récurrentes (13/09/2026)
 
 Nouvel onglet **Jardin** (entre Tâches et Admin sur desktop, entre Tâches
@@ -1926,9 +1779,9 @@ activité porte un nom, une description, un ensemble de **mois de l'année**
 **responsables** (`garden_activity_assignees`, many-to-many comme
 `task_assignees` mais sans notion éditeur/lecteur).
 
-**Génération de tâche** (`src/lib/garden.ts`, pas de `"use server"` — même
-montage que `rewards.ts`, importé aussi bien par les Server Actions
-dédiées que par `src/lib/actions.ts`) :
+**Génération de tâche** (`src/lib/garden.ts`, pas de `"use server"` —
+importé aussi bien par les Server Actions dédiées que par
+`src/lib/actions.ts`) :
 
 - **Création d'une activité** (`createGardenActivityAction`,
   `src/lib/garden-actions.ts`) : calcule la prochaine période à partir du
@@ -2338,7 +2191,7 @@ la tâche). Emplacement dans l'en-tête, au cas par cas :
 - Détail de la tâche : ajouté en dernière position du groupe d'icônes
   déjà présent à droite (export calendrier, modifier).
 - Admin : **contenu dépendant de l'onglet actif** (Membres/Catégories/
-  Réglages/Activité/Récompenses, `HELP_CONTENT` dans `AdminScreen.tsx`),
+  Réglages/Activité, `HELP_CONTENT` dans `AdminScreen.tsx`),
   situé sur la même ligne que le titre « Administration » — qui vit
   désormais dans `AdminScreen.tsx` (retiré du header statique de
   `src/app/admin/page.tsx`) pour rester à côté de l'aide contextuelle.
@@ -2787,7 +2640,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/PullToRefresh.tsx` | Tirer vers le bas pour rafraîchir (`router.refresh()`), mobile uniquement (voir 6.8, 6.16) |
 | `src/app/api/version/route.ts` | Repère de version interrogé par `AppUpdateWatcher.tsx` |
 | `src/app/admin/page.tsx` | Écran d'administration, réservé au rôle admin — charge membres + stats (voir 6.9) |
-| `src/components/AdminScreen.tsx` | Titre + bascule des cinq onglets de l'écran admin (Membres/Catégories/Réglages/Activité/Récompenses), onglet actif porté par l'URL (voir 6.26), aide contextuelle par onglet (voir 6.27) |
+| `src/components/AdminScreen.tsx` | Titre + bascule des quatre onglets de l'écran admin (Membres/Catégories/Réglages/Activité), onglet actif porté par l'URL (voir 6.26), aide contextuelle par onglet (voir 6.27) |
 | `src/components/UserManager.tsx` | Onglet « Membres » : créer / réinitialiser / supprimer un compte (voir 6.9) |
 | `src/components/UserStatsList.tsx` | Onglet « Activité » : statistiques par membre (voir 6.9) |
 | `src/components/ChecklistSection.tsx` | Checklist d'une tâche sur l'écran de détail — coche optimiste uniquement, ajout/renommage/suppression dans `TaskForm.tsx` (voir 6.10, 6.16) ; réutilisée telle quelle sur les cartes d'activité d'agenda (voir 6.28) |

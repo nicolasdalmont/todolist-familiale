@@ -12,8 +12,7 @@ import { parseChecklistItems, syncChecklistItems } from "@/lib/checklist";
 // 003) — ouverte à tout utilisateur connecté, pas réservée à l'admin
 // (contrairement aux catégories) : au même titre que les tâches, c'est de
 // l'organisation familiale courante. Même moule que src/lib/actions.ts
-// (Server Actions "use server", FormData en entrée) et
-// src/lib/reward-actions.ts (résultat { error?, ok? }).
+// (Server Actions "use server", FormData en entrée, résultat { error?, ok? }).
 
 type Result = { error?: string; ok?: boolean };
 

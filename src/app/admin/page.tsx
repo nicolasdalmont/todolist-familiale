@@ -1,14 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import {
-  getAllRewardTiers,
-  getAppSettings,
-  getCategories,
-  getMembers,
-  getRewardAchievements,
-  getTags,
-  getUserStats,
-} from "@/lib/queries";
+import { getAppSettings, getCategories, getMembers, getTags, getUserStats } from "@/lib/queries";
 import { getGardenActivityCategories } from "@/lib/garden-queries";
 import { Topbar } from "@/components/Topbar";
 import { AdminScreen } from "@/components/AdminScreen";
@@ -26,17 +18,14 @@ export default async function AdminPage() {
   const profile = await requireUser();
   if (profile.role !== "admin") notFound();
 
-  const [members, categories, gardenCategories, tags, settings, stats, rewardTiers, rewardAchievements] =
-    await Promise.all([
-      getMembers(),
-      getCategories(),
-      getGardenActivityCategories(),
-      getTags(),
-      getAppSettings(),
-      getUserStats(),
-      getAllRewardTiers(),
-      getRewardAchievements(),
-    ]);
+  const [members, categories, gardenCategories, tags, settings, stats] = await Promise.all([
+    getMembers(),
+    getCategories(),
+    getGardenActivityCategories(),
+    getTags(),
+    getAppSettings(),
+    getUserStats(),
+  ]);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -50,8 +39,6 @@ export default async function AdminPage() {
           tags={tags}
           settings={settings}
           stats={stats}
-          rewardTiers={rewardTiers}
-          rewardAchievements={rewardAchievements}
         />
       </main>
     </div>

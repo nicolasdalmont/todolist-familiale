@@ -9,8 +9,8 @@
 // à cette même tâche (typiquement le rappel "due_soon" du jour, une fois
 // l'heure d'échéance dépassée dans la journée) ne doit compter qu'une seule
 // fois : les deux sources se recoupent par id de tâche plutôt que de
-// s'additionner. Une notification sans tâche associée (ex. palier de
-// récompense, voir src/lib/rewards.ts) compte pour elle-même.
+// s'additionner. Une notification sans tâche associée compte pour
+// elle-même.
 export function computeBadgeCount(
   overdueTaskIds: string[],
   notifications: Array<{ id: string; task_id: string | null }>

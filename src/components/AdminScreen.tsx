@@ -1,27 +1,25 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { AppSettings, Category, Member, RewardAchievement, RewardTier, Tag, UserStats } from "@/lib/types";
+import type { AppSettings, Category, Member, Tag, UserStats } from "@/lib/types";
 import { UserManager } from "./UserManager";
 import { CategoryManager } from "./CategoryManager";
 import { GardenCategoryManager } from "./GardenCategoryManager";
 import { TagManager } from "./TagManager";
 import { SettingsPanel } from "./SettingsPanel";
 import { UserStatsList } from "./UserStatsList";
-import { RewardManager } from "./RewardManager";
 import { HelpButton } from "./HelpButton";
-import { IconBarChart, IconGift, IconSliders, IconTag, IconUsers } from "./Icons";
+import { IconBarChart, IconSliders, IconTag, IconUsers } from "./Icons";
 
-// Écran /admin réorganisé (voir 6.9) : cinq onglets — « Membres » (gestion
+// Écran /admin réorganisé (voir 6.9) : quatre onglets — « Membres » (gestion
 // des comptes), « Catégories » (catégories de tâches, puis — second bloc —
 // catégories d'activités de jardin, migration 004 : deux gestions
 // indépendantes, deux tables séparées, juste co-localisées dans cet onglet),
-// « Réglages » (rappel, agendas + infos d'instance), « Activité »
-// (statistiques par membre) et « Récompenses » (paliers de gamification,
-// migration 002 — voir src/lib/rewards.ts). Réservé au rôle admin, protégé
-// côté serveur dans src/app/admin/page.tsx.
-type Tab = "members" | "categories" | "settings" | "activity" | "rewards";
-const TABS: Tab[] = ["members", "categories", "settings", "activity", "rewards"];
+// « Réglages » (rappel, agendas + infos d'instance) et « Activité »
+// (statistiques par membre). Réservé au rôle admin, protégé côté serveur
+// dans src/app/admin/page.tsx.
+type Tab = "members" | "categories" | "settings" | "activity";
+const TABS: Tab[] = ["members", "categories", "settings", "activity"];
 
 // L'onglet actif vit dans l'URL (?tab=...) plutôt que dans un useState :
 // chaque panneau (UserManager, CategoryManager, SettingsPanel, ...) appelle
@@ -102,18 +100,6 @@ const HELP_CONTENT: Record<Tab, { title: string; body: React.ReactNode }> = {
       </>
     ),
   },
-  rewards: {
-    title: "Récompenses",
-    body: (
-      <>
-        <p>Des paliers configurables sur le streak personnel ou les défis familiaux réussis cumulés.</p>
-        <ul>
-          <li>Créer un palier : seuil + récompense en texte libre (pas de monnaie virtuelle).</li>
-          <li>Marquer une récompense atteinte comme donnée une fois remise en vrai.</li>
-        </ul>
-      </>
-    ),
-  },
 };
 
 export function AdminScreen({
@@ -124,8 +110,6 @@ export function AdminScreen({
   tags,
   settings,
   stats,
-  rewardTiers,
-  rewardAchievements,
 }: {
   currentUserId: string;
   members: Member[];
@@ -134,8 +118,6 @@ export function AdminScreen({
   tags: Tag[];
   settings: AppSettings;
   stats: UserStats[];
-  rewardTiers: RewardTier[];
-  rewardAchievements: RewardAchievement[];
 }) {
   const [tab, setTab] = useAdminTab();
 
@@ -144,7 +126,6 @@ export function AdminScreen({
     { value: "categories" as const, label: "Catégories", Icon: IconTag },
     { value: "settings" as const, label: "Réglages", Icon: IconSliders },
     { value: "activity" as const, label: "Activité", Icon: IconBarChart },
-    { value: "rewards" as const, label: "Récompenses", Icon: IconGift },
   ];
 
   return (
@@ -203,10 +184,8 @@ export function AdminScreen({
         </div>
       ) : tab === "settings" ? (
         <SettingsPanel settings={settings} />
-      ) : tab === "activity" ? (
-        <UserStatsList stats={stats} />
       ) : (
-        <RewardManager tiers={rewardTiers} achievements={rewardAchievements} />
+        <UserStatsList stats={stats} />
       )}
     </div>
   );

@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getFamilyWeekActivity, getMyNotifications, getProfiles, getRecentActivity, getRewardAchievements, getSharedTasksSnapshot, getTasks, getUserActiveDays } from "@/lib/queries";
-import { challengeNeedsMembers, evaluateChallenge, getCurrentChallenge } from "@/lib/challenges";
+import { getMyNotifications, getRecentActivity, getTasks, getUserActiveDays } from "@/lib/queries";
 import { computeStreak } from "@/lib/streaks";
-import { settleRewards } from "@/lib/rewards";
 import { dateKeyFromDate } from "@/lib/format";
-import { parisWallTimeToUtcIso } from "@/lib/timezone";
 import { Topbar } from "@/components/Topbar";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { IconPlus } from "@/components/Icons";
@@ -39,36 +36,10 @@ export default async function HomePage() {
 
   const todayKey = dateKeyFromDate(new Date());
 
-  // Défi familial de la semaine (src/lib/challenges.ts) — pas de requête
-  // supplémentaire hors des 9 semaines couvertes (activeChallenge === null).
-  const activeChallenge = getCurrentChallenge(todayKey);
-  const challenge = activeChallenge
-    ? await (async () => {
-        const weekStartIso = parisWallTimeToUtcIso(`${activeChallenge.weekStart}T00:00`);
-        const [familyActivity, sharedTasks, members] = await Promise.all([
-          getFamilyWeekActivity(weekStartIso),
-          getSharedTasksSnapshot(),
-          challengeNeedsMembers(activeChallenge) ? getProfiles() : Promise.resolve([]),
-        ]);
-        return {
-          challenge: activeChallenge,
-          progress: evaluateChallenge(activeChallenge, { activity: familyActivity, sharedTasks, members }),
-        };
-      })()
-    : null;
-
   // Streak personnel (src/lib/streaks.ts) — 400 jours en arrière : borne
   // de sécurité alignée sur celle du calcul (voir streaks.ts).
   const activeDaysSinceIso = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
   const streak = computeStreak(await getUserActiveDays(profile.id, activeDaysSinceIso), todayKey);
-
-  // Paliers de récompense (src/lib/rewards.ts) — tourne inconditionnellement
-  // (contrairement au bloc `challenge` ci-dessus) : une semaine de défi peut
-  // se terminer même hors des 9 semaines couvertes, et le streak est
-  // recalculé tous les jours de toute façon.
-  await settleRewards(profile, streak);
-  const allAchievements = await getRewardAchievements();
-  const achievements = allAchievements.filter((a) => a.user === null || a.user.id === profile.id);
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -79,9 +50,7 @@ export default async function HomePage() {
           tasks={tasks}
           activity={activity}
           notifications={notifications}
-          challenge={challenge}
           streak={streak}
-          achievements={achievements}
         />
       </main>
       <Link

@@ -235,8 +235,8 @@ export function upcomingSunday(from: Date): Date {
 // Renvoie une date dont le jour civil (à Paris) est le lundi de la semaine
 // de `from` (aujourd'hui inclus si on est déjà lundi) — même construction
 // que upcomingSunday() ci-dessus (ancrage midi UTC, seule la clé de date a
-// du sens). Sert de borne de semaine pour les défis familiaux
-// (src/lib/challenges.ts).
+// du sens). Sert de borne de semaine civile pour le streak personnel
+// (src/lib/streaks.ts).
 export function mondayOfWeek(from: Date): Date {
   const [y, m, d] = dateKeyFromDate(from).split("-").map(Number);
   const noon = new Date(Date.UTC(y, m - 1, d, 12));
@@ -245,8 +245,8 @@ export function mondayOfWeek(from: Date): Date {
 }
 
 // Arithmétique sur des clés "YYYY-MM-DD" (jour civil, sans notion
-// d'heure) — partagée par src/lib/challenges.ts et src/lib/streaks.ts, qui
-// n'ont besoin que de comparer/décaler des jours, jamais des instants.
+// d'heure) — utilisée par src/lib/streaks.ts, qui n'a besoin que de
+// comparer/décaler des jours, jamais des instants.
 // Ancrage midi UTC (comme upcomingSunday/mondayOfWeek ci-dessus) : évite
 // qu'un changement d'heure d'été/hiver ne fasse déborder sur le jour
 // voisin lors d'un +/-1 jour.

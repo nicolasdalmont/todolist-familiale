@@ -117,8 +117,7 @@ déployée**, une par une au fil des mises à jour du code, pas pour un
 premier déploiement. Tables : `users`, `tasks`, `task_assignees` (partage
 multiple, avec rôle), `comments`, `categories`, `app_settings`,
 `tags`/`task_tags`, `checklist_items`, `activity_log`,
-`user_activity_log` (streak personnel), `reward_tiers`,
-`challenge_results`, `reward_achievements` (paliers de récompense),
+`user_activity_log` (streak personnel),
 `garden_activities`, `garden_activity_assignees`,
 `garden_activity_categories` (activités récurrentes du jardin),
 `car_activities`, `car_activity_assignees` (activités récurrentes de la
@@ -148,17 +147,11 @@ partagée/privée est appliquée entièrement au niveau applicatif
   §6.16.
 - Export d'une tâche datée vers le calendrier de l'appareil (fichier
   `.ics`). Voir §6.13.
-- Gamification (12/09/2026, en test) : streak personnel (jours actifs
-  consécutifs, une grâce par semaine) affiché sur l'accueil, « Mon
-  compte » et l'onglet Membres de l'admin, plus une carte « Défi de la
-  semaine » sur l'accueil (objectif familial hebdomadaire calculé sur les
-  tâches partagées). Voir la doc technique §6.17.
-- Paliers de récompense (12/09/2026) : seuils configurables par l'admin
-  (onglet Admin → « Récompenses ») sur le streak personnel ou les défis
-  familiaux réussis cumulés, chacun associé à une récompense en texte
-  libre négociée en famille (pas de monnaie virtuelle). Suivi en
-  attente/donné géré par l'admin ; affiché sur l'accueil une fois atteint.
-  Voir la doc technique §6.18.
+- Gamification (12/09/2026) : streak personnel (jours actifs consécutifs,
+  une grâce par semaine) affiché sur l'accueil, « Mon compte » et l'onglet
+  Membres de l'admin. Les défis familiaux hebdomadaires et les paliers de
+  récompense testés en même temps ont été retirés (26/09/2026), le streak
+  restant seul. Voir la doc technique §6.17.
 - Menu **Agendas** (13/09/2026, `/agendas`) : regroupe les onglets Jardin,
   Voiture, Santé et Finances (liens de menu remplaçant l'ancien lien
   direct « Jardin »). Chacun a un lien retour vers `/agendas` en tête de

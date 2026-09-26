@@ -301,7 +301,8 @@ sources complémentaires, toutes deux dans `db/` :
    - `010_ideas.sql` — table `ideas` (onglet Idées, voir 6.29).
    - `011_drop_reward_tiers.sql` — supprime `reward_tiers`,
      `challenge_results`, `reward_achievements` (défis familiaux et
-     paliers de récompense retirés, streak personnel conservé).
+     paliers de récompense retirés, streak personnel conservé) —
+     **appliquée sur Neon le 26/09/2026**.
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en

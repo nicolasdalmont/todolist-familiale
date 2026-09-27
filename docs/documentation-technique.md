@@ -1426,7 +1426,12 @@ en même temps que `logActivity`, de façon non bloquante :
   chacun indépendamment non bloquants.
 - `notifyTaskParticipants({ taskId, excludeUserId, … })` —
   fan-out vers créateur + assigné(e)s + lecteurs, moins l'auteur de
-  l'action.
+  l'action. N'envoie **rien** (ni ligne `notifications`, ni push) si la
+  tâche est déjà `done`/`archived` (garde-fou ajouté le 27/09/2026) : un
+  commentaire reste possible sur une tâche close (`addCommentAction` ne
+  vérifie pas le statut), mais ne doit plus déclencher de notification.
+  Même garde dans `updateTaskAction` pour un partage qui coïnciderait
+  avec la clôture de la tâche dans la même modification.
 
 **Envoi du push** (`sendPushToUser()`, protocole Web Push standard —
 RFC 8291/8292, aucun service tiers) : signe la requête avec les clés VAPID
@@ -1547,7 +1552,14 @@ veille + le jour même plutôt que d'ajouter cette dépendance.
 (`src/lib/queries.ts`) ne renvoie **que les notifications non lues** (30
 au plus, plus récentes d'abord) — une notif marquée lue **disparaît du
 fil**, et la section entière disparaît quand il n'y a plus rien à lire.
-Trois façons de marquer lu :
+Depuis le 27/09/2026, elle exclut aussi (`left join tasks`) toute
+notification liée à une tâche déjà `done`/`archived` : le cas concret est
+un rappel `due_soon` envoyé le matin pour une tâche close dans la
+journée, qui restait sinon visible dans le fil jusqu'à un clic manuel
+alors que la tâche n'était plus « à faire ». Une notification sans tâche
+(`task_id = null`, ex. `task_deleted`) n'est pas concernée. Même filtre
+dans `getBadgeCount()` pour la pastille — voir plus haut. Trois façons de
+marquer lu :
 
 - le **bouton ✓** sur chaque ligne (`markNotificationReadAction(id)`,
   `useTransition` local, pas de gel d'écran) ;

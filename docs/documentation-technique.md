@@ -159,10 +159,11 @@ paramétré (tag template). Dépendances runtime : `next`, `react`,
 > `@supabase/supabase-js`). Elle tourne depuis sur Neon, un Postgres
 > serverless piloté par une seule variable `DATABASE_URL` — objectif :
 > une appli déployable sur n'importe quel Postgres standard (voir
-> `docs/migration-neon.md` pour le détail des 7 phases). Le dossier
-> `supabase/` reste dans le dépôt le temps d'une période d'observation
-> (nettoyage prévu en Phase 6, ~25/09/2026) mais n'est plus utilisé par le
-> code.
+> `docs/migration-neon.md` pour le détail des 7 phases). **Phase 6
+> (nettoyage) faite le 27/09/2026** après deux semaines sans incident :
+> dépendance `pg` et script `db/migrate.mjs` (copie/rollback Neon↔Supabase)
+> retirés du dépôt. Le dossier `supabase/` reste comme archive historique
+> pure (plus de filet de rollback associé) — voir 5.1.
 
 ## 3. Architecture générale
 
@@ -325,10 +326,10 @@ depuis l'application.
 > `supabase/migrations/` (`001_categories_and_tags.sql` à
 > `009_categories.sql`). `db/neon_schema.sql` en est la version adaptée
 > Neon (12 tables, contenu identique — voir 5.3 pour le détail des
-> écarts). Ces fichiers `supabase/` restent dans le dépôt pour référence
-> et filet de secours (rollback) jusqu'au nettoyage de Phase 6
-> (~25/09/2026), mais ne sont plus la source de vérité : ne plus les
-> faire évoluer.
+> écarts). Ces fichiers `supabase/` restent dans le dépôt en archive
+> historique pure depuis le nettoyage de Phase 6 (27/09/2026) — le script
+> de copie/rollback (`db/migrate.mjs`) a été supprimé, il n'y a plus de
+> filet de secours associé. Ne plus les faire évoluer.
 
 ### 5.2 Schéma des tables
 
@@ -2710,8 +2711,7 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/app/error.tsx` / `not-found.tsx` / `loading.tsx` | Pages système à la marque (voir 6.16) |
 | `db/neon_schema.sql` | Référence structurelle complète, à jour et exécutable (reset — réservé à un sinistre, voir 5.1 et 5.3) |
 | `db/migrations/` | Évolutions de schéma additives postérieures à `neon_schema.sql` |
-| `db/migrate.mjs` | Script de copie Supabase → Neon utilisé lors de la migration (Phases 3 et 5, voir `docs/migration-neon.md`) — `--rollback` en sens inverse, non utilisé en fonctionnement normal |
-| `supabase/recreate_full_schema.sql` | **Historique, non maintenu depuis le 11/09/2026** — équivalent Supabase de `db/neon_schema.sql` (voir 5.1), conservé pour référence/rollback jusqu'à la Phase 6 |
+| `supabase/recreate_full_schema.sql` | **Historique, non maintenu depuis le 11/09/2026** — équivalent Supabase de `db/neon_schema.sql` (voir 5.1), conservé en archive pure depuis le nettoyage de Phase 6 (27/09/2026, script de rollback supprimé) |
 | `supabase/migrations/` | **Historique, non maintenu depuis le 11/09/2026** — évolutions additives appliquées du temps de Supabase |
 | `supabase/fix_due_at_timezone_2026-09-04.sql` | Correction ponctuelle des données (réalignement des échéances sur Europe/Paris) — déjà appliquée (données reprises telles quelles par la migration Neon), à ne pas rejouer (voir 8.1) |
 | `src/app/api/widget/route.ts` | Endpoint lecture seule pour le widget iPhone, protégé par `WIDGET_TOKEN`/`WIDGET_PROFILE_ID` (voir 6.30) |

@@ -534,19 +534,27 @@ lancer un script qui vide une cible.
 
 ## 10. Phase 6 — Nettoyage (après ~2 semaines sans incident)
 
-- [ ] Supprimer / mettre en pause le projet Supabase (libère un slot gratuit).
-- [ ] Retirer du dépôt : `src/lib/supabase/`, la dépendance
-  `@supabase/supabase-js`, `db/migrate.mjs --rollback` (si le retour arrière
-  est jugé définitivement clos), la dépendance `pg`.
-- [ ] `supabase/` → renommer en `db/` (schéma + historique migrations), ou
-  garder `supabase/migrations/` en archive et démarrer `db/migrations/` pour
-  la suite.
-- [ ] Doc technique : §3 (architecture), §5 (modèle de données), §8.2 (pièges
-  de cache — le contournement `admin.ts` devient `db.ts`), inventaire §11,
-  en-tête, README, `.env.example`. Retirer les mentions « service_role »,
-  « PostgREST », « RLS ».
-- [ ] Mémoire projet + changelog.
-- [ ] **Documenter le socle « Neon (ou tout Postgres) + Vercel » comme base
+**Statut : FAITE (27/09/2026)**, validation utilisateur après 2 semaines
+d'usage prod sans incident (bascule le 11/09/2026).
+
+- [ ] Supprimer / mettre en pause le projet Supabase (libère un slot
+  gratuit) — **action dashboard Supabase, à faire par l'utilisateur**
+  (hors accès Claude Code).
+- [x] Retirer du dépôt : `src/lib/supabase/` (déjà fait en Phase 2),
+  la dépendance `@supabase/supabase-js` (idem), `db/migrate.mjs` supprimé
+  en entier (copie + `--rollback`, le retour arrière est jugé
+  définitivement clos), la dépendance `pg` retirée de `package.json`.
+- [x] `supabase/` gardé en archive (`supabase/migrations/`), `db/migrations/`
+  déjà la référence courante pour la suite (démarré dès la migration 001
+  du 12/09/2026).
+- [x] Doc technique : en-tête §2 et §5.1 mis à jour (mention du nettoyage,
+  plus de filet de rollback), inventaire §11 (ligne `db/migrate.mjs`
+  retirée, ligne `supabase/recreate_full_schema.sql` mise à jour). Les
+  mentions « service_role » / « PostgREST » / « RLS » restantes sont des
+  comparatifs explicatifs (pourquoi Neon n'a pas de RLS) et sont
+  conservées à dessein plutôt que retirées.
+- [x] Mémoire projet — voir [[neon-migration-plan]] (mise à jour, fermée).
+- [x] **Socle « Neon + Vercel » déjà documenté comme base de packaging**
   du packaging** (étape suivante).
 
 ---

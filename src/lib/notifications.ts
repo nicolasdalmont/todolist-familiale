@@ -44,6 +44,12 @@ export async function notifyUser(params: {
 // omis pour une notification système sans auteur (ex. rappel d'échéance,
 // voir /api/cron/reminders), qui doit alors atteindre tout le monde y
 // compris le créateur d'une tâche privée.
+//
+// N'envoie rien (ni insertion, ni push) si la tâche est déjà "done" ou
+// "archived" : un commentaire sur une tâche déjà close (autorisé, voir
+// addCommentAction) ne doit pas déclencher de push — cohérent avec le
+// filtre appliqué à la lecture dans getMyNotifications()/getBadgeCount()
+// (src/lib/queries.ts).
 export async function notifyTaskParticipants(params: {
   taskId: string;
   excludeUserId?: string;
@@ -52,11 +58,12 @@ export async function notifyTaskParticipants(params: {
   body?: string | null;
 }): Promise<void> {
   const [taskRows, assigneeRows] = await Promise.all([
-    sql`select created_by from tasks where id = ${params.taskId}`,
+    sql`select created_by, status from tasks where id = ${params.taskId}`,
     sql`select user_id from task_assignees where task_id = ${params.taskId}`,
   ]);
-  const task = taskRows[0] as { created_by: string } | undefined;
+  const task = taskRows[0] as { created_by: string; status: string } | undefined;
   if (!task) return;
+  if (task.status === "done" || task.status === "archived") return;
 
   const recipients = new Set<string>([
     task.created_by,

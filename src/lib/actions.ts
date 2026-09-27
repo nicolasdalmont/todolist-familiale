@@ -457,7 +457,11 @@ export async function updateTaskAction(formData: FormData) {
     const newlyShared = currentIds.filter(
       (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
     );
-    if (newlyShared.length > 0) {
+    // Pas de notification si cette même modification clôt aussi la tâche
+    // (done/archived) : partager une tâche qu'on ferme dans le même geste
+    // n'a rien à signaler (cohérent avec le garde-fou de
+    // notifyTaskParticipants(), src/lib/notifications.ts).
+    if (newlyShared.length > 0 && status !== "done" && status !== "archived") {
       const who = await actorName(userId);
       await Promise.all(
         newlyShared.map((id) =>

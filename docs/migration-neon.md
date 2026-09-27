@@ -534,12 +534,13 @@ lancer un script qui vide une cible.
 
 ## 10. Phase 6 — Nettoyage (après ~2 semaines sans incident)
 
-**Statut : FAITE (27/09/2026)**, validation utilisateur après 2 semaines
-d'usage prod sans incident (bascule le 11/09/2026).
+**Statut : FAITE ET COMPLÈTE (27/09/2026)**, validation utilisateur après 2
+semaines d'usage prod sans incident (bascule le 11/09/2026). Projet
+Supabase supprimé par l'utilisateur le jour même — plus aucune trace côté
+Supabase, migration entièrement close.
 
-- [ ] Supprimer / mettre en pause le projet Supabase (libère un slot
-  gratuit) — **action dashboard Supabase, à faire par l'utilisateur**
-  (hors accès Claude Code).
+- [x] Supprimer / mettre en pause le projet Supabase (libère un slot
+  gratuit) — **fait par l'utilisateur (27/09/2026)**, projet supprimé.
 - [x] Retirer du dépôt : `src/lib/supabase/` (déjà fait en Phase 2),
   la dépendance `@supabase/supabase-js` (idem), `db/migrate.mjs` supprimé
   en entier (copie + `--rollback`, le retour arrière est jugé

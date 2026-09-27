@@ -2619,6 +2619,29 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
   vérification visuelle, démarrer/relancer `npm run dev` (après avoir
   arrêté un build en cours) plutôt que de supposer qu'un changement UI
   fonctionne.
+- **Renouvellement du token GitHub** (alerte GitHub « token expiring
+  soon ») : l'authentification `git push` passe par un Personal Access
+  Token stocké dans le trousseau macOS (`git config credential.helper` →
+  `osxkeychain`). Modop :
+  1. GitHub → Settings → Developer settings → Personal access tokens →
+     générer un nouveau token avec les mêmes permissions que l'ancien
+     (`repo` au minimum).
+  2. Effacer l'entrée périmée du trousseau : `git credential-osxkeychain
+     erase`, puis taper à la main (pas coller d'un coup) `protocol=https`
+     et `host=github.com`, puis valider avec une ligne vide.
+  3. Déclencher un nouveau prompt d'authentification avec un vrai `git
+     push` (pas `fetch`/`pull` : le dépôt est public, donc lecture
+     anonyme sans auth — seul push vérifie les droits d'écriture).
+     Entrer le login GitHub en username et le **nouveau token** en
+     password.
+  - Le trousseau macOS a une seule entrée par host (`github.com`),
+    partagée par tous les dépôts locaux en HTTPS de la machine (`woro`,
+    `mabedetheque`, `calyxter-set-manager`, etc.) : un seul renouvellement
+    suffit pour tous.
+  - Vérification a posteriori : `security find-internet-password -s
+    github.com` (sans `-g`, pour ne pas afficher le secret) affiche la
+    date de création (`cdat`) de l'entrée — elle doit correspondre au
+    moment du renouvellement.
 - **Évolutions du schéma de base** : toujours via un nouveau fichier
   numéroté dans `db/migrations/` (additif : `add column if not exists`,
   `create table if not exists`, jamais de `drop`), exécuté à la main

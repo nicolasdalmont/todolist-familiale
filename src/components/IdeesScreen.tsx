@@ -44,7 +44,7 @@ export function IdeesScreen({ ideas, currentUserId }: { ideas: Idea[]; currentUs
 
   const [content, setContent] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<IdeaStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<IdeaStatus | "all">("created");
   const [deleting, setDeleting] = useState<Idea | null>(null);
 
   const filtered = useMemo(

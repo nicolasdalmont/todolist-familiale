@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start"
   },
+  "engines": {
+    "node": ">=24.22.1"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "jose": "6.2.3",

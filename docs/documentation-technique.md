@@ -203,7 +203,7 @@ Points clés :
   boutons). Les rares Route Handlers `/api/*` couvrent des besoins précis
   qui ne rentrent pas dans ce modèle : `/api/version` (repère de version,
   6.8), `/api/push/subscribe` (abonnement push, appelé aussi par le
-  service worker, 6.15), `/api/cron/reminders` (Vercel Cron, 6.15),
+  service worker, 6.15), `/api/cron/reminders` (Vercel Cron, 6.15), `/api/cron/purge` (Vercel Cron, 6.31),
   `/api/tasks/[id]/calendar` (fichier `.ics`, 6.13). Chacun applique son
   propre contrôle d'accès (session et/ou `CRON_SECRET`, plus `canView`
   pour le `.ics`) — voir le tableau des routes en section 7.
@@ -304,12 +304,15 @@ sources complémentaires, toutes deux dans `db/` :
      `challenge_results`, `reward_achievements` (défis familiaux et
      paliers de récompense retirés, streak personnel conservé) —
      **appliquée sur Neon le 26/09/2026**.
+   - `012_purge_done_tasks.sql` — `tasks.completed_at`, suppression du
+     statut `archived` (contrainte `tasks_status_check`), purge à 3 mois
+     (voir 6.31) — **appliquée sur Neon le 11/11/2026**.
 
    Toute nouvelle évolution du schéma passe par un nouveau fichier
    numéroté ici (voir section 10), et `neon_schema.sql` est mis à jour en
    parallèle pour rester le reflet fidèle de la structure — **à jour
-   jusqu'à la migration 011 inclue au 26/09/2026** : un déploiement neuf
-   n'a besoin que de `neon_schema.sql`, pas de rejouer ces onze fichiers
+   jusqu'à la migration 012 inclue au 11/11/2026** : un déploiement neuf
+   n'a besoin que de `neon_schema.sql`, pas de rejouer ces douze fichiers
    un par un.
 
 **Le contenu (les lignes) n'est pas versionné ici** : `neon_schema.sql`
@@ -355,7 +358,8 @@ depuis l'application.
 | `description` | text | |
 | `due_at` | timestamptz, nullable | Échéance (optionnelle) |
 | `recurrence` | jsonb | `{ type, interval?, unit? }` — voir 6.3 |
-| `status` | text | `todo` \| `in_progress` \| `done` \| `archived` |
+| `status` | text | `todo` \| `in_progress` \| `done` (le statut `archived` a été supprimé le 11/11/2026, migration 012) |
+| `completed_at` | timestamptz, nullable | Date de passage à `done` (posée/effacée par `setStatusAction`/`updateTaskAction`) ; sert à la purge à 3 mois — voir 6.31 |
 | `visibility` | text | `shared` \| `private` — **champ dérivé, jamais saisi par l'utilisateur** (voir 6.1) |
 | `category` | text → `categories.slug` | clé étrangère `on delete restrict`, défaut `autre` — voir 6.2 |
 | `created_by` | uuid → `users.id` | |
@@ -615,7 +619,7 @@ Ce module est appliqué systématiquement :
   d'afficher un formulaire désactivé.
 
 Statuts de tâche (inchangés) : `todo` (à faire) → `in_progress` (en cours)
-→ `done` (terminée) → `archived` (archivée). Les boutons de statut
+→ `done` (terminée). Les boutons de statut
 (`StatusButtons.tsx`) sont tous visibles sur l'écran de détail pour qui a
 `canEdit` (il n'y a pas de machine à états stricte) ; ils sont masqués
 pour un lecteur en lecture seule.
@@ -798,7 +802,7 @@ toujours le même chiffre, cliquer sur une tuile atterrit sur exactement ce
 qu'elle comptait.
 
 - **En retard** (ajoutée le 03/09/2026) : nombre de tâches dont
-  l'échéance est dépassée, ni terminées ni archivées — même définition
+  l'échéance est dépassée, pas terminées — même définition
   que le badge "En retard" déjà utilisé sur la carte de tâche et l'écran
   de détail (`isOverdue()` dans `src/lib/format.ts`). Mise en avant en
   rouge (mêmes teintes que ce badge) dès que son compte est supérieur à
@@ -824,10 +828,9 @@ initialement affiché a été retiré, sur demande de l'utilisateur, la portée
 "jusqu'au dimanche à venir inclus" restant décrite plus haut sans avoir
 besoin de figurer dans le libellé lui-même).
 
-**Aucun des trois compteurs ne compte une tâche terminée (`done`) ou
-archivée (`archived`)** — "Aujourd'hui"/"Cette semaine" ne portent que sur
+**Aucun des trois compteurs ne compte une tâche terminée (`done`)** — "Aujourd'hui"/"Cette semaine" ne portent que sur
 les tâches `todo`/`in_progress` (`open` dans `HomeDashboard.tsx`), "En
-retard" exclut `done`/`archived` par construction de `isOverdue()`.
+retard" exclut `done` par construction de `isOverdue()`.
 
 Les tuiles "Aujourd'hui" et "Cette semaine" sont des liens vers
 `/tasks?dueFrom=YYYY-MM-DD&dueAtMost=YYYY-MM-DD` (voir 6.7) : depuis le
@@ -901,8 +904,8 @@ n'aurait plus de sens dans cette disposition empilée) :
      arrivant depuis une tuile (`cameFromTile` dans `TaskFilterList.tsx`
      continue seulement à ignorer tout filtre mémorisé dans ce cas — voir
      plus bas).
-   - **Statut** : quatre boutons à cocher indépendamment (À faire, En
-     cours, Terminée, Archivée — `STATUS_ORDER`/`STATUS_LABELS` dans
+   - **Statut** : trois boutons à cocher indépendamment (À faire, En
+     cours, Terminée — `STATUS_ORDER`/`STATUS_LABELS` dans
      `src/lib/format.ts`), sélection multiple comme les tags. **À faire**
      et **En cours** sont cochés par défaut. Un bref essai avec un seul
      bouton à bascule "tous les statuts / actifs" (livré puis remplacé le
@@ -1427,7 +1430,7 @@ en même temps que `logActivity`, de façon non bloquante :
 - `notifyTaskParticipants({ taskId, excludeUserId, … })` —
   fan-out vers créateur + assigné(e)s + lecteurs, moins l'auteur de
   l'action. N'envoie **rien** (ni ligne `notifications`, ni push) si la
-  tâche est déjà `done`/`archived` (garde-fou ajouté le 27/09/2026) : un
+  tâche est déjà `done` (garde-fou ajouté le 27/09/2026) : un
   commentaire reste possible sur une tâche close (`addCommentAction` ne
   vérifie pas le statut), mais ne doit plus déclencher de notification.
   Même garde dans `updateTaskAction` pour un partage qui coïnciderait
@@ -1553,7 +1556,7 @@ veille + le jour même plutôt que d'ajouter cette dépendance.
 au plus, plus récentes d'abord) — une notif marquée lue **disparaît du
 fil**, et la section entière disparaît quand il n'y a plus rien à lire.
 Depuis le 27/09/2026, elle exclut aussi (`left join tasks`) toute
-notification liée à une tâche déjà `done`/`archived` : le cas concret est
+notification liée à une tâche déjà `done` : le cas concret est
 un rappel `due_soon` envoyé le matin pour une tâche close dans la
 journée, qui restait sinon visible dans le fil jusqu'à un clic manuel
 alors que la tâche n'était plus « à faire ». Une notification sans tâche
@@ -1685,7 +1688,7 @@ modifications les plus visibles :
   défaut de la liste, donc invisibles autrement. Affiche les **3 plus
   urgentes** (en retard d'abord, puis par échéance croissante, sans
   échéance en dernier) + un lien « Voir tout » vers `/tasks?readOnly=1`
-  (voir 6.7). Une tâche n'en sort que lorsqu'elle est terminée / archivée.
+  (voir 6.7). Une tâche n'en sort que lorsqu'elle est terminée.
 - **Salutation selon l'heure** de Paris (UX-14) : « Bonsoir » de 18 h à
   5 h, « Bonjour » le reste de la journée.
 
@@ -1702,8 +1705,6 @@ modifications les plus visibles :
   activité du jour. Les fils de type boîte de réception (« À ton
   attention », « Partagées avec toi ») continuent, eux, à disparaître
   quand ils sont vides.
-- **Tâche archivée** (INC-8) : même traitement atténué qu'une tâche
-  terminée dans la liste — titre grisé barré + carte à 60 % d'opacité.
 - **Bandeau « Filtré depuis l'accueil · Réinitialiser »** (INC-9) :
   affiché sur `/tasks` quand on arrive via une tuile ou un lien
   (`cameFromTile`), pour expliquer d'où vient le filtrage courant ;
@@ -1819,7 +1820,7 @@ importé aussi bien par les Server Actions dédiées que par
   en retard depuis plusieurs mois) et crée la tâche de cette nouvelle
   occurrence. Une activité n'a donc **jamais plus d'une tâche ouverte à
   la fois** (index unique partiel `tasks_garden_open_occurrence_uidx` sur
-  `garden_activity_id` où le statut n'est ni `done` ni `archived`).
+  `garden_activity_id` où le statut n'est pas `done`).
 - **Suppression d'une activité** (`deleteGardenActivityAction`) : supprime
   sa tâche ouverte (pas de nouvelle occurrence à générer, la récurrence
   s'arrête) ; une tâche déjà clôturée garde son historique
@@ -2399,6 +2400,25 @@ s'écouler.
 
 ## 8. Limites connues et points d'attention
 
+### 6.31 Suppression du statut « Archivée » et purge à 3 mois (11/11/2026)
+
+Le statut `archived` n'était pas utilisé : il est retiré (type
+`TaskStatus`, `STATUS_LABELS`, boutons, filtre de `/tasks`, requêtes
+`status <> 'done'`). Un filtre mémorisé contenant « archived » est ignoré.
+Les tables d'activités Voiture/Santé/Finances gardent « archived » dans
+leur contrainte `status` (jamais produit par l'appli).
+
+**Purge** : `tasks.completed_at` est posé quand une tâche passe à `done`
+(`setStatusAction`, `updateTaskAction`) et remis à `null` si elle est
+rouverte. Le cron `/api/cron/purge` (`src/app/api/cron/purge/route.ts`,
+Vercel Cron 3h30 UTC, protégé par `CRON_SECRET`) supprime les tâches
+`done` dont `completed_at` a plus de 3 mois ; assignations, commentaires,
+tags, checklist, notifications et journal partent en cascade. Streak
+(`user_activity_log`) et activités d'agenda non touchés. Route séparée de
+`reminders` pour ne pas dépendre du réglage `reminder_enabled`. La
+migration 012 a converti les tâches archivées en `done` et daté les
+tâches déjà terminées au jour de la migration (3 mois de sursis).
+
 ### 8.1 Fuseau horaire (refonte du 04/09/2026)
 
 **L'appli est désormais explicitement en Europe/Paris** de bout en bout —
@@ -2722,7 +2742,8 @@ de session. `layout.tsx` ne déclare plus que l'icône `apple-touch`
 | `src/components/NotificationsToggle.tsx` | Activation/désactivation des notifications sur l'écran « Mon compte » (voir 6.15) |
 | `src/app/api/push/subscribe/route.ts` | Enregistre/supprime l'abonnement push de l'appareil courant (voir 6.15) |
 | `src/app/api/cron/reminders/route.ts` | Rappel quotidien d'échéance, appelé par Vercel Cron (voir 6.15) |
-| `vercel.json` | Déclare le Cron Job (`/api/cron/reminders`, 1×/jour) |
+| `src/app/api/cron/purge/route.ts` | Purge quotidienne des tâches terminées depuis plus de 3 mois (voir 6.31) |
+| `vercel.json` | Déclare les Cron Jobs (`/api/cron/reminders` à 7h, `/api/cron/purge` à 3h30 UTC, 1×/jour chacun) |
 | `public/sw.js` | App shell + handlers `push`/`notificationclick`/`pushsubscriptionchange` (voir 6.15) + cache de lecture hors ligne réseau-d'abord/repli-cache (voir 6.22) |
 | `public/offline.html` | Page de secours statique servie hors ligne pour une route jamais visitée (voir 6.22) |
 | `src/components/OfflineBanner.tsx` | Bandeau « Hors ligne — dernières données à HH:mm » (voir 6.22) |

@@ -106,8 +106,8 @@ des notifications push web (protocole standard, aucun compte/service tiers
 garder ensuite, ne pas régénérer (ça invaliderait tous les abonnements déjà
 enregistrés). `VAPID_SUBJECT` est un contact `mailto:...` transmis au
 service push en cas de souci de délivrabilité, jamais affiché aux
-utilisateurs. `CRON_SECRET` protège la route de rappel d'échéance
-(`/api/cron/reminders`, voir `vercel.json`) — Vercel Cron l'ajoute
+utilisateurs. `CRON_SECRET` protège les routes cron (rappel d'échéance
+`/api/cron/reminders` et purge `/api/cron/purge`, voir `vercel.json`) — Vercel Cron l'ajoute
 automatiquement en en-tête `Authorization` à ses appels dès que cette
 variable est définie sur le projet ; à générer une fois
 (ex. `openssl rand -base64 32`). Toutes en type **Secret**, sauf
@@ -239,6 +239,11 @@ partagée/privée est appliquée entièrement au niveau applicatif
   streak, tâches du jour et en retard d'un seul profil fixe, lu par un
   endpoint dédié (`/api/widget`, jeton séparé du cookie de session).
   Voir la doc technique §6.30.
+- Statuts de tâche : À faire · En cours · Terminée (le statut « Archivée »
+  a été supprimé le 11/11/2026). Les tâches terminées depuis plus de 3 mois
+  sont supprimées automatiquement chaque nuit (Vercel Cron
+  `/api/cron/purge`, `tasks.completed_at`, migration 012). Voir la doc
+  technique §6.31.
 - Toutes les heures sont gérées en fuseau **Europe/Paris**. Voir §8.1.
 - Sur mobile : navigation par une barre d'onglets en bas d'écran
   (Accueil · Tâches · Agendas · Compte · Créer) et « tirer pour

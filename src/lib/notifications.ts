@@ -46,7 +46,7 @@ export async function notifyUser(params: {
 // compris le créateur d'une tâche privée.
 //
 // N'envoie rien (ni insertion, ni push) si la tâche est déjà "done" ou
-// "archived" : un commentaire sur une tâche déjà close (autorisé, voir
+// "done" : un commentaire sur une tâche déjà close (autorisé, voir
 // addCommentAction) ne doit pas déclencher de push — cohérent avec le
 // filtre appliqué à la lecture dans getMyNotifications()/getBadgeCount()
 // (src/lib/queries.ts).
@@ -63,7 +63,7 @@ export async function notifyTaskParticipants(params: {
   ]);
   const task = taskRows[0] as { created_by: string; status: string } | undefined;
   if (!task) return;
-  if (task.status === "done" || task.status === "archived") return;
+  if (task.status === "done") return;
 
   const recipients = new Set<string>([
     task.created_by,

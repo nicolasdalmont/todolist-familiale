@@ -400,7 +400,9 @@ export async function updateTaskAction(formData: FormData) {
     await sql`
       update tasks
       set title = ${title}, description = ${description}, due_at = ${dueAt},
-          visibility = ${visibility}, status = ${status}, recurrence = ${JSON.stringify(recurrence)}, category = ${category}
+          visibility = ${visibility}, status = ${status},
+          completed_at = case when ${status} = 'done' then coalesce(completed_at, now()) else null end,
+          recurrence = ${JSON.stringify(recurrence)}, category = ${category}
       where id = ${taskId}
     `;
   } catch (e) {
@@ -458,10 +460,10 @@ export async function updateTaskAction(formData: FormData) {
       (id) => id !== userId && id !== creatorId && !previouslyShared.has(id)
     );
     // Pas de notification si cette même modification clôt aussi la tâche
-    // (done/archived) : partager une tâche qu'on ferme dans le même geste
+    // (done) : partager une tâche qu'on ferme dans le même geste
     // n'a rien à signaler (cohérent avec le garde-fou de
     // notifyTaskParticipants(), src/lib/notifications.ts).
-    if (newlyShared.length > 0 && status !== "done" && status !== "archived") {
+    if (newlyShared.length > 0 && status !== "done") {
       const who = await actorName(userId);
       await Promise.all(
         newlyShared.map((id) =>
@@ -627,7 +629,10 @@ export async function setStatusAction(taskId: string, status: string) {
   if (!task) return;
 
   try {
-    await sql`update tasks set status = ${status} where id = ${taskId}`;
+    await sql`update tasks
+      set status = ${status},
+          completed_at = case when ${status} = 'done' then coalesce(completed_at, now()) else null end
+      where id = ${taskId}`;
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : "Impossible de mettre à jour le statut.");
   }

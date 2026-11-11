@@ -55,7 +55,7 @@ function writePersistedFilters(filters: PersistedFilters): void {
 
 // Ordre d'affichage des quatre boutons de statut (ligne 1) — l'ordre
 // naturel du cycle de vie d'une tâche, pas l'ordre alphabétique.
-const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
+const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done"];
 
 // Statuts cochés par défaut : tâches actives uniquement (à faire + en
 // cours) — voir l'état `statuses` plus bas.
@@ -183,7 +183,7 @@ export function TaskFilterList({
     if (!persisted) return;
     if (persisted.query !== undefined) setQuery(persisted.query);
     if (persisted.scope) setScope(persisted.scope);
-    if (persisted.statuses) setStatuses(new Set(persisted.statuses));
+    if (persisted.statuses) setStatuses(new Set(persisted.statuses.filter((s: TaskStatus) => STATUS_ORDER.includes(s))));
     if (persisted.category !== undefined) setCategory(persisted.category);
     if (persisted.dueFrom !== undefined) setDueFrom(persisted.dueFrom);
     if (persisted.dueAtMost !== undefined) setDueAtMost(persisted.dueAtMost);
@@ -263,8 +263,8 @@ export function TaskFilterList({
         if (dueAtMost && key > dueAtMost) return false;
       }
       // Même définition du retard que la tuile "En retard" du tableau de
-      // bord (voir isOverdue() dans src/lib/format.ts) : ni terminée, ni
-      // archivée, échéance dépassée.
+      // bord (voir isOverdue() dans src/lib/format.ts) : pas terminée,
+      // échéance dépassée.
       if (overdueOnly && !isOverdue(task.due_at, task.status)) return false;
       if (q) {
         const haystack = `${task.title} ${task.description ?? ""}`.toLowerCase();

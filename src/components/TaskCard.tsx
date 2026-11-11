@@ -25,9 +25,7 @@ export function TaskCard({ task, categories }: { task: Task; categories: Categor
   return (
     <Link
       href={`/tasks/${task.id}`}
-      className={`flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50 ${
-        task.status === "archived" ? "opacity-60" : ""
-      }`}
+      className={`flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4 shadow-sm transition hover:border-brand/50`}
     >
       <div className="flex items-start justify-between gap-2">
         {/* min-w-0 : laisse le titre s'enrouler sur plusieurs lignes pour
@@ -37,7 +35,7 @@ export function TaskCard({ task, categories }: { task: Task; categories: Categor
             titre long. */}
         <span
           className={`min-w-0 text-[15px] font-bold leading-snug ${
-            task.status === "done" || task.status === "archived"
+            task.status === "done"
               ? "text-ink-muted line-through"
               : "text-ink"
           }`}

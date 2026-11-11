@@ -14,7 +14,7 @@ type SharedTask = {
 // **pérenne** des tâches ouvertes (à faire / en cours) où l'utilisateur
 // est en lecture seule — absentes des compteurs et de la portée par
 // défaut de la liste, donc invisibles autrement. Y restent tant qu'elles
-// sont ouvertes (les tâches terminées / archivées sont filtrées en amont
+// sont ouvertes (les tâches terminées sont filtrées en amont
 // dans HomeDashboard). On n'affiche que **les 3 plus urgentes** (en
 // retard d'abord, puis par échéance croissante, sans échéance en
 // dernier), avec un lien « Voir tout » vers la liste filtrée. Rien

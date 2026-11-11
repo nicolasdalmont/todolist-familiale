@@ -6,7 +6,6 @@ const STATUS_STYLES: Record<TaskStatus, string> = {
   todo: "bg-sand text-ink-muted",
   in_progress: "bg-brand-soft text-brand-dark",
   done: "bg-emerald-50 text-emerald-700",
-  archived: "bg-stone-200 text-stone-500",
 };
 
 export function StatusBadge({ status }: { status: TaskStatus }) {

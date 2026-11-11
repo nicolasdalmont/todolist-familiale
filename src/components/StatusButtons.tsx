@@ -8,7 +8,7 @@ import { STATUS_LABELS } from "@/lib/format";
 import type { TaskStatus } from "@/lib/types";
 import { IconCheck } from "./Icons";
 
-const STATUSES: TaskStatus[] = ["todo", "in_progress", "done", "archived"];
+const STATUSES: TaskStatus[] = ["todo", "in_progress", "done"];
 
 // Statut courant : fond plein coloré + coche (affordance non uniquement
 // chromatique). Les autres : bouton clair cliquable bien lisible — pas un
@@ -17,7 +17,6 @@ const ACTIVE_STYLES: Record<TaskStatus, string> = {
   todo: "border-transparent bg-ink text-white",
   in_progress: "border-transparent bg-brand text-white",
   done: "border-transparent bg-emerald-600 text-white",
-  archived: "border-transparent bg-stone-500 text-white",
 };
 
 export function StatusButtons({ taskId, current }: { taskId: string; current: TaskStatus }) {

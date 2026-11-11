@@ -137,7 +137,7 @@ export async function updateCarActivityAction(formData: FormData): Promise<Resul
   // src/lib/garden-actions.ts) — titre/description/échéance/responsables
   // sont systématiquement réécrits.
   const openTaskRows = await sql`
-    select id from tasks where car_activity_id = ${activityId} and status not in ('done', 'archived')
+    select id from tasks where car_activity_id = ${activityId} and status <> 'done'
   `;
   const openTask = openTaskRows[0] as { id: string } | undefined;
   const dueAt = occurrenceDueAtIso(parsedDate.dueDate, parsedDate.dayKnown);
@@ -176,7 +176,7 @@ export async function deleteCarActivityAction(activityId: string): Promise<Resul
   // instance à générer : on arrête la récurrence) — même comportement que
   // deleteGardenActivityAction, src/lib/garden-actions.ts.
   const openTaskRows = await sql`
-    select id from tasks where car_activity_id = ${activityId} and status not in ('done', 'archived')
+    select id from tasks where car_activity_id = ${activityId} and status <> 'done'
   `;
   const openTask = openTaskRows[0] as { id: string } | undefined;
   if (openTask) {

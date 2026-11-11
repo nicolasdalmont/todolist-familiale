@@ -20,7 +20,7 @@ export async function getGardenActivities(): Promise<GardenActivity[]> {
     sql`
       select id, garden_activity_id, status, due_at
       from tasks
-      where garden_activity_id is not null and status not in ('done', 'archived')
+      where garden_activity_id is not null and status <> 'done'
     `,
     // Checklist de la tâche en cours de chaque activité (voir le
     // commentaire sur GardenActivity.openTask, src/lib/types.ts).
@@ -28,7 +28,7 @@ export async function getGardenActivities(): Promise<GardenActivity[]> {
       select t.garden_activity_id as garden_activity_id, ci.id, ci.label, ci.done, ci.created_at
       from checklist_items ci
       join tasks t on t.id = ci.task_id
-      where t.garden_activity_id is not null and t.status not in ('done', 'archived')
+      where t.garden_activity_id is not null and t.status <> 'done'
       order by ci.created_at asc
     `,
   ]);

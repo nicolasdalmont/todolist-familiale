@@ -13,7 +13,7 @@ export async function getCarActivities(): Promise<CarActivity[]> {
       select id, name, description, to_char(due_date, 'YYYY-MM-DD') as due_date,
              day_known, recurrence, status, created_by, created_at
       from car_activities
-      where status not in ('done', 'archived')
+      where status <> 'done'
       order by due_date asc
     `,
     sql`
@@ -26,7 +26,7 @@ export async function getCarActivities(): Promise<CarActivity[]> {
     sql`
       select id, car_activity_id, status, due_at
       from tasks
-      where car_activity_id is not null and status not in ('done', 'archived')
+      where car_activity_id is not null and status <> 'done'
     `,
     // Checklist de la tâche en cours de chaque activité (voir le
     // commentaire sur CarActivity.openTask, src/lib/types.ts).
@@ -34,7 +34,7 @@ export async function getCarActivities(): Promise<CarActivity[]> {
       select t.car_activity_id as car_activity_id, ci.id, ci.label, ci.done, ci.created_at
       from checklist_items ci
       join tasks t on t.id = ci.task_id
-      where t.car_activity_id is not null and t.status not in ('done', 'archived')
+      where t.car_activity_id is not null and t.status <> 'done'
       order by ci.created_at asc
     `,
   ]);

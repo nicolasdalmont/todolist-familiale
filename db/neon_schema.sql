@@ -82,7 +82,9 @@ create table public.tasks (
   due_at timestamptz,
   recurrence jsonb default '{"type": "none"}',
   status text not null default 'todo'
-    check (status in ('todo', 'in_progress', 'done', 'archived')),
+    check (status in ('todo', 'in_progress', 'done')),
+  -- Date de passage à « done » (migration 012) ; sert à la purge à 3 mois.
+  completed_at timestamptz,
   -- Recalculée par l'application (computeVisibility(), src/lib/access.ts).
   visibility text not null default 'shared'
     check (visibility in ('shared', 'private')),

@@ -1,5 +1,5 @@
 export type Role = "admin" | "user";
-export type TaskStatus = "todo" | "in_progress" | "done" | "archived";
+export type TaskStatus = "todo" | "in_progress" | "done";
 export type Visibility = "shared" | "private";
 // "editor" : voit, modifie, change le statut et commente une tâche.
 // "viewer" : voit et commente, sans pouvoir la modifier. Voir

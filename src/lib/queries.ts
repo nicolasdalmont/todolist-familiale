@@ -434,7 +434,7 @@ export async function getUserActiveDays(userId: string, sinceIso: string): Promi
 // l'utilisateur, plus récentes d'abord. Une notification marquée lue
 // disparaît donc du fil (voir markNotificationReadAction /
 // markNotificationsReadAction dans src/lib/actions.ts). Exclut aussi les
-// notifications dont la tâche liée est désormais terminée ou archivée
+// notifications dont la tâche liée est désormais terminée
 // (ex. un commentaire notifié avant la clôture de la tâche) : une fois la
 // tâche fermée, elle ne doit plus solliciter l'attention de personne.
 // Tolère l'absence de la table (migration 006 pas encore appliquée) en
@@ -446,7 +446,7 @@ export async function getMyNotifications(userId: string, limit = 30): Promise<No
       from notifications n
       left join tasks t on t.id = n.task_id
       where n.user_id = ${userId} and n.read_at is null
-        and (n.task_id is null or t.status not in ('done', 'archived'))
+        and (n.task_id is null or t.status <> 'done')
       order by n.created_at desc
       limit ${limit}
     `;
@@ -472,7 +472,7 @@ export async function getBadgeCount(userId: string): Promise<number> {
       from notifications n
       left join tasks t on t.id = n.task_id
       where n.user_id = ${userId} and n.read_at is null
-        and (n.task_id is null or t.status not in ('done', 'archived'))
+        and (n.task_id is null or t.status <> 'done')
     `
       .then((rows) => rows as Array<{ id: string; task_id: string | null }>)
       .catch(() => []),

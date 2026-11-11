@@ -13,7 +13,7 @@ export async function getFinancesActivities(): Promise<FinancesActivity[]> {
       select id, name, description, to_char(due_date, 'YYYY-MM-DD') as due_date,
              day_known, recurrence, status, created_by, created_at
       from finances_activities
-      where status not in ('done', 'archived')
+      where status <> 'done'
       order by due_date asc
     `,
     sql`
@@ -26,7 +26,7 @@ export async function getFinancesActivities(): Promise<FinancesActivity[]> {
     sql`
       select id, finances_activity_id, status, due_at
       from tasks
-      where finances_activity_id is not null and status not in ('done', 'archived')
+      where finances_activity_id is not null and status <> 'done'
     `,
     // Checklist de la tâche en cours de chaque activité (voir le
     // commentaire sur FinancesActivity.openTask, src/lib/types.ts).
@@ -34,7 +34,7 @@ export async function getFinancesActivities(): Promise<FinancesActivity[]> {
       select t.finances_activity_id as finances_activity_id, ci.id, ci.label, ci.done, ci.created_at
       from checklist_items ci
       join tasks t on t.id = ci.task_id
-      where t.finances_activity_id is not null and t.status not in ('done', 'archived')
+      where t.finances_activity_id is not null and t.status <> 'done'
       order by ci.created_at asc
     `,
   ]);

@@ -78,7 +78,7 @@ export function relativeTime(iso: string): string {
 
 export function isOverdue(dueAt: string | null, status: TaskStatus): boolean {
   if (!dueAt) return false;
-  return new Date(dueAt).getTime() < Date.now() && status !== "done" && status !== "archived";
+  return new Date(dueAt).getTime() < Date.now() && status !== "done";
 }
 
 // Variante date seule (sans heure) — activités voiture (`due_date`,
@@ -86,7 +86,7 @@ export function isOverdue(dueAt: string | null, status: TaskStatus): boolean {
 // instant, sinon une activité "pour aujourd'hui" apparaîtrait en retard
 // dès 00h01.
 export function isDateOnlyOverdue(dueDate: string, status: TaskStatus): boolean {
-  if (status === "done" || status === "archived") return false;
+  if (status === "done") return false;
   return dueDate.slice(0, 10) < dateKeyFromDate(new Date());
 }
 
@@ -94,7 +94,6 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: "À faire",
   in_progress: "En cours",
   done: "Terminée",
-  archived: "Archivée",
 };
 
 export function recurrenceLabel(recurrence: Recurrence | null | undefined): string {

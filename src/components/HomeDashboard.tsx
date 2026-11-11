@@ -72,8 +72,8 @@ export function HomeDashboard({
     // défaut.
     const mine = tasks.filter((t) => canEdit(t, profile.id));
 
-    // "Tâches ouvertes" : ni terminées, ni archivées — aucun des trois
-    // compteurs de l'accueil ne compte une tâche terminée ou archivée.
+    // "Tâches ouvertes" : pas terminées — aucun des trois
+    // compteurs de l'accueil ne compte une tâche terminée.
     const open = mine.filter((t) => t.status === "todo" || t.status === "in_progress");
 
     const todayCount = open.filter((t) => t.due_at && dateKeyFromIso(t.due_at) === todayKey).length;
@@ -83,7 +83,7 @@ export function HomeDashboard({
     // Même définition du retard que partout ailleurs dans l'appli (badge
     // "En retard" sur la carte de tâche et l'écran de détail — voir
     // isOverdue() dans src/lib/format.ts) : échéance dépassée et tâche ni
-    // terminée ni archivée. isOverdue() exclut déjà "done"/"archived", donc
+    // terminée. isOverdue() exclut déjà "done", donc
     // pas besoin de repartir de `open` ici.
     const overdueTaskIds = mine.filter((t) => isOverdue(t.due_at, t.status)).map((t) => t.id);
     const overdueCount = overdueTaskIds.length;
@@ -148,7 +148,7 @@ export function HomeDashboard({
   // exclues des compteurs et de la portée par défaut de la liste, donc
   // quasi invisibles autrement. Liste pérenne — on garde toutes les
   // tâches ouvertes (à faire / en cours), y compris en retard ; seules
-  // les terminées / archivées sont écartées.
+  // les terminées sont écartées.
   const sharedForInfo = useMemo(
     () =>
       tasks

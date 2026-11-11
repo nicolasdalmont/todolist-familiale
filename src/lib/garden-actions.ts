@@ -140,7 +140,7 @@ export async function updateGardenActivityAction(formData: FormData): Promise<Re
   const openTaskRows = await sql`
     select id, garden_occurrence_month, garden_occurrence_year
     from tasks
-    where garden_activity_id = ${activityId} and status not in ('done', 'archived')
+    where garden_activity_id = ${activityId} and status <> 'done'
   `;
   const openTask = openTaskRows[0] as
     | { id: string; garden_occurrence_month: number; garden_occurrence_year: number }
@@ -200,7 +200,7 @@ export async function deleteGardenActivityAction(activityId: string): Promise<Re
   // occurrence à générer : on arrête la récurrence) ; une tâche déjà
   // clôturée reste dans l'historique (FK "on delete set null").
   const openTaskRows = await sql`
-    select id from tasks where garden_activity_id = ${activityId} and status not in ('done', 'archived')
+    select id from tasks where garden_activity_id = ${activityId} and status <> 'done'
   `;
   const openTask = openTaskRows[0] as { id: string } | undefined;
   if (openTask) {
